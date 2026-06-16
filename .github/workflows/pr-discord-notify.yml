@@ -39,6 +39,7 @@ jobs:
           CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
           ADDITIONS: ${{ github.event.pull_request.additions }}
           DELETIONS: ${{ github.event.pull_request.deletions }}
+          REQUESTED_REVIEWERS: ${{ toJSON(github.event.pull_request.requested_reviewers) }}
         run: |
           TOTAL_CHANGES=$(( ADDITIONS + DELETIONS ))
           if [ "$TOTAL_CHANGES" -lt 50 ]; then
@@ -53,11 +54,12 @@ jobs:
             SIZE_LABEL="💀 리뷰어 사망각 (커피 챙기세요)"
           fi
 
-          DESCRIPTION=$(echo "$PR_BODY" | head -c 200)
-          if [ ${#PR_BODY} -gt 200 ]; then
-            DESCRIPTION="${DESCRIPTION}..."
+          DESCRIPTION=$(echo "$PR_BODY" | jq -Rs 'if length > 3500 then .[0:3500] + "..." else . end')
+
+          REVIEWERS=$(echo "$REQUESTED_REVIEWERS" | jq -r 'map(.login) | join(", ")')
+          if [ -z "$REVIEWERS" ]; then
+            REVIEWERS="아직 없음"
           fi
-          DESCRIPTION=$(echo "$DESCRIPTION" | jq -Rs '.')
 
           curl -H "Content-Type: application/json" \
             -X POST \
@@ -88,6 +90,11 @@ jobs:
                     "name": "📊 변경 사항",
                     "value": "\`${CHANGED_FILES}\`개 파일  |  +${ADDITIONS}  -${DELETIONS}",
                     "inline": true
+                  },
+                  {
+                    "name": "🔍 리뷰어",
+                    "value": "${REVIEWERS}",
+                    "inline": false
                   }
                 ],
                 "footer": {
