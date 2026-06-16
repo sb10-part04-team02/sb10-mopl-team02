@@ -53,13 +53,20 @@ jobs:
           else
             SIZE_LABEL="💀 리뷰어 사망각 (커피 챙기세요)"
           fi
-
-          DESCRIPTION=$(echo "$PR_BODY" | jq -Rs 'if length > 3500 then .[0:3500] + "..." else . end')
-
+          
           REVIEWERS=$(echo "$REQUESTED_REVIEWERS" | jq -r 'map(.login) | join(", ")')
           if [ -z "$REVIEWERS" ]; then
             REVIEWERS="아직 없음"
           fi
+
+          SUMMARY=$(echo "$PR_BODY" | tr -d '\r' \
+            | awk '/^##[[:space:]].*요약/{flag=1; next} /^##[[:space:]]/{flag=0} flag' \
+            | sed 's/<!--.*-->//' \
+            | sed '/^[[:space:]]*$/d')
+          if [ -z "$SUMMARY" ]; then
+            SUMMARY="(요약 미작성)"
+          fi
+          SUMMARY_JSON=$(echo "$SUMMARY" | jq -Rs '.')
 
           curl -H "Content-Type: application/json" \
             -X POST \
@@ -74,7 +81,7 @@ jobs:
                 "title": "📝 ${PR_TITLE}",
                 "url": "${PR_URL}",
                 "color": 16750848,
-                "description": ${DESCRIPTION},
+                "description": ${SUMMARY_JSON},
                 "fields": [
                   {
                     "name": "👤 작성자",
