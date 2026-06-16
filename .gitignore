@@ -43,6 +43,9 @@ out/
 *.pem
 !.env.example
 
+### ref ###
+/ref
+
 #===================================================================================================
 # Created by https://www.toptal.com/developers/gitignore/api/intellij,java,windows,macos,linux
 # Edit at https://www.toptal.com/developers/gitignore?templates=intellij,java,windows,macos,linux
