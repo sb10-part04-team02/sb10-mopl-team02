@@ -34,9 +34,6 @@ reviews:
         프로젝트: 모두의 플리(Mopl) — 영화/드라마/스포츠 콘텐츠 평점·큐레이션 + 실시간 같이보기 소셜 플랫폼
         스택: Spring Boot 3.5.x / Java 17 / base package `com.team02.mopl` / PostgreSQL(운영)·H2(개발·테스트)
               JPA, Spring Security, Bean Validation, Actuator, Lombok / 대규모 트래픽·분산 확장 고려
-        ※ 규칙의 단일 출처는 `ref/api-docs-codeit-mopl.json`(OpenAPI) + `ref/모두의플리안내` 요구사항 문서.
-          명세에 없는 제약(닉네임 길이, 비밀번호 정규식 등)은 임의로 단정하지 말 것.
-
         핵심 도메인/공통 규약 (위반 시 반드시 지적):
 
         [인증/인가]
@@ -240,7 +237,7 @@ reviews:
         - 신규 핵심 로직에 테스트가 없으면 가볍게 안내 (커버리지 수치는 강제하지 않음)
 
     # 16) 애플리케이션 설정 파일
-    - path: "**/resources/application*.{yml,yaml}"
+    - path: "**/resources/application*.{yml}"
       instructions: |
         - 시크릿(DB 비밀번호, JWT 서명 키, 외부 API 키 등) 평문 금지 → 환경변수/외부화
         - 환경별 프로필(dev/prod) 구성 분리 및 키 일관성 확인
