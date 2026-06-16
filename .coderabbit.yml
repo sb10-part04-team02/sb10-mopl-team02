@@ -1,0 +1,276 @@
+# https://docs.coderabbit.ai/
+
+language: ko-KR # 리뷰 언어를 한국어로 사용
+early_access: false # 실험 기능 사용 안함
+
+chat:
+  auto_reply: true # PR 코멘트에서 @coderabbitai 를 언급했을 때 자동 응답 활용을 위한 설정
+  # PR에서 바로 물어보고 응답받기 가능
+  # '이 파일만 다시 봐줘' 같은 작업 지정 가능
+
+reviews:
+  changed_files_summary: true # 변경된 파일에 대한 요약 추가
+  sequence_diagrams: true # 복잡한 흐름을 시퀀스 다이어그램으로 설명하게 함
+  collapse_walkthrough: true # walkthrough 색션을 접은 상태로 둠
+
+  profile: assertive # 리뷰 스타일 지정 chill(기본값), assertive
+  request_changes_workflow: false # GitHub의 Request changes 워크플로우를 적극적으로 사용할지 여부
+  # false : 팀이 AI를 보조 Reviewer로 사용하고 싶을 때 적합
+  high_level_summary: true # 리뷰 상단에 이번 PR이 무엇을 바꾸는지 큰 그림 요약을 붙임
+  poem: false # 리뷰에 재미 요소 넣지 않음
+  review_status: true # 리뷰 완료 상태나 진행 상태를 PR에 표시
+  review_details: false # 리뷰에서 파일/라인 단위의 상세 walkthrough를 줄이는 설정
+  auto_review:
+    enabled: true # 자동리뷰 켬
+    drafts: false # Draft PR은 자동 리뷰하지 않음
+    base_branches:
+      - "main"
+      - "dev"
+
+  path_instructions:
+    # 1) 모든 파일에 적용되는 전역 컨텍스트
+    - path: "**/*"
+      instructions: |
+        프로젝트: 모두의 플리(Mopl) — 영화/드라마/스포츠 콘텐츠 평점·큐레이션 + 실시간 같이보기 소셜 플랫폼
+        스택: Spring Boot 3.5.x / Java 17 / base package `com.team02.mopl` / PostgreSQL(운영)·H2(개발·테스트)
+              JPA, Spring Security, Bean Validation, Actuator, Lombok / 대규모 트래픽·분산 확장 고려
+        ※ 규칙의 단일 출처는 `ref/api-docs-codeit-mopl.json`(OpenAPI) + `ref/모두의플리안내` 요구사항 문서.
+          명세에 없는 제약(닉네임 길이, 비밀번호 정규식 등)은 임의로 단정하지 말 것.
+
+        핵심 도메인/공통 규약 (위반 시 반드시 지적):
+
+        [인증/인가]
+        - JWT Bearer 인증 (`Authorization: Bearer <accessToken>`), 역할은 `USER` / `ADMIN`
+        - CSRF: 토큰을 쿠키 `XSRF-TOKEN`에 저장, 요청은 헤더 `X-XSRF-TOKEN`으로 전달 (변경 요청에 적용)
+        - 서버 기동 시 admin 계정 자동 초기화
+        - 권한 변경 / 계정 잠금 시 해당 사용자 자동 로그아웃, 잠긴 계정은 로그인 불가
+        - 비밀번호 초기화: 임시 비밀번호 발급 + 만료 3분, 로그인 API 그대로 활용, 재설정 시 임시 비밀번호 파기
+
+        [콘텐츠]
+        - type enum: `movie` | `tvSeries` | `sport`
+        - 등록/수정/삭제는 관리자(ADMIN)만 가능
+        - 데이터는 TMDB(영화·드라마) / The Sports DB(스포츠) Open API를 Spring Batch로 수집
+        - 정렬: createdAt | watcherCount | rate (택1)
+
+        [리뷰]
+        - 본인이 작성한 리뷰만 수정/삭제 가능 (타인 시도 시 403)
+        - 평점(rating)은 double, 필수 필드: contentId / text / rating
+        - 정렬: createdAt | rating (택1)
+
+        [플레이리스트]
+        - 소유자만 수정/삭제 및 콘텐츠 추가·삭제 가능 (타인 시도 시 403)
+        - 구독 가능 — 구독한 플레이리스트에 콘텐츠가 추가되면 구독자에게 알림
+        - 정렬: updatedAt | subscribeCount (택1)
+        - 응답에 요청자 기준 `subscribedByMe` 포함
+
+        [팔로우 / DM / 실시간]
+        - 팔로우는 단방향, 새 팔로워가 생기면 알림
+        - 실시간 같이보기·콘텐츠 채팅·DM은 WebSocket(STOMP) `/ws` 사용 (핸드셰이크 헤더의 액세스 토큰으로 인증)
+        - 콘텐츠 실시간 채팅 메시지는 DB에 저장하지 않음 (웹소켓으로만 송수신)
+        - 비활성 대화의 DM·알림은 SSE `/api/sse`로 수신 (이벤트 이름: `notifications`, `direct-messages`)
+
+        [알림 트리거]
+        - 권한 변경 / 내 플레이리스트 구독 / 구독 중인 플레이리스트에 콘텐츠 추가
+        - 팔로우한 사용자의 주요 활동 / 새 팔로워 / DM 수신
+        - level enum: `INFO` | `WARNING` | `ERROR`
+
+        [공통 — 커서 페이지네이션]
+        - 요청 파라미터: `cursor`, `idAfter`(uuid), `limit`(int32), `sortDirection`(`ASCENDING`|`DESCENDING`), `sortBy`
+        - 응답(CursorResponse): data / nextCursor / nextIdAfter / hasNext / totalCount / sortBy / sortDirection
+
+        [공통 — 에러 응답]
+        - ErrorResponse 구조: exceptionName / message / details(Map<field, message>)
+        - HTTP 상태 코드: 200·201 / 204 / 400 / 401 / 403 / 404 / 500 (명세 기준)
+
+        [공통 — 식별자/시간]
+        - 모든 엔티티 PK는 UUID, 타임스탬프는 ISO-8601(date-time)
+
+    # 2) REST 컨트롤러
+    - path: "**/{controller,api,web}/**/*.java"
+      instructions: |
+        - 모든 입력 DTO는 `@Valid` + Bean Validation으로 검증
+        - 인증 필요 엔드포인트는 인증 컨텍스트(`@AuthenticationPrincipal` 등)로 요청자 식별
+          (회원가입·로그인·CSRF 토큰 발급 등 비인증 엔드포인트는 제외 — API 명세 기준)
+        - 변경(POST/PATCH/DELETE) 요청은 CSRF 보호 대상
+        - 커서 페이지네이션 엔드포인트는 `cursor`, `idAfter`, `limit`, `sortBy`, `sortDirection` 시그니처가 명세와 일치
+        - 응답은 항상 DTO로 변환 — 엔티티 직접 노출 금지
+        - HTTP 상태 코드가 API 명세와 일치하는지 확인
+          (생성 201, 본문 없는 성공 204, 검증 실패 400, 인증 실패 401, 권한 없음 403, 리소스 없음 404, 서버 오류 500)
+        - 관리자 전용 엔드포인트(콘텐츠 CRUD, 사용자 권한/잠금 변경 등)는 ADMIN 권한 검증
+        - 프로필 이미지/콘텐츠 썸네일 업로드는 multipart/form-data 형식 처리
+        - 비즈니스 로직은 컨트롤러에 두지 말고 서비스로 위임
+
+    - path: "**/*Controller.java"
+      instructions: |
+        - REST 컨트롤러 규약(상단 controller 지침)을 동일하게 적용
+
+    # 3) 서비스
+    - path: "**/service/**/*.java"
+      instructions: |
+        - 변경 메서드는 `@Transactional`, 조회 전용은 `readOnly = true`
+        - 도메인 규칙 위반 시 의미 있는 커스텀 예외 throw (예: 이메일 중복 → 409 매핑)
+        - 소유자/관리자 권한 검증: 요청자 ID·권한과 리소스 소유자 비교, 불일치 시 403
+        - 권한 변경·계정 잠금 시 해당 사용자 강제 로그아웃(세션/토큰 무효화) 처리
+        - 비밀번호 임시 발급·만료(3분)·재설정 시 파기 로직의 정확성 확인
+        - 외부 API(TMDB / The Sports DB) 호출 시 타임아웃·재시도·예외 매핑 적절성 확인
+        - 트랜잭션 범위 내 장시간 외부 I/O 호출 회피, N+1 쿼리 점검
+        - 알림/이벤트 발행 트리거(구독·팔로우·DM·권한 변경 등)가 누락 없이 정확한지 확인
+
+    - path: "**/*Service*.java"
+      instructions: |
+        - 서비스 계층 규약(상단 service 지침)을 동일하게 적용
+
+    # 4) Repository
+    - path: "**/repository/**/*.java"
+      instructions: |
+        - 커서 페이지네이션 쿼리는 (정렬 키, id/createdAt) 복합 비교로 안정 페이징 보장
+        - 정렬 키가 명세에서 허용하는 값과 일치하는지 확인
+        - 목록 검색의 부분일치(LIKE)는 인덱스/성능 영향 검토, 조인 시 N+1·성능 점검
+
+    - path: "**/*Repository.java"
+      instructions: |
+        - 리포지토리 규약(상단 repository 지침)을 동일하게 적용
+
+    # 5) 엔티티 / 도메인
+    - path: "**/{entity,domain,model}/**/*.java"
+      instructions: |
+        - PK는 UUID로 설계
+        - createdAt/updatedAt 자동 관리 (`@CreatedDate`, `@LastModifiedDate`)
+        - 연관관계 기본 LAZY
+        - enum 모델링: 콘텐츠 type(movie/tvSeries/sport), 사용자 role(USER/ADMIN), 알림 level(INFO/WARNING/ERROR)
+        - 불변이어야 하는 필드는 setter 부재 또는 불변성 보장
+
+    # 6) DTO
+    - path: "**/dto/**/*.java"
+      instructions: |
+        - Request DTO는 Bean Validation으로 명세 제약만 표현
+          - 필수 필드: @NotNull / @NotBlank
+          - enum 필드: 허용값 검증 (type, role, level 등)
+          - 평점(rating): 디자인상 범위(0.0~5.0)가 정의되어 있으면 @DecimalMin / @DecimalMax 적용
+        - Response DTO에 비밀번호/토큰 등 민감 필드 포함 금지
+        - 커서 응답은 data/nextCursor/nextIdAfter/hasNext/totalCount/sortBy/sortDirection 구조 유지
+        - 요청자 기준 파생 필드(`subscribedByMe` 등)는 요청자 컨텍스트로 계산
+
+    - path: "**/*{Request,Response,Dto}.java"
+      instructions: |
+        - DTO 규약(상단 dto 지침)을 동일하게 적용
+
+    # 7) 예외 처리
+    - path: "**/exception/**/*.java"
+      instructions: |
+        - 도메인 의미를 담은 커스텀 예외 사용 (RuntimeException 직접 throw 지양)
+        - `@RestControllerAdvice` 글로벌 핸들러에서 `ErrorResponse(exceptionName/message/details)` 형식 + 명세 상태 코드와 일관 매핑
+          (400/401/403/404/500)
+        - 응답 바디에 스택 트레이스/내부 구현 노출 금지
+        - 사용자용 메시지와 로그용 메시지 분리
+
+    # 8) 보안 / 인증 (JWT · CSRF)
+    - path: "**/{security,auth,jwt}/**/*.java"
+      instructions: |
+        - JWT 발급/검증, Bearer 토큰 파싱, 토큰 만료/리프레시 처리
+        - CSRF 설정: 토큰 쿠키 `XSRF-TOKEN` / 헤더 `X-XSRF-TOKEN`
+        - 역할 기반 인가(USER/ADMIN), 관리자 전용 경로 보호
+        - 시크릿/서명 키 하드코딩 금지 → 외부 설정 주입
+        - 분산 확장을 고려한 JWT 세션 설계 (서버 상태 의존 최소화)
+
+    # 9) WebSocket / STOMP (실시간 같이보기·채팅·DM)
+    - path: "**/{websocket,ws,stomp,chat}/**/*.java"
+      instructions: |
+        - 연결 엔드포인트 `/ws` 핸드셰이크 시 헤더의 액세스 토큰으로 인증 (WebSocket Security)
+        - 목적지 규약: `/sub/contents/{id}/watch`, `/sub|/pub /contents/{id}/chat`, `/sub|/pub /conversations/{id}/direct-messages`
+        - 페이로드: WatchingSessionChange(type=JOIN/LEAVE), ContentChatDto/Send, DirectMessageDto/Send
+        - 콘텐츠 실시간 채팅 메시지는 DB에 저장하지 않음
+        - 세션 정리(연결 종료 시 watcher 카운트/세션 해제), 구독 권한 검증
+
+    # 10) SSE / 알림
+    - path: "**/{sse,notification}/**/*.java"
+      instructions: |
+        - 연결 엔드포인트 `/api/sse`, 이벤트 이름: `notifications`, `direct-messages`
+        - 알림 트리거 정확성: 권한 변경 / 플레이리스트 구독 / 구독 PL에 콘텐츠 추가 / 팔로우 활동 / 새 팔로워 / DM 수신
+        - SseEmitter 수명·타임아웃·완료/에러 시 정리(자원 누수 방지)
+        - 분산 환경에서의 이벤트 전달(인스턴스 간 브로드캐스트) 고려
+
+    # 11) 배치 / 스케줄러 (콘텐츠 수집)
+    - path: "**/{batch,scheduler,job}/**/*.java"
+      instructions: |
+        - 콘텐츠 수집(TMDB / The Sports DB)은 Spring Batch로 안정적으로 관리
+        - 멱등성: 동일 작업 재실행에도 중복 데이터가 쌓이지 않아야 함
+        - 청크/페이징 처리로 대용량 OOM 방지
+        - JobParameters에 실행 일자 포함, skip/retry 정책 명시
+        - 배치 커스텀 메트릭을 Spring Actuator로 노출
+
+    # 12) 외부 API 클라이언트
+    - path: "**/{client,external,tmdb,sportsdb}/**/*.java"
+      instructions: |
+        - TMDB API: 영화·드라마 콘텐츠 / The Sports DB API: 스포츠 콘텐츠 수집용
+        - API 키/자격 증명 하드코딩 금지 → 외부 설정 주입
+        - 타임아웃/재시도/에러 매핑 정책 명확화
+        - 외부 API 실패가 트랜잭션/배치 전체를 오염시키지 않도록 격리
+
+    # 13) 설정 클래스
+    - path: "**/config/**/*.java"
+      instructions: |
+        - 자격 증명/시크릿 하드코딩 금지 → `@Value`/`@ConfigurationProperties` 외부화
+        - Security/CSRF/WebSocket/Batch 빈 구성 적절성 확인
+        - CORS는 프론트엔드 연동 도메인만 허용 (와일드카드 남발 금지)
+        - (심화) Redis(캐시·세션)/Kafka(이벤트·메시징) 빈 도입 시 연결·타임아웃·직렬화 설정 점검
+
+    # 14) 로깅 / 필터 / 인터셉터 (MDC)
+    - path: "**/{filter,interceptor,logging,log,mdc}/**/*.java"
+      instructions: |
+        - 요청 ID와 클라이언트 IP를 MDC에 추가, 로그 메시지/응답에 반영
+        - 요청 종료 시 MDC 정리 (`MDC.clear()`)
+        - 비밀번호/토큰/개인정보는 절대 로그로 남기지 않을 것
+
+    # 15) 테스트 (TDD)
+    - path: "**/src/test/**/*.java"
+      instructions: |
+        - TDD 원칙: Red-Green-Refactor 사이클, 단계별 커밋 권장 (필수 아님)
+        - 핵심 도메인 규칙 테스트 누락 여부:
+          - 이메일 중복 차단
+          - 콘텐츠 등록/수정/삭제는 ADMIN만 가능 (비관리자 403)
+          - 본인 리소스(리뷰/플레이리스트)만 수정/삭제 가능 (403 시나리오)
+          - 커서 페이지네이션 정합성 (cursor + idAfter + sortBy/sortDirection 조합)
+          - 임시 비밀번호 3분 만료 / 재설정 시 파기
+          - 권한 변경·계정 잠금 시 자동 로그아웃, 잠긴 계정 로그인 불가
+          - 알림 트리거 생성 (구독/팔로우/DM/권한 변경 등)
+          - 콘텐츠 실시간 채팅 메시지 DB 미저장
+        - 테스트 메서드명은 시나리오를 명확히 (given-when-then 권장) 
+        - 외부 API(TMDB / The Sports DB)는 모킹 또는 테스트더블 사용 
+        - 신규 핵심 로직에 테스트가 없으면 가볍게 안내 (커버리지 수치는 강제하지 않음)
+
+    # 16) 애플리케이션 설정 파일
+    - path: "**/resources/application*.{yml,yaml}"
+      instructions: |
+        - 시크릿(DB 비밀번호, JWT 서명 키, 외부 API 키 등) 평문 금지 → 환경변수/외부화
+        - 환경별 프로필(dev/prod) 구성 분리 및 키 일관성 확인
+        - DB/JWT/외부 API 설정 키 누락·오타 점검
+
+    # 17) 소셜 로그인 (심화)
+    - path: "**/{oauth,oauth2,social}/**/*.java"
+      instructions: |
+        - (심화) Google/Kakao 계정 연동 구현 시에만 적용
+        - 카카오는 이메일 미제공 → 가상 이메일 `{닉네임}_{회원ID}@kakao.com` 규약 준수
+        - 연동 후 해당 소셜 계정으로 로그인 가능, 토큰/시크릿 외부화
+
+    # 18) GitHub Actions
+    - path: ".github/workflows/**/*.{yml,yaml}"
+      instructions: |
+        - 시크릿은 `${{ secrets.* }}`로만 참조, 평문 금지
+        - PR 생성 시 테스트 수행. 커버리지 게이트는 도입 시 검토 — 강제 아님
+        - AWS ECS 자동 배포 흐름 분리 명확성
+        - 액션 버전은 SHA 또는 메이저 태그 고정 (`@latest`/임의 브랜치 참조 금지)
+
+    # 19) 빌드 스크립트
+    - path: "**/*.{gradle,gradle.kts}"
+      instructions: |
+        - (도입 시) jacoco 등 커버리지 도구 + 임계값 게이트 설정 검토 — 강제 아님
+        - 커버리지 배지를 README에서 사용할 수 있도록 리포트 출력 경로 일관성
+        - 불필요한 플러그인/의존성 추가 점검
+
+    # 20) README
+    - path: "README.md"
+      instructions: |
+        - 프로젝트 개요, 팀원 구성, 기술 스택, 팀원별 구현 기능 명시
+        - 테스트 커버리지 배지가 메인 브랜치 기준으로 표시되어야 함
+        - 백엔드 배포 링크와 API 명세 링크 포함 권장
