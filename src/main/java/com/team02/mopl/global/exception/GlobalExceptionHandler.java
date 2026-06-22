@@ -2,12 +2,14 @@ package com.team02.mopl.global.exception;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -52,11 +54,14 @@ public class GlobalExceptionHandler {
   }
 
   // 예상하지 못한 서버 내부 오류 처리
+  // 스택 트레이스는 서버 로그에만 기록
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ErrorResponse> handleException(Exception e) {
+    log.error("Unexpected server error", e);
+
     ErrorResponse response =
         new ErrorResponse(
-            e.getClass().getSimpleName(), "서버 내부 오류가 발생했습니다.", Map.of("reason", "관리자에게 문의해주세요."));
+            "InternalServerException", "서버 내부 오류가 발생했습니다.", Map.of("reason", "관리자에게 문의해주세요."));
 
     return ResponseEntity.internalServerError().body(response);
   }
