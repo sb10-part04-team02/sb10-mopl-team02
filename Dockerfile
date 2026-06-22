@@ -11,7 +11,8 @@ RUN gradle dependencies --no-daemon || true
 # 소스 복사 후 빌드
 COPY src ./src
 RUN gradle clean build -x test --no-daemon
-RUN find /app/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' -exec cp {} /app/app.jar \;
+RUN find /app/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' -exec cp {} /app/app.jar \; && \
+    test -f /app/app.jar || (echo "ERROR: No executable JAR found in build/libs" && exit 1)
 
 # ── Runtime Stage ─────────────────────────────────────────────────────────────
 FROM eclipse-temurin:17-jre AS runtime
