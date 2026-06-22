@@ -1,5 +1,7 @@
 package com.team02.mopl.global.exception;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,7 +17,8 @@ public class GlobalExceptionHandler {
     ErrorCode errorCode = e.getErrorCode();
 
     ErrorResponse response =
-        new ErrorResponse(e.getClass().getSimpleName(), errorCode.getMessage(), e.getDetails());
+        new ErrorResponse(
+            e.getClass().getSimpleName(), errorCode.getMessage(), Map.of("reason", e.getDetails()));
 
     return ResponseEntity.status(errorCode.getStatus()).body(response);
   }
@@ -27,7 +30,8 @@ public class GlobalExceptionHandler {
     String value = String.valueOf(e.getValue());
     String details = parameter + " 값 '" + value + "' 이(가) 올바른 형식이 아닙니다.";
 
-    ErrorResponse response = new ErrorResponse(e.getClass().getSimpleName(), "잘못된 요청입니다.", details);
+    ErrorResponse response =
+        new ErrorResponse(e.getClass().getSimpleName(), "잘못된 요청입니다.", Map.of(parameter, details));
 
     return ResponseEntity.badRequest().body(response);
   }
@@ -36,14 +40,24 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ErrorResponse> handleValidationException(
       MethodArgumentNotValidException e) {
-    String details =
-        e.getBindingResult().getFieldErrors().stream()
-            .findFirst()
-            .map(error -> error.getField() + ": " + error.getDefaultMessage())
-            .orElse("요청 값이 올바르지 않습니다.");
+    Map<String, String> details = new LinkedHashMap<>();
+
+    e.getBindingResult()
+        .getFieldErrors()
+        .forEach(error -> details.putIfAbsent(error.getField(), error.getDefaultMessage()));
 
     ErrorResponse response = new ErrorResponse(e.getClass().getSimpleName(), "잘못된 요청입니다.", details);
 
     return ResponseEntity.badRequest().body(response);
+  }
+
+  // 예상하지 못한 서버 내부 오류 처리
+  @ExceptionHandler(Exception.class)
+  public ResponseEntity<ErrorResponse> handleException(Exception e) {
+    ErrorResponse response =
+        new ErrorResponse(
+            e.getClass().getSimpleName(), "서버 내부 오류가 발생했습니다.", Map.of("reason", "관리자에게 문의해주세요."));
+
+    return ResponseEntity.internalServerError().body(response);
   }
 }

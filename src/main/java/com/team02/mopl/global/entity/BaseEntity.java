@@ -20,11 +20,14 @@ public abstract class BaseEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
+  @Column(nullable = false, updatable = false)
   private UUID id;
 
   @CreatedDate
-  @Column(updatable = false)
+  @Column(updatable = false, nullable = false)
   private LocalDateTime createdAt;
 
-  @LastModifiedDate private LocalDateTime updatedAt;
+  @LastModifiedDate
+  @Column(nullable = false)
+  private LocalDateTime updatedAt;
 }

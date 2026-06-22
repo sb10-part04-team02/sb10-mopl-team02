@@ -9,6 +9,11 @@ spring:
     password: ${DB_PASSWORD:mopl}
     driver-class-name: org.postgresql.Driver
 
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema_v5.sql
+
   jpa:
     hibernate:
       ddl-auto: validate
