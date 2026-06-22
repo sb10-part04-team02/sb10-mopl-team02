@@ -53,5 +53,5 @@ jobs:
             - 변경된 파일에만 집중하고, 사소한 스타일보다 버그/보안/로직 오류를 우선하세요.
           claude_args: |
             --max-turns 15
-            --model claude-sonnet-4-6
+            --model claude-opus-4-8
             --allowedTools "Read,Grep,Glob"
