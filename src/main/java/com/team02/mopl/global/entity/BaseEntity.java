@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.Getter;
 import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Getter
@@ -24,10 +23,6 @@ public abstract class BaseEntity {
   private UUID id;
 
   @CreatedDate
-  @Column(updatable = false, nullable = false)
+  @Column(nullable = false, updatable = false)
   private LocalDateTime createdAt;
-
-  @LastModifiedDate
-  @Column(nullable = false)
-  private LocalDateTime updatedAt;
 }
