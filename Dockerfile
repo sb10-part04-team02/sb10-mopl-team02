@@ -33,4 +33,7 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 CMD wget -qO- http://localhost:8080/actuator/health | grep -q '"status":"UP"' || exit 1
 
+# TODO: JVM Configuration (프리티어 고려) -> 배포 시 고려하기
+# ENV JVM_OPTS="-Xmx256m -Xms128m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC"
+
 ENTRYPOINT ["java", "-jar", "app.jar"]

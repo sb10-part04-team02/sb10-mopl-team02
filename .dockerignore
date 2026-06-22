@@ -5,4 +5,4 @@ build/
 .idea/
 ref/
 .env*
-.notes/
+.local/
