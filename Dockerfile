@@ -11,6 +11,7 @@ RUN gradle dependencies --no-daemon || true
 # 소스 복사 후 빌드
 COPY src ./src
 RUN gradle clean build -x test --no-daemon
+RUN find /app/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' -exec cp {} /app/app.jar \;
 
 # ── Runtime Stage ─────────────────────────────────────────────────────────────
 FROM eclipse-temurin:17-jre AS runtime
@@ -20,7 +21,7 @@ WORKDIR /app
 # 비루트 유저 생성 및 전환
 RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
 
-COPY --from=build /app/build/libs/*.jar app.jar
+COPY --from=build /app/app.jar app.jar
 
 RUN chown appuser:appgroup app.jar
 
