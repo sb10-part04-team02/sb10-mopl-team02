@@ -9,6 +9,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -49,11 +50,12 @@ public class Notification extends BaseEntity {
       String content,
       NotificationLevel level,
       NotificationType notificationType) {
-    this.receiverId = receiverId;
-    this.title = title;
-    this.content = content;
-    this.level = level;
-    this.notificationType = notificationType;
+    this.receiverId = Objects.requireNonNull(receiverId, "receiverId는 null일 수 없습니다.");
+    this.title = Objects.requireNonNull(title, "title은 null일 수 없습니다.");
+    this.content = Objects.requireNonNull(content, "content는 null일 수 없습니다.");
+    this.level = level == null ? NotificationLevel.INFO : level;
+    this.notificationType =
+        Objects.requireNonNull(notificationType, "notificationType은 null일 수 없습니다.");
   }
 
   public void markAsRead() {
