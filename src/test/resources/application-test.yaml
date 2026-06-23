@@ -1,0 +1,21 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  datasource:
+    url: jdbc:tc:postgresql:16:///mopl
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:01_schema_v6.sql
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
