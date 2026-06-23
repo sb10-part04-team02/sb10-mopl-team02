@@ -1,4 +1,4 @@
-package com.team02.mopl.notification.entity;
+package com.team02.mopl.domain.notification.entity;
 
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
