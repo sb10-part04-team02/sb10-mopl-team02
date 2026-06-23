@@ -23,7 +23,7 @@ CREATE TABLE contents
     average_rating DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     review_count   INT              NOT NULL DEFAULT 0,
 
-    CONSTRAINT chk_contents_content_type CHECK (content_type IN ('movie', 'tvSeries', 'sport'))
+    CONSTRAINT chk_contents_content_type CHECK (content_type IN ('MOVIE', 'TV_SERIES', 'SPORT'))
 );
 
 CREATE TABLE conversations
@@ -107,8 +107,7 @@ CREATE TABLE notifications
                                                            'PLAYLIST_CONTENT_ADDED',
                                                            'FOLLOWING_USER_ACTIVITY',
                                                            'USER_FOLLOWED',
-                                                           'DIRECT_MESSAGE_RECEIVED')
-        )
+                                                           'DIRECT_MESSAGE_RECEIVED'))
 );
 
 CREATE TABLE follows
@@ -251,7 +250,3 @@ CREATE UNIQUE INDEX uk_playlist_contents_content_playlist
 CREATE UNIQUE INDEX uk_watching_sessions_content_user
     ON watching_sessions (content_id, user_id)
     WHERE deleted_at IS NULL;
-
-CREATE INDEX idx_notifications_receiver_created_at_id_desc
-    ON notifications (receiver_id, created_at DESC, id DESC);
-
