@@ -22,7 +22,7 @@ CREATE TABLE contents(
         average_rating	        DOUBLE PRECISION	NOT	NULL DEFAULT 0.0,
         review_count	        INT		            NOT NULL DEFAULT 0,
 
-        CONSTRAINT chk_contents_content_type CHECK (content_type IN ('movie', 'tvSeries', 'sport'))
+        CONSTRAINT chk_contents_content_type CHECK (content_type IN ('MOVIE', 'TV_SERIES', 'SPORT'))
 );
 
 CREATE TABLE conversations(
