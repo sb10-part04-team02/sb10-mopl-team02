@@ -97,12 +97,18 @@ CREATE TABLE notifications
 
     CONSTRAINT fk_notifications_users FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE,
     CONSTRAINT chk_notifications_level CHECK (level IN ('INFO', 'WARNING', 'ERROR')),
+    CONSTRAINT chk_notifications_read_state CHECK (
+        (is_read = FALSE AND read_at IS NULL)
+            OR
+        (is_read = TRUE AND read_at IS NOT NULL)
+        ),
     CONSTRAINT chk_notifications_notification_type CHECK (notification_type IN
                                                           ('ROLE_UPDATED', 'PLAYLIST_SUBSCRIBED',
                                                            'PLAYLIST_CONTENT_ADDED',
                                                            'FOLLOWING_USER_ACTIVITY',
                                                            'USER_FOLLOWED',
-                                                           'DIRECT_MESSAGE_RECEIVED'))
+                                                           'DIRECT_MESSAGE_RECEIVED')
+        )
 );
 
 CREATE TABLE follows
@@ -248,3 +254,4 @@ CREATE UNIQUE INDEX uk_watching_sessions_content_user
 
 CREATE INDEX idx_notifications_receiver_created_at_id_desc
     ON notifications (receiver_id, created_at DESC, id DESC);
+
