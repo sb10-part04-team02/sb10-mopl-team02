@@ -34,8 +34,11 @@ jobs:
       - name: gradlew 실행 권한 부여
         run: chmod +x gradlew
 
-      - name: 린트 검사 (Spotless)
+      - name: 포맷팅 검사 (Spotless)
         run: ./gradlew spotlessCheck
+
+      - name: 린트 검사 (SpotBugs)
+        run: ./gradlew spotbugsMain
 
       - name: 테스트
         run: ./gradlew test
