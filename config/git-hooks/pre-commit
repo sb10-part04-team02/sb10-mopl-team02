@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+# pre-commit 훅: 커밋 전 Spotless 포맷을 자동 적용한다.
+# config/git-hooks/pre-commit 원본이며, Gradle installGitHooks 태스크가
+# .git/hooks/pre-commit 으로 복사·설치한다. (직접 편집하지 말 것)
+#
+# 동작:
+#   1) 스테이징된 *.java 파일이 있으면 spotlessApply 실행
+#   2) 포맷으로 변경된 파일을 다시 스테이징
+#   3) 스테이징된 java 파일이 없으면 즉시 통과
+
+set -euo pipefail
+
+# 스테이징된(추가/수정/이름변경) java 파일 목록
+STAGED_JAVA=$(git diff --cached --name-only --diff-filter=ACMR -- '*.java' || true)
+
+if [ -z "$STAGED_JAVA" ]; then
+  exit 0
+fi
+
+echo "[pre-commit] Spotless 포맷 적용 중..."
+
+# 프로젝트 루트로 이동 (훅은 어디서 실행되든 루트 기준으로 동작해야 함)
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+if [ -x "./gradlew" ]; then
+  GRADLE="./gradlew"
+else
+  GRADLE="gradle"
+fi
+
+# 전체 spotlessApply 실행 (대상은 build.gradle 의 spotless 설정을 따름)
+if ! "$GRADLE" spotlessApply --quiet; then
+  echo "[pre-commit] spotlessApply 실패. 위 로그를 확인하세요." >&2
+  exit 1
+fi
+
+# 포맷으로 바뀐 스테이징 파일들을 다시 스테이징
+echo "$STAGED_JAVA" | while IFS= read -r f; do
+  [ -f "$f" ] && git add "$f"
+done
+
+echo "[pre-commit] 포맷 적용 완료."
+exit 0

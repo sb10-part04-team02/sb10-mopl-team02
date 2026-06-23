@@ -80,3 +80,20 @@ tasks.spotbugsMain {
         xml.required = true
     }
 }
+
+// Git pre-commit 훅 자동 설치 — 커밋 시 spotlessApply 가 자동 실행되어 포맷 위반이 커밋되지 않게 한다.
+// 원본은 config/git-hooks/ 에 버전 관리되며, 빌드 시 .git/hooks/ 로 복사된다.
+tasks.register('installGitHooks', Copy) {
+    description = 'config/git-hooks 의 훅을 .git/hooks 로 설치한다'
+    group = 'build setup'
+    from "$rootDir/config/git-hooks"
+    into "$rootDir/.git/hooks"
+    fileMode = 0755
+    // .git 디렉터리가 없는 환경(예: CI 체크아웃 일부)에서는 조용히 건너뜀
+    onlyIf { file("$rootDir/.git").exists() }
+}
+
+// 빌드 라이프사이클에 묶어, 팀원이 한 번 빌드하면 훅이 설치되게 한다.
+tasks.named('build') {
+    dependsOn 'installGitHooks'
+}
