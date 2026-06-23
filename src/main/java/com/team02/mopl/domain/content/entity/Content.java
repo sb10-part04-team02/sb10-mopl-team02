@@ -4,6 +4,8 @@ import com.team02.mopl.domain.content.ContentType;
 import com.team02.mopl.global.entity.BaseMutableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -15,6 +17,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Content extends BaseMutableEntity {
 
+  @Enumerated(EnumType.STRING)
   @Column(name = "content_type", nullable = false, length = 20)
   private ContentType contentType;
 
