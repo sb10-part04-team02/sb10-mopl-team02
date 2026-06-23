@@ -1,5 +1,11 @@
+import com.github.spotbugs.snom.Effort
+import com.github.spotbugs.snom.Confidence
+
 plugins {
     id 'java'
+    id 'jacoco'
+    id 'com.diffplug.spotless' version '6.25.0'
+    id 'com.github.spotbugs' version '6.0.26'
     id 'org.springframework.boot' version '3.5.14'
     id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -25,10 +31,13 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     compileOnly 'org.projectlombok:lombok'
-    runtimeOnly 'com.h2database:h2'
+    compileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.6'
     runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.springframework.security:spring-security-test'
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -37,4 +46,56 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+spotless {
+    java {
+        target 'src/**/*.java'
+        googleJavaFormat()
+        removeUnusedImports()
+    }
+}
+
+spotbugs {
+    effort.set(Effort.valueOf('DEFAULT'))          // 분석 강도 (MAX로 올리면 더 꼼꼼·느림)
+    reportLevel.set(Confidence.valueOf('DEFAULT'))  // 보고 민감도 (LOW로 올리면 더 많이 보고)
+    excludeFilter.set(file('config/spotbugs/exclude.xml'))
+    ignoreFailures = false                          // 위반 시 CI 실패(게이트)
+}
+
+tasks.spotbugsMain {
+    reports {
+        html.required = true
+        xml.required = true
+    }
+}
+
+// Git pre-commit 훅 자동 설치 — 커밋 시 spotlessApply 가 자동 실행되어 포맷 위반이 커밋되지 않게 한다.
+// 원본은 config/git-hooks/ 에 버전 관리되며, 빌드 시 .git/hooks/ 로 복사된다.
+tasks.register('installGitHooks', Copy) {
+    description = 'config/git-hooks 의 훅을 .git/hooks 로 설치한다'
+    group = 'build setup'
+    from "$rootDir/config/git-hooks"
+    into "$rootDir/.git/hooks"
+    fileMode = 0755
+    // .git 디렉터리가 없는 환경(예: CI 체크아웃 일부)에서는 조용히 건너뜀
+    onlyIf { file("$rootDir/.git").exists() }
+}
+
+// 빌드 라이프사이클에 묶어, 팀원이 한 번 빌드하면 훅이 설치되게 한다.
+tasks.named('build') {
+    dependsOn 'installGitHooks'
 }
