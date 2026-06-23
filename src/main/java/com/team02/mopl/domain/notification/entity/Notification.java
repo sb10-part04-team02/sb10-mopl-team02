@@ -3,16 +3,13 @@ package com.team02.mopl.domain.notification.entity;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.global.entity.BaseEntity;
-import com.team02.mopl.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,9 +20,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Notification extends BaseEntity {
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "receiver_id", nullable = false)
-  private User receiver;
+  @Column(name = "receiver_id", nullable = false)
+  private UUID receiverId;
 
   @Column(nullable = false, length = 100)
   private String title;
@@ -48,12 +44,12 @@ public class Notification extends BaseEntity {
   private Instant readAt;
 
   public Notification(
-      User receiver,
+      UUID receiverId,
       String title,
       String content,
       NotificationLevel level,
       NotificationType notificationType) {
-    this.receiver = receiver;
+    this.receiverId = receiverId;
     this.title = title;
     this.content = content;
     this.level = level;
