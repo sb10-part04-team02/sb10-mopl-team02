@@ -12,7 +12,7 @@ spring:
   sql:
     init:
       mode: always
-      schema-locations: classpath:schema_v5.sql
+      schema-locations: classpath:01_schema_v6.sql
 
   jpa:
     hibernate:
