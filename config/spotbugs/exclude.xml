@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <FindBugsFilter>
+    <!-- dto/entity 패키지: 순수 데이터 객체이므로 내부 표현 노출 경고 제외 -->
     <Match>
         <Class name="~com\.team02\.mopl\.(.*\.)?(dto|entity)\..*"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- ErrorResponse: exception 패키지에 있으나 사실상 응답 DTO이므로 동일하게 제외 -->
+    <Match>
+        <Class name="com.team02.mopl.global.exception.ErrorResponse"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
 </FindBugsFilter>
