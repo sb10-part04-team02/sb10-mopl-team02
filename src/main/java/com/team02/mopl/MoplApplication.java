@@ -9,5 +9,4 @@ public class MoplApplication {
   public static void main(String[] args) {
     SpringApplication.run(MoplApplication.class, args);
   }
-
 }
