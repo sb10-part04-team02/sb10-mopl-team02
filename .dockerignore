@@ -1,0 +1,8 @@
+.git
+build/
+.gradle/
+*.md
+.idea/
+ref/
+.env*
+.local/

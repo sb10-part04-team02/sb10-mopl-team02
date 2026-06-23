@@ -39,7 +39,25 @@
 ---
 ## 파일 구조
 ```markdown
-
+com.team02.mopl
+├── domain
+│   ├── user
+│   │   ├── controller
+│   │   ├── service
+│   │   ├── repository
+│   │   ├── entity
+│   │   ├── dto
+│   │   ├── mapper
+|   |   └── exception
+|   |
+|
+└── global
+    ├── config
+    ├── security
+    ├── exception
+    ├── entity
+    ├── dto 
+    └── util
 ```
 ---
 ## 구현 홈페이지

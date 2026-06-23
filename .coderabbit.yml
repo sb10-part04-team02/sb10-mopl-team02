@@ -32,7 +32,7 @@ reviews:
     - path: "**/*"
       instructions: |
         프로젝트: 모두의 플리(Mopl) — 영화/드라마/스포츠 콘텐츠 평점·큐레이션 + 실시간 같이보기 소셜 플랫폼
-        스택: Spring Boot 3.5.x / Java 17 / base package `com.team02.mopl` / PostgreSQL(운영)·H2(개발·테스트)
+        스택: Spring Boot 3.5.x / Java 17 / base package `com.team02.mopl` / PostgreSQL(운영·개발·테스트)
               JPA, Spring Security, Bean Validation, Actuator, Lombok / 대규모 트래픽·분산 확장 고려
         핵심 도메인/공통 규약 (위반 시 반드시 지적):
 
