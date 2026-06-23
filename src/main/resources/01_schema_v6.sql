@@ -245,3 +245,6 @@ CREATE UNIQUE INDEX uk_playlist_contents_content_playlist
 CREATE UNIQUE INDEX uk_watching_sessions_content_user
     ON watching_sessions (content_id, user_id)
     WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_notifications_receiver_created_at_id_desc
+    ON notifications (receiver_id, created_at DESC, id DESC);
