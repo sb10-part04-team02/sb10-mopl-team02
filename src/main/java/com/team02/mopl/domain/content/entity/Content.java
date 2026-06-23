@@ -17,14 +17,19 @@ public class Content extends BaseMutableEntity {
 
   @Column(name = "content_type", nullable = false, length = 20)
   private ContentType contentType;
+
   @Column(nullable = false, length = 100)
   private String title;
+
   @Column(nullable = false, length = 255)
   private String description;
+
   @Column(name = "thumbnail_url", nullable = false, columnDefinition = "TEXT")
   private String thumbnailUrl;
+
   @Column(name = "average_rating", nullable = false)
   private double averageRating = 0.0;
+
   @Column(name = "review_count", nullable = false)
   private int reviewCount = 0;
 
