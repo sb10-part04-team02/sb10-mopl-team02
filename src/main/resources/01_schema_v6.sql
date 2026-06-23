@@ -5,16 +5,15 @@ CREATE COLLATION IF NOT EXISTS ko_icu (
 );
 
 -- contents, conversations
--- watching_sessions
 -- users
--- playlists, notifications, follows, reviews, tags, direct_messages, conversation_members, social_accounts
+-- watching_sessions, playlists, notifications, follows, reviews, tags, direct_messages, conversation_members, social_accounts
 -- playlist_subscriptions, playlist_contents
 --==================================================================================================
 
 CREATE TABLE contents(
         id	                    UUID		        PRIMARY KEY,
         created_at	            TIMESTAMPTZ		    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at	            TIMESTAMPTZ		    NULL,
+        updated_at	            TIMESTAMPTZ		    NOT NULL,
         deleted_at              TIMESTAMPTZ         NULL,
         content_type	        VARCHAR(20)		    NOT NULL,
         title	                VARCHAR(100)		NOT NULL,
@@ -34,21 +33,10 @@ CREATE TABLE conversations(
 
 --==================================================================================================
 
-CREATE TABLE watching_sessions(
-        id	                    UUID		        PRIMARY KEY,
-        created_at	            TIMESTAMPTZ		    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        deleted_at              TIMESTAMPTZ         NULL,
-        content_id	            UUID		        NOT NULL,
-
-        CONSTRAINT fk_watching_sessions_contents FOREIGN KEY (content_id) REFERENCES contents (id) ON DELETE CASCADE
-);
-
---==================================================================================================
-
 CREATE TABLE users(
         id	                    UUID		        PRIMARY KEY,
         created_at	            TIMESTAMPTZ		    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at	            TIMESTAMPTZ		    NULL,
+        updated_at	            TIMESTAMPTZ		    NOT NULL,
         deleted_at              TIMESTAMPTZ         NULL,
         name	                VARCHAR(100)		COLLATE ko_icu NOT NULL,
         email	                VARCHAR(255)		COLLATE ko_icu NOT NULL,
@@ -56,19 +44,31 @@ CREATE TABLE users(
         profile_image_url	    TEXT		        NULL,
         role	                VARCHAR(10)	        NOT NULL DEFAULT 'USER',
         is_locked	            BOOLEAN	            NOT NULL DEFAULT FALSE,
-        watching_session_id     UUID                NULL,
 
-        CONSTRAINT fk_users_watching_sessions FOREIGN KEY (watching_session_id) REFERENCES watching_sessions (id) ON DELETE SET NULL,
         CONSTRAINT uk_users_email UNIQUE (email),
         CONSTRAINT chk_users_role CHECK (role IN ('USER', 'ADMIN'))
 );
 
 --==================================================================================================
 
+CREATE TABLE watching_sessions(
+        id	                    UUID		        PRIMARY KEY,
+        created_at	            TIMESTAMPTZ		    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at              TIMESTAMPTZ         NOT NULL,
+        deleted_at              TIMESTAMPTZ         NULL,
+        content_id	            UUID		        NOT NULL,
+        user_id                 UUID                NOT NULL,
+        joined_at               TIMESTAMPTZ         NOT NULL,
+        exited_at               TIMESTAMPTZ         NULL,
+
+        CONSTRAINT fk_watching_sessions_contents FOREIGN KEY (content_id) REFERENCES contents (id) ON DELETE CASCADE,
+        CONSTRAINT fk_watching_sessions_users FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
 CREATE TABLE playlists(
         id	                    UUID		        PRIMARY KEY,
         created_at	            TIMESTAMPTZ		    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at	            TIMESTAMPTZ		    NULL,
+        updated_at	            TIMESTAMPTZ		    NOT NULL,
         deleted_at              TIMESTAMPTZ         NULL,
         owner_id	            UUID		        NOT NULL,
         title	                VARCHAR(100)		NOT NULL,
@@ -109,7 +109,7 @@ CREATE TABLE follows(
 CREATE TABLE reviews(
         id	                    UUID		        PRIMARY KEY,
         created_at	            TIMESTAMPTZ		    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at	            TIMESTAMPTZ		    NULL,
+        updated_at	            TIMESTAMPTZ		    NOT NULL,
         deleted_at              TIMESTAMPTZ         NULL,
         author_id	            UUID		        NOT NULL,
         content_id	            UUID		        NOT NULL,
@@ -148,7 +148,7 @@ CREATE TABLE direct_messages(
 CREATE TABLE conversation_members(
         id	                    UUID		        PRIMARY KEY,
         created_at	            TIMESTAMPTZ		    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at	            TIMESTAMPTZ		    NULL,
+        updated_at	            TIMESTAMPTZ		    NOT NULL,
         deleted_at              TIMESTAMPTZ         NULL,
         conversation_id	        UUID		        NOT NULL,
         member_id	            UUID		        NOT NULL,
@@ -222,4 +222,8 @@ CREATE UNIQUE INDEX uk_playlist_subscriptions_user_playlist
 
 CREATE UNIQUE INDEX uk_playlist_contents_content_playlist
         ON playlist_contents (content_id, playlist_id)
+        WHERE deleted_at IS NULL;
+
+CREATE UNIQUE INDEX uk_watching_sessions_content_user
+        ON watching_sessions (content_id, user_id)
         WHERE deleted_at IS NULL;
