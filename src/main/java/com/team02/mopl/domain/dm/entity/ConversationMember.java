@@ -10,6 +10,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -18,6 +19,13 @@ import lombok.NoArgsConstructor;
 @Table(name = "conversation_members")
 @Entity
 public class ConversationMember extends BaseMutableEntity {
+
+  @Builder
+  private ConversationMember(Conversation conversation, User user, Instant lastReadAt) {
+    this.conversation = conversation;
+    this.user = user;
+    this.lastReadAt = lastReadAt;
+  }
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "conversation_id", columnDefinition = "uuid")
