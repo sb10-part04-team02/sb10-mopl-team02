@@ -2,11 +2,9 @@ package com.team02.mopl.domain.dm.entity;
 
 import static jakarta.persistence.FetchType.LAZY;
 
-import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinColumns;
 import jakarta.persistence.ManyToOne;
