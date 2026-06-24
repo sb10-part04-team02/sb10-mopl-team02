@@ -169,10 +169,10 @@ CREATE TABLE direct_messages
     content         TEXT        NOT NULL,
 
     CONSTRAINT fk_direct_messages_conversations FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE,
-    CONSTRAINT fk_direct_messages_conversation_members_sender FOREIGN KEY (conversation_id, sender_id)
-        REFERENCES conversation_members (conversation_id, member_id) ON DELETE CASCADE,
-    CONSTRAINT fk_direct_messages_conversation_members_receiver FOREIGN KEY (conversation_id, receiver_id)
-        REFERENCES conversation_members (conversation_id, member_id) ON DELETE CASCADE
+    CONSTRAINT fk_direct_messages_conversation_members_sender FOREIGN KEY (sender_id)
+        REFERENCES conversation_members (id) ON DELETE CASCADE,
+    CONSTRAINT fk_direct_messages_conversation_members_receiver FOREIGN KEY (receiver_id)
+        REFERENCES conversation_members (id) ON DELETE CASCADE
 );
 
 CREATE TABLE social_accounts
