@@ -25,4 +25,19 @@ public abstract class BaseEntity {
   @CreatedDate
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
+
+  @Column(nullable = true)
+  private Instant deletedAt;
+
+  public void delete() {
+    this.deletedAt = Instant.now();
+  }
+
+  public void restore() {
+    this.deletedAt = null;
+  }
+
+  public boolean isDeleted() {
+    return this.deletedAt != null;
+  }
 }

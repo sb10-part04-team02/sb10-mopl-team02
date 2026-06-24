@@ -2,7 +2,7 @@ package com.team02.mopl.domain.notification.entity;
 
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
-import com.team02.mopl.global.entity.BaseRemovableEntity;
+import com.team02.mopl.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -18,7 +18,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "notifications")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Notification extends BaseRemovableEntity {
+public class Notification extends BaseEntity {
 
   @Column(name = "receiver_id", nullable = false)
   private UUID receiverId;
