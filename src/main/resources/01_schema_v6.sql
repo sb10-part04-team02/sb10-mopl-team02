@@ -143,6 +143,21 @@ CREATE TABLE tags
     CONSTRAINT fk_tags_contents FOREIGN KEY (content_id) REFERENCES contents (id) ON DELETE CASCADE
 );
 
+CREATE TABLE conversation_members
+(
+    id              UUID PRIMARY KEY,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMPTZ NOT NULL,
+    deleted_at      TIMESTAMPTZ NULL,
+    conversation_id UUID        NOT NULL,
+    member_id       UUID        NOT NULL,
+    last_read_at    TIMESTAMPTZ NOT NULL,
+
+    CONSTRAINT fk_conversation_members_conversation FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE,
+    CONSTRAINT fk_conversation_members_users FOREIGN KEY (member_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT uk_conversation_members_conversation_user UNIQUE (conversation_id, member_id)
+);
+
 CREATE TABLE direct_messages
 (
     id              UUID PRIMARY KEY,
@@ -158,21 +173,6 @@ CREATE TABLE direct_messages
         REFERENCES conversation_members (conversation_id, member_id) ON DELETE CASCADE,
     CONSTRAINT fk_direct_messages_conversation_members_receiver FOREIGN KEY (conversation_id, receiver_id)
         REFERENCES conversation_members (conversation_id, member_id) ON DELETE CASCADE
-);
-
-CREATE TABLE conversation_members
-(
-    id              UUID PRIMARY KEY,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMPTZ NOT NULL,
-    deleted_at      TIMESTAMPTZ NULL,
-    conversation_id UUID        NOT NULL,
-    member_id       UUID        NOT NULL,
-    last_read_at    TIMESTAMPTZ NOT NULL,
-
-    CONSTRAINT fk_conversation_members_conversation FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE,
-    CONSTRAINT fk_conversation_members_users FOREIGN KEY (member_id) REFERENCES users (id) ON DELETE CASCADE,
-    CONSTRAINT uk_conversation_members_conversation_user UNIQUE (conversation_id, member_id)
 );
 
 CREATE TABLE social_accounts
