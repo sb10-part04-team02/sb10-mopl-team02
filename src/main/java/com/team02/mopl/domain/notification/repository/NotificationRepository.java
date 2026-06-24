@@ -8,7 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
 
-  List<Notification> findByReceiverIdOrderByCreatedAtDesc(UUID receiverId);
+  List<Notification> findByReceiverIdAndDeletedAtIsNullOrderByCreatedAtDesc(UUID receiverId);
 
-  Optional<Notification> findByIdAndReceiverId(UUID notificationId, UUID receiverId);
+  Optional<Notification> findByIdAndReceiverIdAndDeletedAtIsNull(
+      UUID notificationId, UUID receiverId);
 }

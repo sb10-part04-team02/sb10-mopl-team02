@@ -2,13 +2,12 @@ package com.team02.mopl.domain.notification.entity;
 
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
-import com.team02.mopl.global.entity.BaseEntity;
+import com.team02.mopl.global.entity.BaseRemovableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -19,7 +18,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "notifications")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Notification extends BaseEntity {
+public class Notification extends BaseRemovableEntity {
 
   @Column(name = "receiver_id", nullable = false)
   private UUID receiverId;
@@ -38,12 +37,6 @@ public class Notification extends BaseEntity {
   @Column(name = "notification_type", nullable = false, length = 30)
   private NotificationType notificationType;
 
-  @Column(name = "is_read", nullable = false)
-  private boolean read = false;
-
-  @Column(name = "read_at")
-  private Instant readAt;
-
   public Notification(
       UUID receiverId,
       String title,
@@ -56,14 +49,5 @@ public class Notification extends BaseEntity {
     this.level = level == null ? NotificationLevel.INFO : level;
     this.notificationType =
         Objects.requireNonNull(notificationType, "notificationType은 null일 수 없습니다.");
-  }
-
-  public void markAsRead() {
-    if (this.read) {
-      return;
-    }
-
-    this.read = true;
-    this.readAt = Instant.now();
   }
 }
