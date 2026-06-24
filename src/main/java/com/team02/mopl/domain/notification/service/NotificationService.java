@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationService {
   private final NotificationRepository notificationRepository;
 
+  // 목록 조회
   public List<NotificationDto> getNotifications(UUID receiverId) {
     return notificationRepository
         .findByReceiverIdAndDeletedAtIsNullOrderByCreatedAtDesc(receiverId)
@@ -25,6 +26,7 @@ public class NotificationService {
         .toList();
   }
 
+  // 삭제 처리
   @Transactional
   public void deleteNotification(UUID notificationId, UUID receiverId) {
     Notification notification =
