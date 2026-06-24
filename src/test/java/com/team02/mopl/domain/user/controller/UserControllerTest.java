@@ -2,7 +2,6 @@ package com.team02.mopl.domain.user.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,6 +12,7 @@ import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.service.UserService;
+import com.team02.mopl.support.TestSecurityConfiguration;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -26,13 +26,14 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(UserController.class)
-class UserControllerTest {
+@Import(TestSecurityConfiguration.class)
+class UserControllerNormalTest {
 
   @MockitoBean private UserService userService;
 
@@ -65,7 +66,6 @@ class UserControllerTest {
 
     @ParameterizedTest
     @MethodSource("provideInvalidUserCreateRequests")
-    @WithMockUser
     @DisplayName("유효하지 않은 회원가입 요청은 400 BadRequest를 반환한다")
     void fail_shouldReturnBadRequest_whenRequestIsInvalid(
         UserCreateRequest invalidRequest, String description) throws Exception {
@@ -73,16 +73,14 @@ class UserControllerTest {
       mockMvc
           .perform(
               post("/api/users")
-                  .with(csrf())
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(objectMapper.writeValueAsString(invalidRequest)))
           .andExpect(status().isBadRequest());
     }
 
     @Test
-    @WithMockUser
     @DisplayName("정상적인 파라미터가 오면 UserDto를 반환한다")
-    void success_shouldReturnUserDto_whenValidParameters() throws Exception {
+    void success_shouldReturnUserDto_whenRequestIsValid() throws Exception {
       // given
       String name = "username";
       String email = "example@gmail.com";
@@ -95,7 +93,6 @@ class UserControllerTest {
       mockMvc
           .perform(
               post("/api/users")
-                  .with(csrf())
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(objectMapper.writeValueAsString(request)))
           .andDo(print())
