@@ -11,4 +11,11 @@
         <Class name="com.team02.mopl.global.exception.ErrorResponse"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
+
+    <!-- dto/entity 패키지: 생성자에서 검증 예외를 던지는 것은 정상적인 방어 로직이므로 제외
+         (JPA 엔티티는 프록시 때문에 final 불가, finalizer 공격은 Java 17 환경에서 사실상 무관) -->
+    <Match>
+        <Class name="~com\.team02\.mopl\.(.*\.)?(dto|entity)\..*"/>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
 </FindBugsFilter>
