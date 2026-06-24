@@ -81,21 +81,16 @@ CREATE TABLE playlists(
 CREATE TABLE notifications(
         id	                    UUID		        PRIMARY KEY,
         created_at	            TIMESTAMPTZ		    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        deleted_at              TIMESTAMPTZ         NULL,
         receiver_id	            UUID		        NOT NULL,
         title	                VARCHAR(100)	    NOT NULL,
         content	                VARCHAR(255)	    NOT NULL,
         level	                VARCHAR(10)	        NOT NULL DEFAULT 'INFO',
         notification_type       VARCHAR(30)         NOT NULL,
-        is_read                 BOOLEAN             NOT NULL DEFAULT FALSE,
-        read_at                 TIMESTAMPTZ         NULL,
+
 
         CONSTRAINT fk_notifications_users FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE,
         CONSTRAINT chk_notifications_level CHECK (level IN ('INFO', 'WARNING', 'ERROR')),
-        CONSTRAINT chk_notifications_read_state CHECK (
-            (is_read = FALSE AND read_at IS NULL)
-                OR
-            (is_read = TRUE AND read_at IS NOT NULL)
-            ),
         CONSTRAINT chk_notifications_notification_type CHECK (notification_type IN ('ROLE_UPDATED', 'PLAYLIST_SUBSCRIBED', 'PLAYLIST_CONTENT_ADDED',
                                                                                     'FOLLOWING_USER_ACTIVITY', 'USER_FOLLOWED', 'DIRECT_MESSAGE_RECEIVED'))
 );
