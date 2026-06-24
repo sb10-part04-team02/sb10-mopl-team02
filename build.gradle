@@ -1,5 +1,5 @@
-import com.github.spotbugs.snom.Effort
 import com.github.spotbugs.snom.Confidence
+import com.github.spotbugs.snom.Effort
 
 plugins {
     id 'java'
@@ -30,6 +30,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17'
     compileOnly 'org.projectlombok:lombok'
     compileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.6'
     runtimeOnly 'org.postgresql:postgresql'
