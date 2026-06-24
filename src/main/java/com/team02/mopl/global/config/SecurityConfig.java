@@ -3,6 +3,7 @@ package com.team02.mopl.global.config;
 import com.team02.mopl.global.config.auth.handler.SpaCsrfTokenRequestHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
@@ -22,11 +23,12 @@ public class SecurityConfig {
             auth ->
                 auth
                     // 예외 URL
-                    .requestMatchers("/api/auth/csrf-token")
+                    .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token")
                     .permitAll()
-                    // 임시 전체 허용
+
+                    // 외의 것들은 인증 필요
                     .anyRequest()
-                    .permitAll())
+                    .authenticated())
         .build();
   }
 }
