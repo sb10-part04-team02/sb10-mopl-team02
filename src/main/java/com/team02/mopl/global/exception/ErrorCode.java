@@ -5,6 +5,8 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 public enum ErrorCode {
+
+  // Common
   INVALID_REQUEST(HttpStatus.BAD_REQUEST, "COMMON_400", "잘못된 요청입니다."),
   UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "COMMON_401", "인증이 필요합니다."),
   FORBIDDEN(HttpStatus.FORBIDDEN, "COMMON_403", "접근 권한이 없습니다."),
@@ -13,12 +15,35 @@ public enum ErrorCode {
   CONFLICT(HttpStatus.BAD_REQUEST, "COMMON_400", "이미 존재하거나 충돌이 발생한 리소스입니다."),
   INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500", "서버 내부 오류가 발생했습니다."),
 
+  // User
   USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_404", "사용자를 찾을 수 없습니다."),
+
+  // Content
   CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CONTENT_404", "콘텐츠를 찾을 수 없습니다."),
+
+  // Playlist
   PLAYLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAYLIST_404", "플레이리스트를 찾을 수 없습니다."),
+  PLAYLIST_CONTENT_ALREADY_EXISTS(
+      HttpStatus.BAD_REQUEST, "PLAYLIST_CONTENT_400", "이미 플레이리스트에 추가된 콘텐츠입니다."),
+  PLAYLIST_CONTENT_NOT_FOUND(
+      HttpStatus.NOT_FOUND, "PLAYLIST_CONTENT_404", "플레이리스트에서 콘텐츠를 찾을 수 없습니다."),
+  SUBSCRIPTION_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "SUBSCRIPTION_400", "이미 구독한 플레이리스트입니다."),
+  SUBSCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "SUBSCRIPTION_404", "구독 정보를 찾을 수 없습니다."),
+  CANNOT_SUBSCRIBE_OWN_PLAYLIST(
+      HttpStatus.BAD_REQUEST, "SUBSCRIPTION_400", "본인의 플레이리스트는 구독할 수 없습니다."),
+
+  // Review
   REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_404", "리뷰를 찾을 수 없습니다."),
+  REVIEW_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "REVIEW_400", "이미 작성한 리뷰가 존재합니다."),
+
+  // Conversation
   CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "CONVERSATION_404", "대화를 찾을 수 없습니다."),
-  WATCH_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "WATCH_ROOM_404", "시청방을 찾을 수 없습니다.");
+
+  // Watch Room
+  WATCH_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "WATCH_ROOM_404", "시청방을 찾을 수 없습니다."),
+
+  // Notification
+  NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_404", "알림을 찾을 수 없습니다.");
 
   private final HttpStatus status;
   private final String code;
