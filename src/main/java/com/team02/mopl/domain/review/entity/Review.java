@@ -4,19 +4,13 @@ import com.team02.mopl.global.entity.BaseMutableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(
-    name = "reviews",
-    uniqueConstraints =
-        @UniqueConstraint(
-            name = "uk_reviews_user_content",
-            columnNames = {"author_id", "content_id"}))
+@Table(name = "reviews")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Review extends BaseMutableEntity {
