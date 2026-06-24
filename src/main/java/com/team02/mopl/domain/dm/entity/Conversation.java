@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Table(name = "conversations")
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor
 @Entity
 public class Conversation extends BaseEntity {}
