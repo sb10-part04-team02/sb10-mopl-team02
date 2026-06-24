@@ -10,7 +10,8 @@ CREATE COLLATION IF NOT EXISTS ko_icu (
 -- playlist_subscriptions, playlist_contents
 --==================================================================================================
 
-CREATE TABLE contents(
+CREATE TABLE contents
+(
     id             UUID PRIMARY KEY,
     created_at     TIMESTAMPTZ      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at     TIMESTAMPTZ      NOT NULL,
@@ -25,7 +26,8 @@ CREATE TABLE contents(
     CONSTRAINT chk_contents_content_type CHECK (content_type IN ('MOVIE', 'TV_SERIES', 'SPORT'))
 );
 
-CREATE TABLE conversations(
+CREATE TABLE conversations
+(
     id         UUID PRIMARY KEY,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ NULL
@@ -33,7 +35,8 @@ CREATE TABLE conversations(
 
 --==================================================================================================
 
-CREATE TABLE users(
+CREATE TABLE users
+(
     id                UUID PRIMARY KEY,
     created_at        TIMESTAMPTZ                 NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMPTZ                 NOT NULL,
@@ -51,7 +54,8 @@ CREATE TABLE users(
 
 --==================================================================================================
 
-CREATE TABLE watching_sessions(
+CREATE TABLE watching_sessions
+(
     id         UUID PRIMARY KEY,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL,
@@ -65,7 +69,8 @@ CREATE TABLE watching_sessions(
     CONSTRAINT fk_watching_sessions_users FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
-CREATE TABLE playlists(
+CREATE TABLE playlists
+(
     id               UUID PRIMARY KEY,
     created_at       TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMPTZ  NOT NULL,
@@ -79,23 +84,28 @@ CREATE TABLE playlists(
 );
 
 CREATE TABLE notifications(
-        id	                    UUID		        PRIMARY KEY,
-        created_at	            TIMESTAMPTZ		    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        deleted_at              TIMESTAMPTZ         NULL,
-        receiver_id	            UUID		        NOT NULL,
-        title	                VARCHAR(100)	    NOT NULL,
-        content	                VARCHAR(255)	    NOT NULL,
-        level	                VARCHAR(10)	        NOT NULL DEFAULT 'INFO',
-        notification_type       VARCHAR(30)         NOT NULL,
+    id                UUID PRIMARY KEY,
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at        TIMESTAMPTZ NULL,
+    receiver_id       UUID         NOT NULL,
+    title             VARCHAR(100) NOT NULL,
+    content           VARCHAR(255) NOT NULL,
+    level             VARCHAR(10)  NOT NULL DEFAULT 'INFO',
+    notification_type VARCHAR(30)  NOT NULL,
 
 
-        CONSTRAINT fk_notifications_users FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE,
-        CONSTRAINT chk_notifications_level CHECK (level IN ('INFO', 'WARNING', 'ERROR')),
-        CONSTRAINT chk_notifications_notification_type CHECK (notification_type IN ('ROLE_UPDATED', 'PLAYLIST_SUBSCRIBED', 'PLAYLIST_CONTENT_ADDED',
-                                                                                    'FOLLOWING_USER_ACTIVITY', 'USER_FOLLOWED', 'DIRECT_MESSAGE_RECEIVED'))
+    CONSTRAINT fk_notifications_users FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT chk_notifications_level CHECK (level IN ('INFO', 'WARNING', 'ERROR')),
+    CONSTRAINT chk_notifications_notification_type CHECK (notification_type IN
+                                                          ('ROLE_UPDATED', 'PLAYLIST_SUBSCRIBED',
+                                                           'PLAYLIST_CONTENT_ADDED',
+                                                           'FOLLOWING_USER_ACTIVITY',
+                                                           'USER_FOLLOWED',
+                                                           'DIRECT_MESSAGE_RECEIVED'))
 );
 
-CREATE TABLE follows(
+CREATE TABLE follows
+(
     id          UUID PRIMARY KEY,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at  TIMESTAMPTZ NULL,
@@ -106,7 +116,8 @@ CREATE TABLE follows(
     CONSTRAINT fk_follows_users_followee FOREIGN KEY (followee_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
-CREATE TABLE reviews(
+CREATE TABLE reviews
+(
     id         UUID PRIMARY KEY,
     created_at TIMESTAMPTZ      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ      NOT NULL,
@@ -121,7 +132,8 @@ CREATE TABLE reviews(
     CONSTRAINT chk_reviews_rating CHECK (rating >= 0.0 AND rating <= 5.0)
 );
 
-CREATE TABLE tags(
+CREATE TABLE tags
+(
     id         UUID PRIMARY KEY,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ NULL,
@@ -131,7 +143,8 @@ CREATE TABLE tags(
     CONSTRAINT fk_tags_contents FOREIGN KEY (content_id) REFERENCES contents (id) ON DELETE CASCADE
 );
 
-CREATE TABLE direct_messages(
+CREATE TABLE direct_messages
+(
     id              UUID PRIMARY KEY,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at      TIMESTAMPTZ NULL,
@@ -147,7 +160,8 @@ CREATE TABLE direct_messages(
         REFERENCES conversation_members (conversation_id, member_id) ON DELETE CASCADE
 );
 
-CREATE TABLE conversation_members(
+CREATE TABLE conversation_members
+(
     id              UUID PRIMARY KEY,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMPTZ NOT NULL,
@@ -161,7 +175,8 @@ CREATE TABLE conversation_members(
     CONSTRAINT uk_conversation_members_conversation_user UNIQUE (conversation_id, member_id)
 );
 
-CREATE TABLE social_accounts(
+CREATE TABLE social_accounts
+(
     id               UUID PRIMARY KEY,
     created_at       TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at       TIMESTAMPTZ NULL,
@@ -175,7 +190,8 @@ CREATE TABLE social_accounts(
 
 --==================================================================================================
 
-CREATE TABLE playlist_subscriptions(
+CREATE TABLE playlist_subscriptions
+(
     id          UUID PRIMARY KEY,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at  TIMESTAMPTZ NULL,
@@ -186,7 +202,8 @@ CREATE TABLE playlist_subscriptions(
     CONSTRAINT fk_playlist_subscriptions_playlist FOREIGN KEY (playlist_id) REFERENCES playlists (id) ON DELETE CASCADE
 );
 
-CREATE TABLE playlist_contents(
+CREATE TABLE playlist_contents
+(
     id          UUID PRIMARY KEY,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at  TIMESTAMPTZ NULL,
