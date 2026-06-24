@@ -28,6 +28,10 @@ public interface UserApi {
         description = "인증 오류",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     @ApiResponse(
+        responseCode = "409",
+        description = "이메일 중복",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
         responseCode = "500",
         description = "서버 오류",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
