@@ -23,14 +23,14 @@ public class Notification extends BaseEntity {
   @Column(name = "receiver_id", nullable = false)
   private UUID receiverId;
 
-  @Column(nullable = false, length = 100)
+  @Column(name = "title", nullable = false, length = 100)
   private String title;
 
-  @Column(nullable = false, length = 255)
+  @Column(name = "content", nullable = false, length = 255)
   private String content;
 
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false, length = 10)
+  @Column(name = "level", nullable = false, length = 10)
   private NotificationLevel level = NotificationLevel.INFO;
 
   @Enumerated(EnumType.STRING)
