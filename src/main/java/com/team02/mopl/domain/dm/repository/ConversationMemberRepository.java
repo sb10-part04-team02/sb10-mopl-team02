@@ -4,6 +4,4 @@ import com.team02.mopl.domain.dm.entity.ConversationMember;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface ConversationMemberRepository extends JpaRepository<ConversationMember, UUID> {
-
-}
+public interface ConversationMemberRepository extends JpaRepository<ConversationMember, UUID> {}

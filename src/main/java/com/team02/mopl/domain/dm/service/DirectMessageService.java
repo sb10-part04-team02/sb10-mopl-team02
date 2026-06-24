@@ -13,5 +13,4 @@ public class DirectMessageService {
   private final DirectMessageRepository directMessageRepository;
   private final ConversationRepository conversationRepository;
   private final ConversationMemberRepository conversationMemberRepository;
-
 }

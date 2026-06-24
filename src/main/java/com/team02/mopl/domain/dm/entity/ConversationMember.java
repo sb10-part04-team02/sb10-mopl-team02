@@ -1,5 +1,6 @@
 package com.team02.mopl.domain.dm.entity;
 
+import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.global.entity.BaseMutableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -11,7 +12,6 @@ import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import com.team02.mopl.domain.user.entity.User;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -29,5 +29,4 @@ public class ConversationMember extends BaseMutableEntity {
 
   @Column(name = "last_read_at", nullable = false)
   private Instant lastReadAt;
-
 }

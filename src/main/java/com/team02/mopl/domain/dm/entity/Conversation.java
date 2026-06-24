@@ -11,6 +11,4 @@ import lombok.NoArgsConstructor;
 @Table(name = "conversations")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
-public class Conversation extends BaseEntity {
-
-}
+public class Conversation extends BaseEntity {}

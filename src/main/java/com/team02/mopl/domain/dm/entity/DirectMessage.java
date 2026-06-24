@@ -25,39 +25,28 @@ public class DirectMessage extends BaseEntity {
 
   @ManyToOne(fetch = LAZY, optional = false)
   @JoinColumns({
-      @JoinColumn(
-          name = "conversation_id",
-          referencedColumnName = "conversation_id",
-          insertable = false,
-          updatable = false,
-          nullable = false
-      ),
-      @JoinColumn(
-          name = "sender_id",
-          referencedColumnName = "member_id",
-          nullable = false
-      )
+    @JoinColumn(
+        name = "conversation_id",
+        referencedColumnName = "conversation_id",
+        insertable = false,
+        updatable = false,
+        nullable = false),
+    @JoinColumn(name = "sender_id", referencedColumnName = "member_id", nullable = false)
   })
   private ConversationMember sender;
 
   @ManyToOne(fetch = LAZY, optional = false)
   @JoinColumns({
-      @JoinColumn(
-          name = "conversation_id",
-          referencedColumnName = "conversation_id",
-          insertable = false,
-          updatable = false,
-          nullable = false
-      ),
-      @JoinColumn(
-          name = "receiver_id",
-          referencedColumnName = "member_id",
-          nullable = false
-      )
+    @JoinColumn(
+        name = "conversation_id",
+        referencedColumnName = "conversation_id",
+        insertable = false,
+        updatable = false,
+        nullable = false),
+    @JoinColumn(name = "receiver_id", referencedColumnName = "member_id", nullable = false)
   })
   private ConversationMember receiver;
 
   @Column(nullable = false, columnDefinition = "TEXT")
   private String content;
-
 }
