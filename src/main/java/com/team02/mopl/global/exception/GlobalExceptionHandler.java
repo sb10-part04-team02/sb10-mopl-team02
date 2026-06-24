@@ -55,6 +55,7 @@ public class GlobalExceptionHandler {
     return ResponseEntity.badRequest().body(response);
   }
 
+  // 지원되지 않는 메서드 요청 예외 처리
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
   public ResponseEntity<ErrorResponse> handleHttpRequestMethodNotSupportedException(
       HttpRequestMethodNotSupportedException e) {
@@ -64,7 +65,7 @@ public class GlobalExceptionHandler {
             "지원하지 않는 HTTP 메서드 요청입니다.",
             Map.of("reason", e.getMethod() + " 메서드는 이 엔드포인트에서 지원되지 않습니다."));
 
-    return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build();
+    return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
   }
 
   // 예상하지 못한 서버 내부 오류 처리
