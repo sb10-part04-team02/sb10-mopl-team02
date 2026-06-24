@@ -31,6 +31,8 @@ public class SecurityConfig {
                     // 예외 URL
                     .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token")
                     .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/users")
+                    .permitAll()
                     .requestMatchers(nonApiMatcher)
                     .permitAll() // swagger, api-docs 대응
 
