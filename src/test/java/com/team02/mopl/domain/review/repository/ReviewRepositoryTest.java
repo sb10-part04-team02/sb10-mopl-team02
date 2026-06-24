@@ -42,7 +42,8 @@ class ReviewRepositoryTest {
     reviewRepository.save(new Review(authorId, contentId, "재밌어요", 4.5));
     em.flush();
 
-    boolean exists = reviewRepository.existsByAuthorIdAndContentId(authorId, contentId);
+    boolean exists =
+        reviewRepository.existsByAuthorIdAndContentIdAndDeletedAtIsNull(authorId, contentId);
 
     assertThat(exists).isTrue();
   }
@@ -50,7 +51,8 @@ class ReviewRepositoryTest {
   @Test
   @DisplayName("리뷰가 존재하지 않으면 existsByAuthorIdAndContentId가 false를 반환한다")
   void existsByAuthorIdAndContentId_whenReviewDoesNotExist_returnsFalse() {
-    boolean exists = reviewRepository.existsByAuthorIdAndContentId(authorId, contentId);
+    boolean exists =
+        reviewRepository.existsByAuthorIdAndContentIdAndDeletedAtIsNull(authorId, contentId);
 
     assertThat(exists).isFalse();
   }
