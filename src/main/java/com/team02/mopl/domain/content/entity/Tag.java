@@ -1,6 +1,6 @@
 package com.team02.mopl.domain.content.entity;
 
-import com.team02.mopl.global.entity.BaseRemovableEntity;
+import com.team02.mopl.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "tags")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Tag extends BaseRemovableEntity {
+public class Tag extends BaseEntity {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "content_id", nullable = false, updatable = false)
