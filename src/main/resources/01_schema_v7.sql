@@ -83,7 +83,8 @@ CREATE TABLE playlists
     CONSTRAINT fk_playlists_users FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
-CREATE TABLE notifications(
+CREATE TABLE notifications
+(
     id                UUID PRIMARY KEY,
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at        TIMESTAMPTZ NULL,
@@ -92,7 +93,6 @@ CREATE TABLE notifications(
     content           VARCHAR(255) NOT NULL,
     level             VARCHAR(10)  NOT NULL DEFAULT 'INFO',
     notification_type VARCHAR(30)  NOT NULL,
-
 
     CONSTRAINT fk_notifications_users FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE,
     CONSTRAINT chk_notifications_level CHECK (level IN ('INFO', 'WARNING', 'ERROR')),
@@ -154,8 +154,7 @@ CREATE TABLE conversation_members
     last_read_at    TIMESTAMPTZ NOT NULL,
 
     CONSTRAINT fk_conversation_members_conversation FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE,
-    CONSTRAINT fk_conversation_members_users FOREIGN KEY (member_id) REFERENCES users (id) ON DELETE CASCADE,
-    CONSTRAINT uk_conversation_members_conversation_user UNIQUE (conversation_id, member_id)
+    CONSTRAINT fk_conversation_members_users FOREIGN KEY (member_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
 CREATE TABLE direct_messages
