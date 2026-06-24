@@ -25,36 +25,36 @@ public class DirectMessage extends BaseEntity {
   @JoinColumn(name = "conversation_id", columnDefinition = "uuid")
   private Conversation conversation;
 
-  @ManyToOne(fetch = LAZY)
+  @ManyToOne(fetch = LAZY, optional = false)
   @JoinColumns({
       @JoinColumn(
           name = "conversation_id",
           referencedColumnName = "conversation_id",
           insertable = false,
-          updatable = false
+          updatable = false,
+          nullable = false
       ),
       @JoinColumn(
           name = "sender_id",
           referencedColumnName = "member_id",
-          insertable = false,
-          updatable = false
+          nullable = false
       )
   })
   private ConversationMember sender;
 
-  @ManyToOne(fetch = LAZY)
+  @ManyToOne(fetch = LAZY, optional = false)
   @JoinColumns({
       @JoinColumn(
           name = "conversation_id",
           referencedColumnName = "conversation_id",
           insertable = false,
-          updatable = false
+          updatable = false,
+          nullable = false
       ),
       @JoinColumn(
           name = "receiver_id",
           referencedColumnName = "member_id",
-          insertable = false,
-          updatable = false
+          nullable = false
       )
   })
   private ConversationMember receiver;
