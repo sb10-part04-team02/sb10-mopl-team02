@@ -50,7 +50,8 @@ public class NotificationService {
   public void markAsRead(UUID notificationId, UUID receiverId) {
     Notification notification =
         notificationRepository
-            .findByIdAndReceiverIdAndDeletedAtIsNull(notificationId, receiverId)
+            .findByIdAndReceiverIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(
+                notificationId, receiverId)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOTIFICATION_NOT_FOUND));
 
     notification.delete();
@@ -59,7 +60,8 @@ public class NotificationService {
   // 요청자와 수신자 일치 확인
   private Notification getOwnedActiveNotification(UUID notificationId, UUID receiverId) {
     return notificationRepository
-        .findByIdAndReceiverIdAndDeletedAtIsNull(notificationId, receiverId)
+        .findByIdAndReceiverIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(
+            notificationId, receiverId)
         .orElseThrow(() -> new BusinessException(ErrorCode.NOTIFICATION_NOT_FOUND));
   }
 }
