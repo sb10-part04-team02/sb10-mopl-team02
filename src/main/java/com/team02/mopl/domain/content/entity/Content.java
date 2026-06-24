@@ -6,7 +6,11 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -35,6 +39,9 @@ public class Content extends BaseMutableEntity {
 
   @Column(name = "review_count", nullable = false)
   private int reviewCount = 0;
+
+  @OneToMany(mappedBy = "content", fetch = FetchType.LAZY)
+  private List<Tag> tags = new ArrayList<>();
 
   public Content(ContentType contentType, String title, String description, String thumbnailUrl) {
     this.contentType = contentType;
