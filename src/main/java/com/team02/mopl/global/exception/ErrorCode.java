@@ -18,7 +18,19 @@ public enum ErrorCode {
   PLAYLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAYLIST_404", "플레이리스트를 찾을 수 없습니다."),
   REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_404", "리뷰를 찾을 수 없습니다."),
   CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "CONVERSATION_404", "대화를 찾을 수 없습니다."),
-  WATCH_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "WATCH_ROOM_404", "시청방을 찾을 수 없습니다.");
+  WATCH_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "WATCH_ROOM_404", "시청방을 찾을 수 없습니다."),
+
+  REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "REVIEW_409", "이미 작성한 리뷰가 존재합니다."),
+
+  PLAYLIST_CONTENT_ALREADY_EXISTS(
+      HttpStatus.CONFLICT, "PLAYLIST_CONTENT_409", "이미 플레이리스트에 추가된 콘텐츠입니다."),
+  PLAYLIST_CONTENT_NOT_FOUND(
+      HttpStatus.NOT_FOUND, "PLAYLIST_CONTENT_404", "플레이리스트에서 콘텐츠를 찾을 수 없습니다."),
+
+  SUBSCRIPTION_ALREADY_EXISTS(HttpStatus.CONFLICT, "SUBSCRIPTION_409", "이미 구독한 플레이리스트입니다."),
+  SUBSCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "SUBSCRIPTION_404", "구독 정보를 찾을 수 없습니다."),
+  CANNOT_SUBSCRIBE_OWN_PLAYLIST(
+      HttpStatus.BAD_REQUEST, "SUBSCRIPTION_400", "본인의 플레이리스트는 구독할 수 없습니다.");
 
   private final HttpStatus status;
   private final String code;
