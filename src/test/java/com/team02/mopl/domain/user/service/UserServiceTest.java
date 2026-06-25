@@ -66,7 +66,7 @@ class UserServiceTest {
       // given
       UserCreateRequest request = new UserCreateRequest(name, email, password);
       given(userRepository.existsByEmail(anyString())).willReturn(false);
-      given(userRepository.save(any(User.class)))
+      given(userRepository.saveAndFlush(any(User.class)))
           .willThrow(new DataIntegrityViolationException("Duplicate Email"));
 
       // when & then
@@ -82,7 +82,7 @@ class UserServiceTest {
       UserDto expect =
           new UserDto(UUID.randomUUID(), Instant.now(), email, name, null, Role.USER, false);
       given(userRepository.existsByEmail(anyString())).willReturn(false);
-      given(userRepository.save(any(User.class))).willReturn(mockUser);
+      given(userRepository.saveAndFlush(any(User.class))).willReturn(mockUser);
       given(userMapper.toDto(any(User.class))).willReturn(expect);
 
       // when
@@ -91,7 +91,7 @@ class UserServiceTest {
       // then
       assertThat(actual).isEqualTo(expect);
       then(userRepository).should().existsByEmail(anyString());
-      then(userRepository).should().save(userCaptor.capture());
+      then(userRepository).should().saveAndFlush(userCaptor.capture());
       then(userMapper).should().toDto(any(User.class));
 
       User savedUser = userCaptor.getValue();
@@ -110,7 +110,7 @@ class UserServiceTest {
       UserDto expect =
           new UserDto(UUID.randomUUID(), Instant.now(), shortEmail, name, null, Role.USER, false);
       given(userRepository.existsByEmail(anyString())).willReturn(false);
-      given(userRepository.save(any(User.class))).willReturn(mockUser);
+      given(userRepository.saveAndFlush(any(User.class))).willReturn(mockUser);
       given(userMapper.toDto(any(User.class))).willReturn(expect);
 
       // when

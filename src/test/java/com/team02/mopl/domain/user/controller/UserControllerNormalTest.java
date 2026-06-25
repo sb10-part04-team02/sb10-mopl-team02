@@ -66,7 +66,9 @@ class UserControllerNormalTest {
           Arguments.of(new UserCreateRequest(name, "", password), "이메일 누락"),
           Arguments.of(new UserCreateRequest(name, "invalid email", password), "이메일 형식 오류"),
           Arguments.of(new UserCreateRequest(name, email, ""), "비밀번호 누락"),
-          Arguments.of(new UserCreateRequest(name, email, "1234"), "비밀번호 길이 미달(8자 미만)"));
+          Arguments.of(new UserCreateRequest(name, email, "1234"), "비밀번호 길이 미달(8자 미만)"),
+          Arguments.of(
+              new UserCreateRequest(name, email, "123456789012345678901"), "비밀번호 길이 초과(20 초과)"));
     }
 
     @ParameterizedTest

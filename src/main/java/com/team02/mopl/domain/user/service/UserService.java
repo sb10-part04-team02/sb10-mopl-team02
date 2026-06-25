@@ -37,7 +37,7 @@ public class UserService {
     User savedUser;
     try {
       savedUser =
-          userRepository.save(
+          userRepository.saveAndFlush(
               new User(request.name(), request.email(), encryptedPassword, null, Role.USER, false));
     } catch (DataIntegrityViolationException e) {
       throw new UserEmailDuplicateException();
