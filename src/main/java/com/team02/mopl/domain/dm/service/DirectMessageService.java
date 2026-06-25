@@ -53,6 +53,8 @@ public class DirectMessageService {
         .user(withUser)
         .build();
 
+    conversationMemberRepository.saveAll(java.util.List.of(requestUserMember, withUserMember));
+
     return new ConversationDto(
         newConversation.getId(),
         new UserSummary(withUser.getId(), withUser.getName(), withUser.getProfileImageUrl()),
