@@ -3,7 +3,9 @@ package com.team02.mopl.global.exception;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -51,6 +53,19 @@ public class GlobalExceptionHandler {
     ErrorResponse response = new ErrorResponse(e.getClass().getSimpleName(), "잘못된 요청입니다.", details);
 
     return ResponseEntity.badRequest().body(response);
+  }
+
+  // 지원되지 않는 메서드 요청 예외 처리
+  @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+  public ResponseEntity<ErrorResponse> handleHttpRequestMethodNotSupportedException(
+      HttpRequestMethodNotSupportedException e) {
+    ErrorResponse response =
+        new ErrorResponse(
+            e.getClass().getSimpleName(),
+            "지원하지 않는 HTTP 메서드 요청입니다.",
+            Map.of("reason", e.getMethod() + " 메서드는 이 엔드포인트에서 지원되지 않습니다."));
+
+    return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
   }
 
   // 예상하지 못한 서버 내부 오류 처리

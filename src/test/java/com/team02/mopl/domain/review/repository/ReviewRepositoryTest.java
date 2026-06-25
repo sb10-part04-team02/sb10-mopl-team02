@@ -6,26 +6,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.review.entity.Review;
+import com.team02.mopl.support.RepositoryTestSupport;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@Transactional
-class ReviewRepositoryTest {
+class ReviewRepositoryTest extends RepositoryTestSupport {
 
   @Autowired private ReviewRepository reviewRepository;
 
-  @PersistenceContext private EntityManager em;
+  @Autowired private EntityManager em;
 
   private UUID authorId;
   private UUID contentId;
