@@ -1,6 +1,6 @@
 package com.team02.mopl.domain.content.entity;
 
-import com.team02.mopl.domain.content.ContentType;
+import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.global.entity.BaseMutableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
