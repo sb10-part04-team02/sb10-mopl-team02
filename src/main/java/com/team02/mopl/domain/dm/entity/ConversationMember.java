@@ -25,7 +25,7 @@ public class ConversationMember extends BaseMutableEntity {
   private ConversationMember(Conversation conversation, User user, Instant lastReadAt) {
     this.conversation = Objects.requireNonNull(conversation);
     this.user = Objects.requireNonNull(user);
-    this.lastReadAt = lastReadAt;
+    this.lastReadAt = Objects.requireNonNull(lastReadAt);
   }
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)

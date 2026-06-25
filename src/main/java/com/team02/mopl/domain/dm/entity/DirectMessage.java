@@ -25,7 +25,7 @@ public class DirectMessage extends BaseEntity {
     this.conversation = Objects.requireNonNull(conversation);
     this.sender = Objects.requireNonNull(sender);
     this.receiver = Objects.requireNonNull(receiver);
-    this.content = content;
+    this.content = Objects.requireNonNull(content);
   }
 
   @ManyToOne(fetch = LAZY, optional = false)
