@@ -9,6 +9,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -22,8 +23,8 @@ public class ConversationMember extends BaseMutableEntity {
 
   @Builder
   private ConversationMember(Conversation conversation, User user, Instant lastReadAt) {
-    this.conversation = conversation;
-    this.user = user;
+    this.conversation = Objects.requireNonNull(conversation);
+    this.user = Objects.requireNonNull(user);
     this.lastReadAt = lastReadAt;
   }
 

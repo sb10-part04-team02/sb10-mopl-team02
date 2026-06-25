@@ -8,6 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,9 +22,9 @@ public class DirectMessage extends BaseEntity {
 
   @Builder
   private DirectMessage(Conversation conversation, ConversationMember sender, ConversationMember receiver, String content) {
-    this.conversation = conversation;
-    this.sender = sender;
-    this.receiver = receiver;
+    this.conversation = Objects.requireNonNull(conversation);
+    this.sender = Objects.requireNonNull(sender);
+    this.receiver = Objects.requireNonNull(receiver);
     this.content = content;
   }
 
