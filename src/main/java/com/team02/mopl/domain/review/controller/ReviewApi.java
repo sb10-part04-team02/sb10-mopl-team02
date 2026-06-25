@@ -4,6 +4,7 @@ import com.team02.mopl.domain.review.dto.ReviewCreateRequest;
 import com.team02.mopl.domain.review.dto.ReviewDto;
 import com.team02.mopl.global.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -38,5 +39,5 @@ public interface ReviewApi {
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   })
   ResponseEntity<ReviewDto> createReview(
-      UUID authorId, @RequestBody @Valid ReviewCreateRequest request);
+      @Parameter(hidden = true) UUID authorId, @RequestBody @Valid ReviewCreateRequest request);
 }

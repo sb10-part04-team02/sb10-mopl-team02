@@ -38,6 +38,7 @@ public class ReviewService {
     try {
       savedReview = reviewRepository.saveAndFlush(review);
     } catch (DataIntegrityViolationException e) {
+      log.warn("리뷰 저장 중 무결성 위반 발생: authorId={}, contentId={}", authorId, request.contentId(), e);
       throw new ReviewAlreadyExistsException();
     }
     ReviewDto reviewDto = reviewMapper.toDto(savedReview);
