@@ -24,7 +24,6 @@ public class NotificationService {
 
   @Transactional
   public NotificationDto createNotification(@Valid NotificationCreateCommand command) {
-
     Notification notification =
         new Notification(
             command.receiverId(),
@@ -39,29 +38,27 @@ public class NotificationService {
   // TODO: 커서 페이지네이션 구현 후 수정 예정
   public List<NotificationDto> getNotifications(UUID receiverId) {
     return notificationRepository
-        .findByReceiverIdAndDeletedAtIsNullOrderByCreatedAtDesc(receiverId)
+        .findByReceiverIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(receiverId)
         .stream()
         .map(NotificationDto::from)
         .toList();
   }
 
-  // 읽음 처리
   @Transactional
   public void markAsRead(UUID notificationId, UUID receiverId) {
     Notification notification =
         notificationRepository
-            .findByIdAndReceiverIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(
-                notificationId, receiverId)
+            .findByIdAndDeletedAtIsNull(notificationId)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOTIFICATION_NOT_FOUND));
+
+    validateOwner(notification, receiverId);
 
     notification.delete();
   }
 
-  // 요청자와 수신자 일치 확인 (권한 검증)
-  private Notification getOwnedActiveNotification(UUID notificationId, UUID receiverId) {
-    return notificationRepository
-        .findByIdAndReceiverIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(
-            notificationId, receiverId)
-        .orElseThrow(() -> new BusinessException(ErrorCode.NOTIFICATION_NOT_FOUND));
+  private void validateOwner(Notification notification, UUID receiverId) {
+    if (!notification.getReceiverId().equals(receiverId)) {
+      throw new BusinessException(ErrorCode.NOTIFICATION_FORBIDDEN);
+    }
   }
 }
