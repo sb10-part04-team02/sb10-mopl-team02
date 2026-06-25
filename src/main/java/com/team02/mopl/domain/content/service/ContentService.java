@@ -65,6 +65,7 @@ public class ContentService {
   }
 
   // [어드민] 콘텐츠 수정
+  // TODO: 교체된 구 썸네일은 즉시 삭제하지 않음. DB 미추적이므로 디스크 스캔 배치로 고아 파일 정리
   @Transactional
   public ContentDto update(UUID contentId, ContentUpdateRequest request, MultipartFile thumbnail) {
     Content content = findActiveOrThrow(contentId);
@@ -85,6 +86,7 @@ public class ContentService {
   }
 
   // [어드민] 콘텐츠 삭제
+  // TODO: 썸네일 물리 삭제는 배치로 처리 (논리 삭제 후 N일 경과 콘텐츠의 thumbnailUrl 정리)
   @Transactional
   public void delete(UUID contentId) {
     Content content = findActiveOrThrow(contentId);
