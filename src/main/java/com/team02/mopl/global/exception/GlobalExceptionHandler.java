@@ -21,8 +21,7 @@ public class GlobalExceptionHandler {
     ErrorCode errorCode = e.getErrorCode();
 
     ErrorResponse response =
-        new ErrorResponse(
-            e.getClass().getSimpleName(), errorCode.getMessage(), Map.of("reason", e.getDetails()));
+        new ErrorResponse(e.getClass().getSimpleName(), errorCode.getMessage(), e.getDetails());
 
     return ResponseEntity.status(errorCode.getStatus()).body(response);
   }
