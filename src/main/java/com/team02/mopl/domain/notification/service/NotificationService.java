@@ -43,7 +43,7 @@ public class NotificationService {
   // TODO: 커서 페이지네이션 구현 후 수정 예정
   public List<NotificationDto> getNotifications(UUID receiverId) {
     return notificationRepository
-        .findByReceiver_IdAndDeletedAtIsNullOrderByCreatedAtDesc(receiverId)
+        .findByReceiver_IdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(receiverId)
         .stream()
         .map(NotificationDto::from)
         .toList();

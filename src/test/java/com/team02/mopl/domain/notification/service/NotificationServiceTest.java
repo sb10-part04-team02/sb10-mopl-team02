@@ -113,7 +113,7 @@ class NotificationServiceTest {
             NotificationType.ROLE_UPDATED);
 
     given(
-            notificationRepository.findByReceiver_IdAndDeletedAtIsNullOrderByCreatedAtDesc(
+            notificationRepository.findByReceiver_IdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(
                 receiverId))
         .willReturn(List.of(notification1, notification2));
 
