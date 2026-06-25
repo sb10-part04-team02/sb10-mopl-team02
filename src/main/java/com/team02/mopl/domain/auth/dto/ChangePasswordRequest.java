@@ -5,5 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record ChangePasswordRequest(
-    @Schema(description = "새 비밀번호") @NotBlank @Size(min = 8, message = "비밀번호는 8글자 이상입니다.")
+    @Schema(description = "새 비밀번호")
+        @Size(min = 8, max = 20, message = "비밀번호는 8글자 이상, 20자 이하입니다.")
+        @NotBlank
         String password) {}
