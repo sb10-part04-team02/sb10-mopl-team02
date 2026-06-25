@@ -43,7 +43,7 @@ public class Notification extends BaseEntity {
       String content,
       NotificationLevel level,
       NotificationType notificationType) {
-    this.receiverId = Objects.requireNonNull(receiverId, "receiverId는 null일 수 없습니다.");
+    this.receiverId = Objects.requireNonNull(receiverId, "receiver는 null일 수 없습니다.");
     this.title = Objects.requireNonNull(title, "title은 null일 수 없습니다.");
     this.content = Objects.requireNonNull(content, "content는 null일 수 없습니다.");
     this.level = level == null ? NotificationLevel.INFO : level;
