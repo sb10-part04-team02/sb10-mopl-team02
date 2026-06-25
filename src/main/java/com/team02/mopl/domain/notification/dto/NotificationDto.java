@@ -17,7 +17,7 @@ public record NotificationDto(
     return new NotificationDto(
         notification.getId(),
         notification.getCreatedAt(),
-        notification.getReceiverId(),
+        notification.getReceiver().getId(),
         notification.getTitle(),
         notification.getContent(),
         notification.getLevel());
