@@ -2,10 +2,14 @@ package com.team02.mopl.domain.review.service;
 
 import com.team02.mopl.domain.review.dto.ReviewCreateRequest;
 import com.team02.mopl.domain.review.dto.ReviewDto;
+import com.team02.mopl.domain.review.dto.ReviewUpdateRequest;
 import com.team02.mopl.domain.review.entity.Review;
 import com.team02.mopl.domain.review.exception.ReviewAlreadyExistsException;
 import com.team02.mopl.domain.review.mapper.ReviewMapper;
 import com.team02.mopl.domain.review.repository.ReviewRepository;
+import com.team02.mopl.global.exception.BusinessException;
+import com.team02.mopl.global.exception.ErrorCode;
+import com.team02.mopl.global.util.OwnershipValidator;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +48,24 @@ public class ReviewService {
     ReviewDto reviewDto = reviewMapper.toDto(savedReview);
 
     log.info("리뷰 생성 성공: reviewId={}, authorId={}", reviewDto.id(), authorId);
+    return reviewDto;
+  }
+
+  @Transactional
+  public ReviewDto updateReview(UUID reviewId, UUID requesterId, ReviewUpdateRequest request) {
+    log.debug("리뷰 수정 시작: reviewId={}, requesterId={}", reviewId, requesterId);
+
+    Review review =
+        reviewRepository
+            .findByIdAndDeletedAtIsNull(reviewId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
+
+    OwnershipValidator.validateOwner(review.getAuthorId(), requesterId);
+
+    review.update(request.text(), request.rating());
+    ReviewDto reviewDto = reviewMapper.toDto(review);
+
+    log.info("리뷰 수정 성공: reviewId={}, requesterId={}", reviewId, requesterId);
     return reviewDto;
   }
 }

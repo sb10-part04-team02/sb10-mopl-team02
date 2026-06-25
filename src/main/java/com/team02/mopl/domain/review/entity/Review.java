@@ -39,4 +39,16 @@ public class Review extends BaseMutableEntity {
 
     this.rating = rating;
   }
+
+  public void update(String text, Double rating) {
+    if (text != null) {
+      this.text = text;
+    }
+    if (rating != null) {
+      if (rating < 0.0 || rating > 5.0) {
+        throw new IllegalArgumentException("rating은 0.0 이상 5.0 이하이어야 합니다.");
+      }
+      this.rating = rating;
+    }
+  }
 }

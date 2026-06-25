@@ -9,11 +9,15 @@ import static org.mockito.BDDMockito.then;
 
 import com.team02.mopl.domain.review.dto.ReviewCreateRequest;
 import com.team02.mopl.domain.review.dto.ReviewDto;
+import com.team02.mopl.domain.review.dto.ReviewUpdateRequest;
 import com.team02.mopl.domain.review.entity.Review;
 import com.team02.mopl.domain.review.exception.ReviewAlreadyExistsException;
 import com.team02.mopl.domain.review.mapper.ReviewMapper;
 import com.team02.mopl.domain.review.repository.ReviewRepository;
 import com.team02.mopl.domain.user.dto.UserSummary;
+import com.team02.mopl.global.exception.BusinessException;
+import com.team02.mopl.global.exception.ErrorCode;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -108,6 +112,86 @@ class ReviewServiceTest {
       assertThat(captured.getContentId()).isEqualTo(contentId);
       assertThat(captured.getText()).isEqualTo(text);
       assertThat(captured.getRating()).isEqualTo(rating);
+    }
+  }
+
+  @Nested
+  class UpdateReview {
+    private final UUID reviewId = UUID.randomUUID();
+    private final UUID authorId = UUID.randomUUID();
+    private final UUID contentId = UUID.randomUUID();
+
+    @Test
+    @DisplayName("리뷰가 존재하지 않으면 REVIEW_NOT_FOUND BusinessException을 던진다")
+    void fail_whenReviewNotFound() {
+      // given
+      ReviewUpdateRequest request = new ReviewUpdateRequest("수정", 3.0);
+      given(reviewRepository.findByIdAndDeletedAtIsNull(eq(reviewId))).willReturn(Optional.empty());
+
+      // when & then
+      BusinessException exception =
+          assertThrows(
+              BusinessException.class,
+              () -> reviewService.updateReview(reviewId, authorId, request));
+      assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.REVIEW_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("작성자가 아니면 FORBIDDEN BusinessException을 던진다")
+    void fail_whenRequesterIsNotAuthor() {
+      // given
+      UUID otherUserId = UUID.randomUUID();
+      ReviewUpdateRequest request = new ReviewUpdateRequest("수정", 3.0);
+      Review review = new Review(authorId, contentId, "원본", 4.5);
+      given(reviewRepository.findByIdAndDeletedAtIsNull(eq(reviewId)))
+          .willReturn(Optional.of(review));
+
+      // when & then
+      BusinessException exception =
+          assertThrows(
+              BusinessException.class,
+              () -> reviewService.updateReview(reviewId, otherUserId, request));
+      assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("작성자 본인이 평점·내용을 수정하면 변경된 ReviewDto를 반환한다")
+    void success_whenRequesterIsAuthor() {
+      // given
+      ReviewUpdateRequest request = new ReviewUpdateRequest("수정된 내용", 2.0);
+      Review review = new Review(authorId, contentId, "원본", 4.5);
+      ReviewDto expect =
+          new ReviewDto(reviewId, contentId, new UserSummary(authorId, null, null), "수정된 내용", 2.0);
+      given(reviewRepository.findByIdAndDeletedAtIsNull(eq(reviewId)))
+          .willReturn(Optional.of(review));
+      given(reviewMapper.toDto(any(Review.class))).willReturn(expect);
+
+      // when
+      ReviewDto actual = reviewService.updateReview(reviewId, authorId, request);
+
+      // then
+      assertThat(actual).isEqualTo(expect);
+      assertThat(review.getText()).isEqualTo("수정된 내용");
+      assertThat(review.getRating()).isEqualTo(2.0);
+      then(reviewMapper).should().toDto(any(Review.class));
+    }
+
+    @Test
+    @DisplayName("null 필드는 기존 값을 유지한다")
+    void success_whenPartialUpdate() {
+      // given
+      ReviewUpdateRequest request = new ReviewUpdateRequest(null, 1.0);
+      Review review = new Review(authorId, contentId, "원본", 4.5);
+      given(reviewRepository.findByIdAndDeletedAtIsNull(eq(reviewId)))
+          .willReturn(Optional.of(review));
+      given(reviewMapper.toDto(any(Review.class))).willReturn(null);
+
+      // when
+      reviewService.updateReview(reviewId, authorId, request);
+
+      // then
+      assertThat(review.getText()).isEqualTo("원본");
+      assertThat(review.getRating()).isEqualTo(1.0);
     }
   }
 }
