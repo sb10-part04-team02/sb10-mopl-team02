@@ -97,10 +97,11 @@ class UserServiceTest {
       User savedUser = userCaptor.getValue();
       assertThat(savedUser.getPassword())
           .isNotEqualTo(request.password()); // 암호화된 패스워드와 평문 패스워드 다름 비교
+      assertThat(passwordEncoder.matches(request.password(), savedUser.getPassword())).isTrue();
     }
 
     @Test
-    @DisplayName("아이디가 2글자 이하인 이메일도 정상적으로 마스킹하고 가입해서 UserDto를 반환한다")
+    @DisplayName("아이디가 2글자 이하인 이메일도 가입해서 UserDto를 반환한다")
     void success_shouldReturnUserDto_whenEmailIsShort() {
       // given
       String shortEmail = "ab@gmail.com";
@@ -116,6 +117,7 @@ class UserServiceTest {
       UserDto actual = userService.createUser(request);
 
       // then
+      assertThat(actual).isEqualTo(expect);
       assertThat(actual.email()).isEqualTo(shortEmail);
     }
   }
