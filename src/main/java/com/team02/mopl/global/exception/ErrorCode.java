@@ -17,6 +17,7 @@ public enum ErrorCode {
 
   // User
   USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_404", "사용자를 찾을 수 없습니다."),
+  EMAIL_DUPLICATED(HttpStatus.CONFLICT, "USER_409", "이미 존재하는 이메일입니다."),
 
   // Content
   CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CONTENT_404", "콘텐츠를 찾을 수 없습니다."),
