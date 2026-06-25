@@ -72,10 +72,10 @@ public class ContentService {
   @Transactional
   public ContentDto update(UUID contentId, ContentUpdateRequest request, MultipartFile thumbnail) {
     Content content = findActiveOrThrow(contentId);
-    content.update(request.title(), request.description()); // TODO: Entity 수정
+    content.update(request.title(), request.description());
 
     if (thumbnail != null && !thumbnail.isEmpty()) {
-      content.changeThumbnailUrl(fileStorage.store(thumbnail)); // TODO: Entity 수정
+      content.changeThumbnailUrl(fileStorage.store(thumbnail));
     }
 
     List<Tag> tags =
