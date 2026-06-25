@@ -38,6 +38,7 @@ public enum ErrorCode {
 
   // Conversation
   CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "CONVERSATION_404", "대화를 찾을 수 없습니다."),
+  SELF_CONVERSATION(HttpStatus.BAD_REQUEST, "CONVERSATION_400", "자기 자신과 대화방을 만들 수 없습니다."),
 
   // Watch Room
   WATCH_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "WATCH_ROOM_404", "시청방을 찾을 수 없습니다."),
