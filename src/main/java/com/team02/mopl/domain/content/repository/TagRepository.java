@@ -11,7 +11,7 @@ public interface TagRepository extends JpaRepository<Tag, UUID> {
   // SELECT t.* FROM tags t WHERE t.content_id = ? AND t.deleted_at IS NULL;
   List<Tag> findByContentIdAndDeletedAtIsNull(UUID contentId);
 
-  // 활성 태그 중복 여부(partial unique uk_tags_content_name 정합)
+  // 활성 태그 중복 여부
   // SELECT t.* FROM tags t
   // WHERE t.content_id = ?
   //  AND t.name = ?
