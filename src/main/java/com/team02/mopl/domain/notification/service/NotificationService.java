@@ -57,7 +57,7 @@ public class NotificationService {
     notification.delete();
   }
 
-  // 요청자와 수신자 일치 확인
+  // 요청자와 수신자 일치 확인 (권한 검증)
   private Notification getOwnedActiveNotification(UUID notificationId, UUID receiverId) {
     return notificationRepository
         .findByIdAndReceiverIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(
