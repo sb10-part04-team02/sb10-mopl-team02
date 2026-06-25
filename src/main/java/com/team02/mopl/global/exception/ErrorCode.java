@@ -44,6 +44,12 @@ public enum ErrorCode {
   // Watch Room
   WATCH_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "WATCH_ROOM_404", "시청방을 찾을 수 없습니다."),
 
+  // Follow
+  FOLLOW_NOT_FOUND(HttpStatus.NOT_FOUND, "FOLLOW_404", "팔로우 정보를 찾을 수 없습니다."),
+  FOLLOW_FORBIDDEN(HttpStatus.FORBIDDEN, "FOLLOW_403", "해당 팔로우에 접근할 권한이 없습니다."),
+  FOLLOW_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "FOLLOW_400", "이미 팔로우한 사용자입니다."),
+  CANNOT_FOLLOW_SELF(HttpStatus.BAD_REQUEST, "FOLLOW_400", "자기 자신은 팔로우할 수 없습니다."),
+
   // Notification
   NOTIFICATION_FORBIDDEN(HttpStatus.FORBIDDEN, "NOTIFICATION_403", "해당 알림에 접근할 권한이 없습니다."),
   NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_404", "알림을 찾을 수 없습니다.");
