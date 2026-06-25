@@ -4,6 +4,8 @@ import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
 import com.team02.mopl.domain.notification.dto.NotificationDto;
 import com.team02.mopl.domain.notification.entity.Notification;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
+import com.team02.mopl.domain.user.entity.User;
+import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import jakarta.validation.Valid;
@@ -21,12 +23,15 @@ import org.springframework.validation.annotation.Validated;
 public class NotificationService {
 
   private final NotificationRepository notificationRepository;
+  private final UserRepository userRepository;
 
   @Transactional
   public NotificationDto createNotification(@Valid NotificationCreateCommand command) {
+    User receiver = getActiveUser(command.receiverId());
+
     Notification notification =
         new Notification(
-            command.receiverId(),
+            receiver,
             command.title(),
             command.content(),
             command.level(),
@@ -38,12 +43,13 @@ public class NotificationService {
   // TODO: 커서 페이지네이션 구현 후 수정 예정
   public List<NotificationDto> getNotifications(UUID receiverId) {
     return notificationRepository
-        .findByReceiverIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(receiverId)
+        .findByReceiver_IdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(receiverId)
         .stream()
         .map(NotificationDto::from)
         .toList();
   }
 
+  // 읽음 처리
   @Transactional
   public void markAsRead(UUID notificationId, UUID receiverId) {
     Notification notification =
@@ -56,8 +62,14 @@ public class NotificationService {
     notification.delete();
   }
 
+  private User getActiveUser(UUID userId) {
+    return userRepository
+        .findByIdAndDeletedAtIsNull(userId)
+        .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+  }
+
   private void validateOwner(Notification notification, UUID receiverId) {
-    if (!notification.getReceiverId().equals(receiverId)) {
+    if (!notification.getReceiver().getId().equals(receiverId)) {
       throw new BusinessException(ErrorCode.NOTIFICATION_FORBIDDEN);
     }
   }
