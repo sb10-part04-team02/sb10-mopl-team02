@@ -44,8 +44,11 @@ public class ContentService {
     contentRepository.save(content);
 
     List<Tag> tags = addTags(content, request.tags());
-    log.info("content.created contentId={} type={} tagCount={}",
-        content.getId(), request.type(), tags.size());
+    log.info(
+        "content.created contentId={} type={} tagCount={}",
+        content.getId(),
+        request.type(),
+        tags.size());
     return contentMapper.toDto(content, tags, 0L);
   }
 
@@ -75,13 +78,17 @@ public class ContentService {
       content.changeThumbnailUrl(fileStorage.store(thumbnail)); // TODO: Entity 수정
     }
 
-    List<Tag> tags = (request.tags() != null)
-        ? replaceTags(content, request.tags())
-        : tagRepository.findByContentIdAndDeletedAtIsNull(contentId);
+    List<Tag> tags =
+        (request.tags() != null)
+            ? replaceTags(content, request.tags())
+            : tagRepository.findByContentIdAndDeletedAtIsNull(contentId);
 
     long watcherCount = watcherCountService.count(contentId);
-    log.info("content.updated contentId={} tagCount={} thumbnailChanged={}",
-        contentId, tags.size(), (thumbnail != null && !thumbnail.isEmpty()));
+    log.info(
+        "content.updated contentId={} tagCount={} thumbnailChanged={}",
+        contentId,
+        tags.size(),
+        (thumbnail != null && !thumbnail.isEmpty()));
     return contentMapper.toDto(content, tags, watcherCount);
   }
 

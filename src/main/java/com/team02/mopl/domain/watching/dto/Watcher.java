@@ -6,8 +6,6 @@ import java.util.UUID;
 public record Watcher(UUID id, String name, String email, String profileImageUrl) {
 
   public static Watcher from(User user) {
-    return new Watcher(
-        user.getId(), user.getName(), user.getEmail(), user.getProfileImageUrl()
-    );
+    return new Watcher(user.getId(), user.getName(), user.getEmail(), user.getProfileImageUrl());
   }
 }

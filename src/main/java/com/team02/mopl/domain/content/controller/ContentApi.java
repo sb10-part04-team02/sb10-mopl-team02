@@ -22,42 +22,42 @@ public interface ContentApi {
   // [어드민] 콘텐츠 생성 - /api/contents
   @Operation(summary = "[어드민] 콘텐츠 생성", description = "콘텐츠를 생성합니다.")
   @ApiResponses({
-      @ApiResponse(responseCode = "201", description = "콘텐츠 생성 성공"),
-      @ApiResponse(
-          responseCode = "400",
-          description = "잘못된 요청",
-          content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-      @ApiResponse(
-          responseCode = "401",
-          description = "인증 오류",
-          content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-      @ApiResponse(
-          responseCode = "403",
-          description = "권한 오류",
-          content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-      @ApiResponse(
-          responseCode = "500",
-          description = "서버 오류",
-          content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "201", description = "콘텐츠 생성 성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "권한 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   })
   ResponseEntity<ContentDto> createContent(ContentCreateRequest request, MultipartFile thumbnail);
 
   // 콘텐츠 단건 조회 - /api/contents/{contentId}
   @Operation(summary = "콘텐츠 단건 조회", description = "콘텐츠 ID로 단건 조회합니다.")
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "콘텐츠 단건 조회 성공"),
-      @ApiResponse(
-          responseCode = "400",
-          description = "잘못된 요청",
-          content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-      @ApiResponse(
-          responseCode = "401",
-          description = "인증 오류",
-          content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-      @ApiResponse(
-          responseCode = "500",
-          description = "서버 오류",
-          content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "200", description = "콘텐츠 단건 조회 성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   })
   ResponseEntity<ContentDto> getContent(UUID contentId);
 
@@ -80,24 +80,24 @@ public interface ContentApi {
   })
   ResponseEntity<CursorResponse<ContentDto>> getContents(ContentSearchRequest request);
 
-//  // 특정 콘텐츠의 시청 세션 목록 조회 - /api/contents/{contentId}/watching-sessions
-//  @Operation(summary = "특정 콘텐츠의 시청 세션 목록 조회", description = "콘텐츠의 시청 세션 목록을 커서 페이지네이션으로 조회합니다.")
-//  @ApiResponses({
-//      @ApiResponse(responseCode = "200", description = "조회 성공"),
-//      @ApiResponse(
-//          responseCode = "400",
-//          description = "잘못된 요청",
-//          content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-//      @ApiResponse(
-//          responseCode = "401",
-//          description = "인증 오류",
-//          content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-//      @ApiResponse(
-//          responseCode = "500",
-//          description = "서버 오류",
-//          content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-//  })
-//  ResponseEntity<CursorResponse<WatchingSessionDto>> getWatchingSessions();
+  //  // 특정 콘텐츠의 시청 세션 목록 조회 - /api/contents/{contentId}/watching-sessions
+  //  @Operation(summary = "특정 콘텐츠의 시청 세션 목록 조회", description = "콘텐츠의 시청 세션 목록을 커서 페이지네이션으로 조회합니다.")
+  //  @ApiResponses({
+  //      @ApiResponse(responseCode = "200", description = "조회 성공"),
+  //      @ApiResponse(
+  //          responseCode = "400",
+  //          description = "잘못된 요청",
+  //          content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+  //      @ApiResponse(
+  //          responseCode = "401",
+  //          description = "인증 오류",
+  //          content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+  //      @ApiResponse(
+  //          responseCode = "500",
+  //          description = "서버 오류",
+  //          content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  //  })
+  //  ResponseEntity<CursorResponse<WatchingSessionDto>> getWatchingSessions();
 
   // [어드민] 콘텐츠 수정 - /api/contents/{contentId}
   @Operation(summary = "콘텐츠 수정", description = "콘텐츠를 수정합니다. 썸네일은 선택. (ADMIN 전용)")
