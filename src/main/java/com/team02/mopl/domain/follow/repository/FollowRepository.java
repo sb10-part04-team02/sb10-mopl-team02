@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface FollowRepository extends JpaRepository<Follow, UUID> {
 
   // 중복 방지
-  boolean existByFollower_IdAndFollowee_Id(UUID followerId, UUID followeeId);
+  boolean existsByFollower_IdAndFollowee_IdAndDeletedAtIsNull(UUID followerId, UUID followeeId);
 
   // 단건 조회
   Optional<Follow> findByIdAndDeletedAtIsNull(UUID id);
