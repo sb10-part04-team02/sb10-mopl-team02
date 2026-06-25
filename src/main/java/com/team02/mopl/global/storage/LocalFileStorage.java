@@ -32,7 +32,7 @@ public class LocalFileStorage implements FileStorage {
   @Override
   public String store(MultipartFile file) {
     if (file == null || file.isEmpty()) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST, "업로드할 파일이 비어 있습니다.");
+      throw new BusinessException(ErrorCode.INVALID_REQUEST);
     }
     // 파일명 충돌 방지 - UUID + 원본확장자 붙이기 (원본 파일명 저장시 - path traversal 등 기타 고려사항 있음)
     String storedName = UUID.randomUUID() + extractExtension(file.getOriginalFilename());
@@ -43,7 +43,7 @@ public class LocalFileStorage implements FileStorage {
       log.debug("파일 저장 완료: {}", target);
       return baseUrl + "/" + storedName;
     } catch (IOException e) {
-      throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "파일 저장에 실패했습니다.");
+      throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
