@@ -20,7 +20,7 @@ public class NotificationService {
   // 목록 조회
   public List<NotificationDto> getNotifications(UUID receiverId) {
     return notificationRepository
-        .findByReceiverIdAndDeletedAtIsNullOrderByCreatedAtDesc(receiverId)
+        .findByReceiver_IdAndDeletedAtIsNullOrderByCreatedAtDesc(receiverId)
         .stream()
         .map(NotificationDto::from)
         .toList();
@@ -31,7 +31,7 @@ public class NotificationService {
   public void deleteNotification(UUID notificationId, UUID receiverId) {
     Notification notification =
         notificationRepository
-            .findByIdAndReceiverIdAndDeletedAtIsNull(notificationId, receiverId)
+            .findByIdAndReceiver_IdAndDeletedAtIsNull(notificationId, receiverId)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOTIFICATION_NOT_FOUND));
 
     notification.delete();

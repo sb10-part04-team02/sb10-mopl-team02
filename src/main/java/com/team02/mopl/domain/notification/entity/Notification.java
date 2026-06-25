@@ -2,14 +2,17 @@ package com.team02.mopl.domain.notification.entity;
 
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
+import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.util.Objects;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -20,8 +23,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Notification extends BaseEntity {
 
-  @Column(name = "receiver_id", nullable = false)
-  private UUID receiverId;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "receiver_id", nullable = false)
+  private User receiver;
 
   @Column(name = "title", nullable = false, length = 100)
   private String title;
@@ -38,12 +42,12 @@ public class Notification extends BaseEntity {
   private NotificationType notificationType;
 
   public Notification(
-      UUID receiverId,
+      User receiver,
       String title,
       String content,
       NotificationLevel level,
       NotificationType notificationType) {
-    this.receiverId = Objects.requireNonNull(receiverId, "receiverId는 null일 수 없습니다.");
+    this.receiver = Objects.requireNonNull(receiver, "receiver는 null일 수 없습니다.");
     this.title = Objects.requireNonNull(title, "title은 null일 수 없습니다.");
     this.content = Objects.requireNonNull(content, "content는 null일 수 없습니다.");
     this.level = level == null ? NotificationLevel.INFO : level;
