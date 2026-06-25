@@ -1,120 +1,14 @@
 # ============================================================
-# GitHub Actions Workflow: PR 발생 시 디스코드 알림 전송
-# 트리거: PR이 열리거나(opened), 재오픈되거나(reopened),
-#        드래프트 해제되거나(ready_for_review), 닫힐 때(closed)
+# GitHub Actions Workflow: PR 머지 시 디스코드 알림 전송
+# 트리거: PR이 닫힐 때(closed) — 실제 머지된 경우에만 알림
 # ============================================================
 name: 🌿 PR 디스코드 알림
 
 on:
   pull_request:
-    types: [ opened, reopened, ready_for_review, closed ]
+    types: [ closed ]
 
 jobs:
-  # ──────────────────────────────────────────────
-  # PR 열림 → 리뷰 요청 알림
-  # ──────────────────────────────────────────────
-  notify-review:
-    if: >-
-      github.event.action != 'closed'
-      && !github.event.pull_request.draft
-    runs-on: ubuntu-latest
-    steps:
-      - name: 🎲 메시지 뽑기
-        id: message
-        run: |
-          MESSAGES=(
-            "따끈따끈한 PR이 나왔어요! 식기 전에 리뷰해주세요~ 🍞"
-          )
-          INDEX=$(( RANDOM % ${#MESSAGES[@]} ))
-          echo "cute_msg=${MESSAGES[$INDEX]}" >> "$GITHUB_OUTPUT"
-
-      - name: 📨 디스코드로 리뷰 요청 보내기
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.BE_PR_WEBHOOK }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-          CUTE_MSG: ${{ steps.message.outputs.cute_msg }}
-          CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
-          ADDITIONS: ${{ github.event.pull_request.additions }}
-          DELETIONS: ${{ github.event.pull_request.deletions }}
-          REQUESTED_REVIEWERS: ${{ toJSON(github.event.pull_request.requested_reviewers) }}
-        run: |
-          TOTAL_CHANGES=$(( ADDITIONS + DELETIONS ))
-          if [ "$TOTAL_CHANGES" -lt 50 ]; then
-            SIZE_LABEL="🍰 한입 크기"
-          elif [ "$TOTAL_CHANGES" -lt 200 ]; then
-            SIZE_LABEL="🍔 적당한 크기"
-          elif [ "$TOTAL_CHANGES" -lt 500 ]; then
-            SIZE_LABEL="🍕 꽤 큰 편"
-          elif [ "$TOTAL_CHANGES" -lt 1000 ]; then
-            SIZE_LABEL="🏋️ 헬스장 급 (힘내세요...)"
-          else
-            SIZE_LABEL="💀 리뷰어 사망각 (커피 챙기세요)"
-          fi
-          
-          REVIEWERS=$(echo "$REQUESTED_REVIEWERS" | jq -r 'map(.login) | join(", ")')
-          if [ -z "$REVIEWERS" ]; then
-            REVIEWERS="아직 없음"
-          fi
-
-          SUMMARY=$(echo "$PR_BODY" | tr -d '\r' \
-            | awk '/^##[[:space:]].*요약/{flag=1; next} /^##[[:space:]]/{flag=0} flag' \
-            | sed 's/<!--.*-->//' \
-            | sed '/^[[:space:]]*$/d')
-          if [ -z "$SUMMARY" ]; then
-            SUMMARY="(요약 미작성)"
-          fi
-          SUMMARY_JSON=$(echo "$SUMMARY" | jq -Rs '.')
-
-          curl -H "Content-Type: application/json" \
-            -X POST \
-            -d @- \
-            "$DISCORD_WEBHOOK_URL" <<CURL_EOF
-          {
-            "username": "PR봇 🤖",
-            "avatar_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-            "content": "📢 **[BE] 리뷰 요청이 도착했어요!** ${CUTE_MSG}",
-            "embeds": [
-              {
-                "title": "📝 ${PR_TITLE}",
-                "url": "${PR_URL}",
-                "color": 16750848,
-                "description": ${SUMMARY_JSON},
-                "fields": [
-                  {
-                    "name": "👤 작성자",
-                    "value": "${PR_AUTHOR}",
-                    "inline": true
-                  },
-                  {
-                    "name": "📦 PR 크기",
-                    "value": "${SIZE_LABEL}",
-                    "inline": true
-                  },
-                  {
-                    "name": "📊 변경 사항",
-                    "value": "\`${CHANGED_FILES}\`개 파일  |  +${ADDITIONS}  -${DELETIONS}",
-                    "inline": true
-                  },
-                  {
-                    "name": "🔍 리뷰어",
-                    "value": "${REVIEWERS}",
-                    "inline": false
-                  }
-                ],
-                "footer": {
-                  "text": "Backend 🌿 리뷰해주시면 복이 와요 🍀"
-                },
-                "timestamp": "${{ github.event.pull_request.created_at }}"
-              }
-            ]
-          }
-          CURL_EOF
-
-          echo "✅ 리뷰 요청 알림 전송 완료!"
-
   # ──────────────────────────────────────────────
   # 🎉 PR 머지됨 → 축하 알림
   # ──────────────────────────────────────────────
