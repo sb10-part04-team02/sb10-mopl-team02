@@ -1,4 +1,4 @@
-package com.team02.mopl.domain.content;
+package com.team02.mopl.domain.content.enums;
 
 public enum ContentType {
   MOVIE,

@@ -44,6 +44,7 @@ public enum ErrorCode {
   WATCH_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "WATCH_ROOM_404", "시청방을 찾을 수 없습니다."),
 
   // Notification
+  NOTIFICATION_FORBIDDEN(HttpStatus.FORBIDDEN, "NOTIFICATION_403", "해당 알림에 접근할 권한이 없습니다."),
   NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_404", "알림을 찾을 수 없습니다.");
 
   private final HttpStatus status;
