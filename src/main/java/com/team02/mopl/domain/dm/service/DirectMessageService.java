@@ -29,30 +29,27 @@ public class DirectMessageService {
   private final UserRepository userRepository;
 
   @Transactional
-  public ConversationDto createConversation(
-      ConversationCreateRequest request,
-      UUID requesterId
-  ) {
+  public ConversationDto createConversation(ConversationCreateRequest request, UUID requesterId) {
     if (requesterId.equals(request.withUserId())) {
       throw new BusinessException(SELF_CONVERSATION);
     }
-    User requestUser = userRepository.findById(requesterId)
-        .orElseThrow(() -> new BusinessException(USER_NOT_FOUND));
+    User requestUser =
+        userRepository
+            .findById(requesterId)
+            .orElseThrow(() -> new BusinessException(USER_NOT_FOUND));
 
-    User withUser = userRepository.findById(request.withUserId())
-        .orElseThrow(() -> new BusinessException(USER_NOT_FOUND));
+    User withUser =
+        userRepository
+            .findById(request.withUserId())
+            .orElseThrow(() -> new BusinessException(USER_NOT_FOUND));
 
     Conversation newConversation = conversationRepository.save(new Conversation());
 
-    ConversationMember requestUserMember = ConversationMember.builder()
-        .conversation(newConversation)
-        .user(requestUser)
-        .build();
+    ConversationMember requestUserMember =
+        ConversationMember.builder().conversation(newConversation).user(requestUser).build();
 
-    ConversationMember withUserMember = ConversationMember.builder()
-        .conversation(newConversation)
-        .user(withUser)
-        .build();
+    ConversationMember withUserMember =
+        ConversationMember.builder().conversation(newConversation).user(withUser).build();
 
     conversationMemberRepository.saveAll(java.util.List.of(requestUserMember, withUserMember));
 
@@ -60,7 +57,6 @@ public class DirectMessageService {
         newConversation.getId(),
         new UserSummary(withUser.getId(), withUser.getName(), withUser.getProfileImageUrl()),
         null,
-        false
-    );
+        false);
   }
 }

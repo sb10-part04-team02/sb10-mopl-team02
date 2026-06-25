@@ -6,7 +6,6 @@ import com.team02.mopl.domain.dm.service.DirectMessageService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -22,10 +21,8 @@ public class DirectMessageController {
 
   @PostMapping
   public ResponseEntity<ConversationDto> createConversation(
-      @RequestHeader("X-USER-ID") UUID userId,
-      @RequestBody ConversationCreateRequest request
-  ){
-    //userId는 임시
+      @RequestHeader("X-USER-ID") UUID userId, @RequestBody ConversationCreateRequest request) {
+    // userId는 임시
     return ResponseEntity.ok(directMessageService.createConversation(request, userId));
   }
 }

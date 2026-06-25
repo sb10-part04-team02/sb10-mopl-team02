@@ -9,12 +9,7 @@ public record DirectMessageDto(
     Instant createdAt,
     UserSummary sender,
     UserSummary receiver,
-    String content
-) {
-  //유저측에서 dto 구현 전까지 임시로 구현
-  public record UserSummary(
-      UUID id,
-      String name,
-      String profileImageUrl
-  ) { }
+    String content) {
+  // 유저측에서 dto 구현 전까지 임시로 구현
+  public record UserSummary(UUID id, String name, String profileImageUrl) {}
 }

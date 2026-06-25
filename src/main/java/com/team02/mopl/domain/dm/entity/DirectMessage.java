@@ -21,7 +21,11 @@ import lombok.NoArgsConstructor;
 public class DirectMessage extends BaseEntity {
 
   @Builder
-  private DirectMessage(Conversation conversation, ConversationMember sender, ConversationMember receiver, String content) {
+  private DirectMessage(
+      Conversation conversation,
+      ConversationMember sender,
+      ConversationMember receiver,
+      String content) {
     this.conversation = Objects.requireNonNull(conversation);
     this.sender = Objects.requireNonNull(sender);
     this.receiver = Objects.requireNonNull(receiver);
