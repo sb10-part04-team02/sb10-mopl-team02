@@ -3,8 +3,8 @@ package com.team02.mopl.domain.playlist.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.team02.mopl.domain.content.ContentType;
 import com.team02.mopl.domain.content.entity.Content;
+import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.entity.PlaylistContent;
 import com.team02.mopl.support.RepositoryTestSupport;
