@@ -26,7 +26,7 @@ public class UserService {
 
   @Transactional
   public UserDto createUser(UserCreateRequest request) {
-    log.debug("유저 생성 시작: name={}, email={}", request.name(), maskValidEmail(request.email()));
+    log.debug("유저 생성 시작: email={}", maskValidEmail(request.email()));
 
     if (userRepository.existsByEmail(request.email())) {
       throw new UserEmailDuplicateException();
@@ -44,7 +44,7 @@ public class UserService {
     }
     UserDto userDto = userMapper.toDto(savedUser);
 
-    log.info("유저 생성 성공: name={}, email={}", userDto.name(), maskValidEmail(userDto.email()));
+    log.info("유저 생성 성공: userId={}, email={}", userDto.id(), maskValidEmail(userDto.email()));
     return userDto;
   }
 

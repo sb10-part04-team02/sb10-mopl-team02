@@ -72,9 +72,10 @@ class UserServiceTest {
       given(userMapper.toDto(any(User.class))).willReturn(expect);
 
       // when
-      userService.createUser(request);
+      UserDto actual = userService.createUser(request);
 
       // then
+      assertThat(actual).isEqualTo(expect);
       then(userRepository).should().existsByEmail(anyString());
       then(userRepository).should().save(userCaptor.capture());
       then(userMapper).should().toDto(any(User.class));
