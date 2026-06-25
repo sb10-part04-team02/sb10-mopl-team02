@@ -18,4 +18,12 @@
         <Class name="~com\.team02\.mopl\.(.*\.)?(dto|entity)\..*"/>
         <Bug pattern="CT_CONSTRUCTOR_THROW"/>
     </Match>
+
+    <!-- Spring 컴포넌트 레이어(controller/service/config): @RequiredArgsConstructor 가 생성한
+         생성자가 DI 주입 협력 빈(싱글톤)을 필드에 그대로 저장하는 것은 정상 패턴이다.
+         이 빈들은 데이터 보유 객체가 아니라 공유 재사용이 설계 의도이므로 방어적 복사 대상이 아니다 -> 오탐 제외 -->
+    <Match>
+        <Class name="~com\.team02\.mopl\.(.*\.)?(controller|service|config)\..*"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>
