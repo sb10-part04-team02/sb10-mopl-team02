@@ -139,4 +139,22 @@ class NotificationServiceTest {
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.NOTIFICATION_FORBIDDEN));
   }
+
+  @Test
+  @DisplayName("알림 생성 시 level이 null이면 INFO로 기본 설정된다")
+  void createNotification_levelNull_defaultsToInfo() {
+    UUID receiverId = UUID.randomUUID();
+    NotificationCreateCommand command =
+        new NotificationCreateCommand(
+            receiverId, "알림 제목", "알림 내용", null, NotificationType.USER_FOLLOWED);
+
+    given(notificationRepository.save(any(Notification.class)))
+        .willAnswer(invocation -> invocation.getArgument(0));
+
+    NotificationDto result = notificationService.createNotification(command);
+
+    assertThat(result.level()).isEqualTo(NotificationLevel.INFO);
+
+    verify(notificationRepository).save(any(Notification.class));
+  }
 }
