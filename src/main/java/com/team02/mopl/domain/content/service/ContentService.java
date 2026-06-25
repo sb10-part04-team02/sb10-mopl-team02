@@ -20,6 +20,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,10 +36,20 @@ public class ContentService {
   private final WatcherCountService watcherCountService;
   private final FileStorage fileStorage;
 
+  // 썸네일 미제공 시 사용할 기본값.
+  // 생성 폼 - 썸네일을 클라이언트단에서 필수로 강제하고 있으나 직접 API 호출 시 방어 목적.
+  // project-mopl-fe-1.0.2/src/pages/contents/components/ContentFormDialog.tsx 98-101 lines
+  // TODO: S3 스토리지 구현 이슈에서 실제 기본 이미지의 절대 URL로 교체 예정
+  @Value("${app.storage.default-thumbnail-url:}")
+  private String defaultThumbnailUrl;
+
   // [어드민] 콘텐츠 생성
   @Transactional
   public ContentDto create(ContentCreateRequest request, MultipartFile thumbnail) {
-    String thumbnailUrl = fileStorage.store(thumbnail);
+    String thumbnailUrl =
+        (thumbnail != null && !thumbnail.isEmpty())
+            ? fileStorage.store(thumbnail)
+            : defaultThumbnailUrl;
     Content content =
         new Content(request.type(), request.title(), request.description(), thumbnailUrl);
     contentRepository.save(content);
