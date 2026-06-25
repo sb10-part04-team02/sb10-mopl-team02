@@ -1,0 +1,137 @@
+package com.team02.mopl.domain.content.service;
+
+import com.team02.mopl.domain.content.dto.ContentCreateRequest;
+import com.team02.mopl.domain.content.dto.ContentDto;
+import com.team02.mopl.domain.content.dto.ContentSearchRequest;
+import com.team02.mopl.domain.content.dto.ContentUpdateRequest;
+import com.team02.mopl.domain.content.entity.Content;
+import com.team02.mopl.domain.content.entity.Tag;
+import com.team02.mopl.domain.content.mapper.ContentMapper;
+import com.team02.mopl.domain.content.repository.ContentRepository;
+import com.team02.mopl.domain.content.repository.TagRepository;
+import com.team02.mopl.global.dto.CursorResponse;
+import com.team02.mopl.global.exception.BusinessException;
+import com.team02.mopl.global.exception.ErrorCode;
+import com.team02.mopl.global.storage.FileStorage;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ContentService {
+
+  private final ContentRepository contentRepository;
+  private final TagRepository tagRepository;
+  private final ContentMapper contentMapper;
+  private final WatcherCountService watcherCountService;
+  private final FileStorage fileStorage;
+
+  // [어드민] 콘텐츠 생성
+  @Transactional
+  public ContentDto create(ContentCreateRequest request, MultipartFile thumbnail) {
+    String thumbnailUrl = fileStorage.store(thumbnail);
+    Content content =
+        new Content(request.type(), request.title(), request.description(), thumbnailUrl);
+    contentRepository.save(content);
+
+    List<Tag> tags = addTags(content, request.tags());
+    log.info("content.created contentId={} type={} tagCount={}",
+        content.getId(), request.type(), tags.size());
+    return contentMapper.toDto(content, tags, 0L);
+  }
+
+  // 콘텐츠 단건 조회
+  @Transactional(readOnly = true)
+  public ContentDto get(UUID contentId) {
+    Content content = findActiveOrThrow(contentId);
+    List<Tag> tags = tagRepository.findByContentIdAndDeletedAtIsNull(contentId);
+    long watcherCount = watcherCountService.count(contentId);
+    return contentMapper.toDto(content, tags, watcherCount);
+  }
+
+  // 콘텐츠 목록 조회 (커서 페이지네이션)
+  @Transactional(readOnly = true)
+  public CursorResponse<ContentDto> getContents(ContentSearchRequest request) {
+    throw new UnsupportedOperationException("TODO: 콘텐츠 목록 조회 미구현");
+  }
+
+  // [어드민] 콘텐츠 수정
+  @Transactional
+  public ContentDto update(UUID contentId, ContentUpdateRequest request, MultipartFile thumbnail) {
+    Content content = findActiveOrThrow(contentId);
+    content.update(request.title(), request.description()); // TODO: Entity 수정
+
+    if (thumbnail != null && !thumbnail.isEmpty()) {
+      content.changeThumbnailUrl(fileStorage.store(thumbnail)); // TODO: Entity 수정
+    }
+
+    List<Tag> tags = (request.tags() != null)
+        ? replaceTags(content, request.tags())
+        : tagRepository.findByContentIdAndDeletedAtIsNull(contentId);
+
+    long watcherCount = watcherCountService.count(contentId);
+    log.info("content.updated contentId={} tagCount={} thumbnailChanged={}",
+        contentId, tags.size(), (thumbnail != null && !thumbnail.isEmpty()));
+    return contentMapper.toDto(content, tags, watcherCount);
+  }
+
+  // [어드민] 콘텐츠 삭제
+  @Transactional
+  public void delete(UUID contentId) {
+    Content content = findActiveOrThrow(contentId);
+    content.delete();
+    List<Tag> tags = tagRepository.findByContentIdAndDeletedAtIsNull(contentId);
+    tags.forEach(Tag::delete);
+
+    log.info("content.deleted contentId={} deletedTagCount={}", contentId, tags.size());
+  }
+
+  // ===
+
+  // TODO: 태그로 검색 (장르 검색) 기능 추가할 경우 엔티티 관계 N:M으로 변경 요망
+  // 현재는 콘텐츠가 가지고 있는 태그 목록 보여주는 조회만 일어나므로 현재 구조 유지
+  private List<Tag> addTags(Content content, List<String> names) {
+    if (names == null || names.isEmpty()) {
+      return List.of();
+    }
+    // 입력된 태그 순서 유지를 위해 LinkedHashSet 사용 (입력 순서를 유지하면서 중복만 제거 목적)
+    LinkedHashSet<String> distinct =
+        names.stream()
+            .filter(name -> name != null && !name.isBlank())
+            .map(String::trim)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+
+    List<Tag> saved = new ArrayList<>();
+    for (String name : distinct) {
+      if (tagRepository.existsByContentIdAndNameAndDeletedAtIsNull(content.getId(), name)) {
+        continue;
+      }
+      saved.add(tagRepository.save(new Tag(content, name)));
+    }
+    return saved;
+  }
+
+  private Content findActiveOrThrow(UUID contentId) {
+    return contentRepository
+        .findByIdAndDeletedAtIsNull(contentId)
+        .orElseThrow(() -> new BusinessException(ErrorCode.CONTENT_NOT_FOUND));
+  }
+
+  private List<Tag> replaceTags(Content content, List<String> names) {
+    // 조회 (영속 상태) -> forEach + delete (영속 엔티티의 deletedAt 변경, 더티 체킹 예약)
+    tagRepository.findByContentIdAndDeletedAtIsNull(content.getId()).forEach(Tag::delete);
+    tagRepository.flush(); // 변경분을 DB에 UPDATED로 반영 (그래야 새로운 태그 정상적으로 저장됨)
+    List<Tag> newTags = addTags(content, names);
+    log.debug("content.tags_replaced contentId={} addedCount={}", content.getId(), newTags.size());
+    return newTags;
+  }
+}
