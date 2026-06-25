@@ -1,5 +1,6 @@
 package com.team02.mopl.global.exception;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.Getter;
@@ -18,5 +19,9 @@ public class BusinessException extends RuntimeException {
   public BusinessException(ErrorCode errorCode, String details) {
     super(errorCode.getMessage());
     this.errorCode = errorCode;
+  }
+
+  public Map<String, String> getDetails() {
+    return Collections.unmodifiableMap(this.details);
   }
 }
