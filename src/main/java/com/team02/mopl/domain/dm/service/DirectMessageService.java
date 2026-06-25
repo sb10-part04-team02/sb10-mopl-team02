@@ -16,8 +16,8 @@ import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.exception.BusinessException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -28,18 +28,19 @@ public class DirectMessageService {
   private final ConversationMemberRepository conversationMemberRepository;
   private final UserRepository userRepository;
 
+  @Transactional
   public ConversationDto createConversation(
       ConversationCreateRequest request,
-      UUID requestId
+      UUID requesterId
   ) {
-    if(request.withUserId().equals(requestId)){
+    if (requesterId.equals(request.withUserId())) {
       throw new BusinessException(SELF_CONVERSATION);
     }
-    User requestUser = userRepository.findById(requestId)
-        .orElseThrow(()->new BusinessException(USER_NOT_FOUND));
+    User requestUser = userRepository.findById(requesterId)
+        .orElseThrow(() -> new BusinessException(USER_NOT_FOUND));
 
     User withUser = userRepository.findById(request.withUserId())
-        .orElseThrow(()->new BusinessException(USER_NOT_FOUND));
+        .orElseThrow(() -> new BusinessException(USER_NOT_FOUND));
 
     Conversation newConversation = conversationRepository.save(new Conversation());
 
