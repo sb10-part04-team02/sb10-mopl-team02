@@ -15,7 +15,7 @@ public class StompChannelInterceptor implements ChannelInterceptor {
     StompHeaderAccessor accessor =
         MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-    if (accessor == null) {
+    if (accessor == null || accessor.getCommand() == null) {
       return message;
     }
 
