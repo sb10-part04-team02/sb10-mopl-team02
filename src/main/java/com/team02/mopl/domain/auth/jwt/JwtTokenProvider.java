@@ -82,7 +82,7 @@ public class JwtTokenProvider {
   // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
   public JWTClaimsSet verifyAccessToken(String token) throws ParseException {
     JWTClaimsSet claimsSet = verifyAndGetClaims(token);
-    if (!claimsSet.getStringClaim("type").equals(TokenType.ACCESS.name().toLowerCase())) {
+    if (!TokenType.ACCESS.name().equalsIgnoreCase(claimsSet.getStringClaim("type"))) {
       throw new RuntimeException("유효하지 않은 토큰입니다.");
     }
 
@@ -92,7 +92,7 @@ public class JwtTokenProvider {
   // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
   public JWTClaimsSet verifyRefreshToken(String token) throws ParseException {
     JWTClaimsSet claimsSet = verifyAndGetClaims(token);
-    if (!claimsSet.getStringClaim("type").equals(TokenType.REFRESH.name().toLowerCase())) {
+    if (!TokenType.REFRESH.name().equalsIgnoreCase(claimsSet.getStringClaim("type"))) {
       throw new RuntimeException("유효하지 않은 토큰입니다.");
     }
 
