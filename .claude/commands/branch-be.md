@@ -3,7 +3,7 @@
 ## 사용법
 
 ```
-/branch <이슈번호> <설명>
+/branch-be <이슈번호> <설명>
 ```
 
 예시: `/branch 121 register-user`
