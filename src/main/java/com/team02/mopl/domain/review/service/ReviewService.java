@@ -68,4 +68,20 @@ public class ReviewService {
     log.info("리뷰 수정 성공: reviewId={}, requesterId={}", reviewId, requesterId);
     return reviewDto;
   }
+
+  @Transactional
+  public void deleteReview(UUID reviewId, UUID requesterId) {
+    log.debug("리뷰 삭제 시작: reviewId={}, requesterId={}", reviewId, requesterId);
+
+    Review review =
+        reviewRepository
+            .findByIdAndDeletedAtIsNull(reviewId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
+
+    OwnershipValidator.validateOwner(review.getAuthorId(), requesterId);
+
+    review.delete();
+
+    log.info("리뷰 삭제 성공: reviewId={}, requesterId={}", reviewId, requesterId);
+  }
 }

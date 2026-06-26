@@ -70,4 +70,26 @@ public interface ReviewApi {
       UUID reviewId,
       @Parameter(hidden = true) UUID requesterId,
       @RequestBody @Valid ReviewUpdateRequest request);
+
+  @Operation(summary = "리뷰 삭제", description = "작성자 본인이 자신의 리뷰를 삭제합니다.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "성공"),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "권한 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "리뷰를 찾을 수 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<Void> deleteReview(UUID reviewId, @Parameter(hidden = true) UUID requesterId);
 }
