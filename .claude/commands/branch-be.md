@@ -6,7 +6,7 @@
 /branch-be <이슈번호> <설명>
 ```
 
-예시: `/branch 121 register-user`
+예시: `/branch-be 121 register-user`
 
 ## 동작 순서
 
