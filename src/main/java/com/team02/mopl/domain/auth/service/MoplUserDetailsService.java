@@ -24,8 +24,7 @@ public class MoplUserDetailsService implements UserDetailsService {
     User findUser =
         userRepository
             .findByEmailAndDeletedAtIsNull(username)
-            .orElseThrow(
-                () -> new UsernameNotFoundException("email을 찾을 수 없습니다. email=" + username));
+            .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
 
     return new MoplUserDetails(userMapper.toDto(findUser), findUser.getPassword());
   }

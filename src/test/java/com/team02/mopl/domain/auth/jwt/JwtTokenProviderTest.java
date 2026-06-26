@@ -20,6 +20,7 @@ import com.team02.mopl.domain.auth.entity.MoplUserDetails;
 import com.team02.mopl.domain.auth.jwt.JwtTokenProvider.TokenType;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.entity.enums.Role;
+import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
@@ -47,7 +48,7 @@ class JwtTokenProviderTest {
   @Nested
   class VerifyToken {
 
-    private JWTClaimsSet innerVerify(TokenType type, String token) {
+    private JWTClaimsSet innerVerify(TokenType type, String token) throws ParseException {
       return switch (type) {
         case ACCESS -> jwtTokenProvider.verifyAccessToken(token);
         case REFRESH -> jwtTokenProvider.verifyRefreshToken(token);
@@ -178,7 +179,7 @@ class JwtTokenProviderTest {
     @EnumSource(TokenType.class)
     @DisplayName("ClaimSet을 정상적으로 반환한다")
     void success_shouldReturnJWTClaimsSet_whenTokenIsValid(TokenType tokenType)
-        throws JOSEException {
+        throws JOSEException, ParseException {
       // given
       given(properties.secretKey()).willReturn(validKey);
       jwtTokenProvider.bakeSignerAndVerifier();

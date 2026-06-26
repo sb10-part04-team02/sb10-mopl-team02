@@ -17,7 +17,6 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.assertj.core.api.InstanceOfAssertFactories;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,18 +29,12 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 @ExtendWith(MockitoExtension.class)
 class MoplUserDetailsServiceTest {
 
-  private static String email;
-  private static String encryptedPassword;
+  private static final String email = "example@gmail.com";
+  private static final String encryptedPassword = "encryptedPassword";
 
   @Mock private UserRepository userRepository;
   @Mock private UserMapper userMapper;
   @InjectMocks private MoplUserDetailsService userDetailsService;
-
-  @BeforeAll
-  static void setUp() {
-    email = "example@gmail.com";
-    encryptedPassword = "encryptedPassword";
-  }
 
   @Test
   @DisplayName("email을 가진 유저가 없다면 UsernameNotFoundException을 반환한다")
@@ -52,6 +45,25 @@ class MoplUserDetailsServiceTest {
     // when & then
     assertThrows(
         UsernameNotFoundException.class, () -> userDetailsService.loadUserByUsername(email));
+  }
+
+  @Test
+  @DisplayName("잠긴 계정이면 isAccountNonLocked는 false이다")
+  void fail_shouldExposeLockedState_whenUserIsLocked() {
+    // given
+    User mockUser = mock(User.class);
+    UserDto lockedUserDto =
+        new UserDto(UUID.randomUUID(), Instant.now(), email, "이름", null, Role.USER, true);
+    given(mockUser.getPassword()).willReturn(encryptedPassword);
+    given(userRepository.findByEmailAndDeletedAtIsNull(anyString()))
+        .willReturn(Optional.of(mockUser));
+    given(userMapper.toDto(any(User.class))).willReturn(lockedUserDto);
+
+    // when
+    UserDetails actual = userDetailsService.loadUserByUsername(email);
+
+    // then
+    assertThat(actual.isAccountNonLocked()).isFalse();
   }
 
   @Test

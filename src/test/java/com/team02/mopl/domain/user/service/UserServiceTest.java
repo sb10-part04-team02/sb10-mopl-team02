@@ -54,7 +54,7 @@ class UserServiceTest {
     void fail_shouldReturn409_whenEmailIsDuplicate() {
       // given
       UserCreateRequest request = new UserCreateRequest(name, email, password);
-      given(userRepository.existsByEmail(anyString())).willReturn(true);
+      given(userRepository.existsByEmailAndDeletedAtIsNull(anyString())).willReturn(true);
 
       // when & then
       assertThrows(UserEmailDuplicateException.class, () -> userService.createUser(request));
@@ -65,7 +65,7 @@ class UserServiceTest {
     void fail_shouldReturn409_whenDbUniqueConstraintViolated() {
       // given
       UserCreateRequest request = new UserCreateRequest(name, email, password);
-      given(userRepository.existsByEmail(anyString())).willReturn(false);
+      given(userRepository.existsByEmailAndDeletedAtIsNull(anyString())).willReturn(false);
       given(userRepository.saveAndFlush(any(User.class)))
           .willThrow(new DataIntegrityViolationException("Duplicate Email"));
 
@@ -81,7 +81,7 @@ class UserServiceTest {
       User mockUser = new User(name, email, "encryptedPassword", null, Role.USER, false);
       UserDto expect =
           new UserDto(UUID.randomUUID(), Instant.now(), email, name, null, Role.USER, false);
-      given(userRepository.existsByEmail(anyString())).willReturn(false);
+      given(userRepository.existsByEmailAndDeletedAtIsNull(anyString())).willReturn(false);
       given(userRepository.saveAndFlush(any(User.class))).willReturn(mockUser);
       given(userMapper.toDto(any(User.class))).willReturn(expect);
 
@@ -90,7 +90,7 @@ class UserServiceTest {
 
       // then
       assertThat(actual).isEqualTo(expect);
-      then(userRepository).should().existsByEmail(anyString());
+      then(userRepository).should().existsByEmailAndDeletedAtIsNull(anyString());
       then(userRepository).should().saveAndFlush(userCaptor.capture());
       then(userMapper).should().toDto(any(User.class));
 
@@ -109,7 +109,7 @@ class UserServiceTest {
       User mockUser = new User(name, shortEmail, "encryptedPassword", null, Role.USER, false);
       UserDto expect =
           new UserDto(UUID.randomUUID(), Instant.now(), shortEmail, name, null, Role.USER, false);
-      given(userRepository.existsByEmail(anyString())).willReturn(false);
+      given(userRepository.existsByEmailAndDeletedAtIsNull(anyString())).willReturn(false);
       given(userRepository.saveAndFlush(any(User.class))).willReturn(mockUser);
       given(userMapper.toDto(any(User.class))).willReturn(expect);
 
