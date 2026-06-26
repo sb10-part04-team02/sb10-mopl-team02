@@ -1,5 +1,6 @@
 package com.team02.mopl.global.websocket;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.security.Principal;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@SuppressFBWarnings(value = "EI_EXPOSE_REP2")
 public class StompChannelInterceptor implements ChannelInterceptor {
 
   private final WebSocketSessionRegistry sessionRegistry;
