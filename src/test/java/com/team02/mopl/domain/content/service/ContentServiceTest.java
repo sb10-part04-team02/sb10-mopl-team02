@@ -60,6 +60,8 @@ class ContentServiceTest {
 
   @Captor ArgumentCaptor<List<Tag>> tagListCaptor;
 
+  @Captor ArgumentCaptor<List<Tag>> mapperTagListCaptor;
+
   // 설정값(app.storage.default-thumbnail-url)이 그대로 쓰이는지 검증하기 위한 상수
   private static final String DEFAULT_THUMBNAIL_URL = "default-thumbnail-sentinel";
 
@@ -428,6 +430,9 @@ class ContentServiceTest {
       then(tagRepository).should().flush();
       then(tagRepository).should().saveAll(tagListCaptor.capture());
       assertThat(tagListCaptor.getValue()).extracting(Tag::getName).containsExactly("액션");
+      // 매퍼에 전달된 태그가 (삭제된 구 태그가 아닌) 새로 교체된 태그인지 검증
+      then(contentMapper).should().toDto(eq(content), mapperTagListCaptor.capture(), eq(0L));
+      assertThat(mapperTagListCaptor.getValue()).extracting(Tag::getName).containsExactly("액션");
     }
   }
 
