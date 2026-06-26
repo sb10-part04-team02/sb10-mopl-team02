@@ -194,4 +194,56 @@ class ReviewServiceTest {
       assertThat(review.getRating()).isEqualTo(1.0);
     }
   }
+
+  @Nested
+  class DeleteReview {
+    private final UUID reviewId = UUID.randomUUID();
+    private final UUID authorId = UUID.randomUUID();
+    private final UUID contentId = UUID.randomUUID();
+
+    @Test
+    @DisplayName("리뷰가 존재하지 않으면 REVIEW_NOT_FOUND BusinessException을 던진다")
+    void fail_whenReviewNotFound() {
+      // given
+      given(reviewRepository.findByIdAndDeletedAtIsNull(eq(reviewId))).willReturn(Optional.empty());
+
+      // when & then
+      BusinessException exception =
+          assertThrows(
+              BusinessException.class, () -> reviewService.deleteReview(reviewId, authorId));
+      assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.REVIEW_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("작성자가 아니면 FORBIDDEN BusinessException을 던진다")
+    void fail_whenRequesterIsNotAuthor() {
+      // given
+      UUID otherUserId = UUID.randomUUID();
+      Review review = new Review(authorId, contentId, "원본", 4.5);
+      given(reviewRepository.findByIdAndDeletedAtIsNull(eq(reviewId)))
+          .willReturn(Optional.of(review));
+
+      // when & then
+      BusinessException exception =
+          assertThrows(
+              BusinessException.class, () -> reviewService.deleteReview(reviewId, otherUserId));
+      assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN);
+      assertThat(review.isDeleted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("작성자 본인이 삭제하면 리뷰가 논리 삭제된다")
+    void success_whenRequesterIsAuthor() {
+      // given
+      Review review = new Review(authorId, contentId, "원본", 4.5);
+      given(reviewRepository.findByIdAndDeletedAtIsNull(eq(reviewId)))
+          .willReturn(Optional.of(review));
+
+      // when
+      reviewService.deleteReview(reviewId, authorId);
+
+      // then
+      assertThat(review.isDeleted()).isTrue();
+    }
+  }
 }
