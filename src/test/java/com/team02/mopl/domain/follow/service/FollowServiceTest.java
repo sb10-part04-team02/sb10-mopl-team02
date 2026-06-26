@@ -13,6 +13,8 @@ import com.team02.mopl.domain.follow.dto.FollowRequest;
 import com.team02.mopl.domain.follow.entity.Follow;
 import com.team02.mopl.domain.follow.repository.FollowRepository;
 import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
+import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
+import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -23,9 +25,11 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class FollowServiceTest {
@@ -74,7 +78,17 @@ class FollowServiceTest {
     assertThat(result.followeeId()).isEqualTo(followeeId);
 
     verify(followRepository).save(any(Follow.class));
-    verify(notificationService).createNotification(any(NotificationCreateCommand.class));
+
+    ArgumentCaptor<NotificationCreateCommand> commandCaptor =
+        ArgumentCaptor.forClass(NotificationCreateCommand.class);
+
+    verify(notificationService).createNotification(commandCaptor.capture());
+
+    NotificationCreateCommand notificationCommand = commandCaptor.getValue();
+
+    assertThat(notificationCommand.receiverId()).isEqualTo(followeeId);
+    assertThat(notificationCommand.level()).isEqualTo(NotificationLevel.INFO);
+    assertThat(notificationCommand.notificationType()).isEqualTo(NotificationType.USER_FOLLOWED);
   }
 
   @Test
@@ -272,5 +286,29 @@ class FollowServiceTest {
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.USER_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("동시 팔로우 요청으로 유니크 제약이 발생하면 FOLLOW_ALREADY_EXISTS 예외가 발생한다")
+  void createFollow_duplicateByUniqueConstraint_throwsException() {
+    UUID followerId = UUID.randomUUID();
+    UUID followeeId = UUID.randomUUID();
+    User follower = mock(User.class);
+    User followee = mock(User.class);
+    FollowRequest request = new FollowRequest(followeeId);
+
+    given(userRepository.findByIdAndDeletedAtIsNull(followerId)).willReturn(Optional.of(follower));
+    given(userRepository.findByIdAndDeletedAtIsNull(followeeId)).willReturn(Optional.of(followee));
+    given(
+            followRepository.existsByFollower_IdAndFollowee_IdAndDeletedAtIsNull(
+                followerId, followeeId))
+        .willReturn(false);
+    given(followRepository.save(any(Follow.class)))
+        .willThrow(DataIntegrityViolationException.class);
+
+    assertThatThrownBy(() -> followService.createFollow(followerId, request))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FOLLOW_ALREADY_EXISTS));
   }
 }

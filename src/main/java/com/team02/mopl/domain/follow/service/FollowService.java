@@ -15,6 +15,7 @@ import com.team02.mopl.global.exception.ErrorCode;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -41,7 +42,12 @@ public class FollowService {
 
     validateNotAlreadyFollowing(followerId, followeeId);
 
-    Follow follow = followRepository.save(new Follow(follower, followee));
+    Follow follow;
+    try {
+      follow = followRepository.save(new Follow(follower, followee));
+    } catch (DataIntegrityViolationException e) {
+      throw new BusinessException(ErrorCode.FOLLOW_ALREADY_EXISTS);
+    }
 
     notificationService.createNotification(
         new NotificationCreateCommand(
