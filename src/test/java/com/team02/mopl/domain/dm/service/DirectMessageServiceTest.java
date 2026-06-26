@@ -93,6 +93,27 @@ class DirectMessageServiceTest {
   }
 
   @Test
+  @DisplayName("두 사용자 간 대화방이 이미 존재하면 CONVERSATION_ALREADY_EXISTS 예외가 발생한다")
+  void createConversation_alreadyExists_throwsException() {
+    UUID requesterId = UUID.randomUUID();
+    UUID withUserId = UUID.randomUUID();
+
+    given(conversationMemberRepository.existsConversationBetween(requesterId, withUserId))
+        .willReturn(true);
+
+    assertThatThrownBy(
+            () ->
+                directMessageService.createConversation(
+                    new ConversationCreateRequest(withUserId), requesterId))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CONVERSATION_ALREADY_EXISTS));
+
+    verify(userRepository, never()).findById(any());
+    verify(conversationRepository, never()).save(any());
+  }
+
+  @Test
   @DisplayName("요청자가 존재하지 않으면 USER_NOT_FOUND 예외가 발생한다")
   void createConversation_requesterNotFound_throwsException() {
     UUID requesterId = UUID.randomUUID();
