@@ -45,9 +45,9 @@ class UserServiceTest {
 
   @Nested
   class CreateUser {
-    private final String name = "username";
-    private final String email = "example@gmail.com";
-    private final String password = "12345678";
+    private static final String name = "username";
+    private static final String email = "example@gmail.com";
+    private static final String password = "12345678";
 
     @Test
     @DisplayName("이메일이 중복일 때 409 에러를 반환한다")
