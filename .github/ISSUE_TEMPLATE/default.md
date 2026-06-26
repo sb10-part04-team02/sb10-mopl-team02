@@ -1,7 +1,7 @@
 ---
 name: "Issue"
 about: "작업, 버그, 개선 사항 등을 기록합니다."
-title: "[TYPE] 제목을 입력해주세요"
+title: "[type] 제목을 입력해주세요"
 labels: ""
 assignees: ""
 ---
