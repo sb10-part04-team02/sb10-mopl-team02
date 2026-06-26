@@ -47,7 +47,6 @@ public class JwtTokenProvider {
   }
 
   // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
-  //        테스트 구현 필요
   private String generateToken(MoplUserDetails userDetails, TokenType type) {
     long expirationTime =
         switch (type) {
@@ -77,7 +76,6 @@ public class JwtTokenProvider {
   }
 
   // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
-  //        테스트 구현 필요
   public JWTClaimsSet verifyAndGetClaims(String token) {
     try {
       SignedJWT signedJWT = SignedJWT.parse(token);
@@ -91,9 +89,9 @@ public class JwtTokenProvider {
       // 만료시간 검증
       JWTClaimsSet claimsSet = signedJWT.getJWTClaimsSet();
       Date tokenExpirationTime = claimsSet.getExpirationTime();
-      if (tokenExpirationTime != null && tokenExpirationTime.before(new Date())) {
-        log.debug("JWT 검증 실패: 만료시간");
-        throw new RuntimeException("만료된 토큰입니다.");
+      if (tokenExpirationTime == null || tokenExpirationTime.before(new Date())) {
+        log.debug("JWT 검증 실패: 만료시간이 없거나 만료됨");
+        throw new RuntimeException("만료되었거나 올바르지 않은 토큰입니다.");
       }
 
       return claimsSet;
