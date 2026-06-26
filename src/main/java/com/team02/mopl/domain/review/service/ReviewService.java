@@ -1,5 +1,6 @@
 package com.team02.mopl.domain.review.service;
 
+import com.team02.mopl.domain.content.service.ContentRatingService;
 import com.team02.mopl.domain.review.dto.ReviewCreateRequest;
 import com.team02.mopl.domain.review.dto.ReviewDto;
 import com.team02.mopl.domain.review.dto.ReviewSearchRequest;
@@ -31,6 +32,7 @@ public class ReviewService {
 
   private final ReviewRepository reviewRepository;
   private final ReviewMapper reviewMapper;
+  private final ContentRatingService contentRatingService;
 
   // 리뷰 목록 조회 (커서 페이지네이션)
   // contentId로 특정 콘텐츠 리뷰 필터링, createdAt/rating 정렬, 논리 삭제 제외
@@ -89,6 +91,7 @@ public class ReviewService {
       log.warn("리뷰 저장 중 무결성 위반 발생: authorId={}, contentId={}", authorId, request.contentId(), e);
       throw new ReviewAlreadyExistsException();
     }
+    contentRatingService.refreshAggregate(request.contentId());
     ReviewDto reviewDto = reviewMapper.toDto(savedReview);
 
     log.info("리뷰 생성 성공: reviewId={}, authorId={}", reviewDto.id(), authorId);
@@ -107,6 +110,8 @@ public class ReviewService {
     OwnershipValidator.validateOwner(review.getAuthorId(), requesterId);
 
     review.update(request.text(), request.rating());
+    reviewRepository.flush();
+    contentRatingService.refreshAggregate(review.getContentId());
     ReviewDto reviewDto = reviewMapper.toDto(review);
 
     log.info("리뷰 수정 성공: reviewId={}, requesterId={}", reviewId, requesterId);
@@ -125,6 +130,8 @@ public class ReviewService {
     OwnershipValidator.validateOwner(review.getAuthorId(), requesterId);
 
     review.delete();
+    reviewRepository.flush();
+    contentRatingService.refreshAggregate(review.getContentId());
 
     log.info("리뷰 삭제 성공: reviewId={}, requesterId={}", reviewId, requesterId);
   }
