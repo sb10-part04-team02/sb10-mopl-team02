@@ -5,6 +5,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -14,6 +15,7 @@ public class WatcherCountService {
   private final WatchingSessionRepository watchingSessionRepository;
 
   // 단일 contentId에 대해 watcherCount(활성 시청 세션 수) 집계
+  @Transactional(readOnly = true)
   public long count(UUID contentId) {
     return watchingSessionRepository.countActiveByContentId(contentId);
   }
