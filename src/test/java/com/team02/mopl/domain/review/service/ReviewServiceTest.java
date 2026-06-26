@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
+import com.team02.mopl.domain.content.service.ContentRatingService;
 import com.team02.mopl.domain.review.dto.ReviewCreateRequest;
 import com.team02.mopl.domain.review.dto.ReviewDto;
 import com.team02.mopl.domain.review.dto.ReviewSearchRequest;
@@ -43,6 +44,8 @@ class ReviewServiceTest {
   @Mock ReviewRepository reviewRepository;
 
   @Mock ReviewMapper reviewMapper;
+
+  @Mock ContentRatingService contentRatingService;
 
   @InjectMocks ReviewService reviewService;
 
@@ -244,6 +247,7 @@ class ReviewServiceTest {
           .should()
           .existsByAuthorIdAndContentIdAndDeletedAtIsNull(eq(authorId), eq(contentId));
       then(reviewRepository).should().saveAndFlush(reviewCaptor.capture());
+      then(contentRatingService).should().refreshAggregate(eq(contentId));
       then(reviewMapper).should().toDto(any(Review.class));
 
       Review captured = reviewCaptor.getValue();
@@ -312,6 +316,7 @@ class ReviewServiceTest {
       assertThat(actual).isEqualTo(expect);
       assertThat(review.getText()).isEqualTo("수정된 내용");
       assertThat(review.getRating()).isEqualTo(2.0);
+      then(contentRatingService).should().refreshAggregate(eq(contentId));
       then(reviewMapper).should().toDto(any(Review.class));
     }
 
@@ -383,6 +388,7 @@ class ReviewServiceTest {
 
       // then
       assertThat(review.isDeleted()).isTrue();
+      then(contentRatingService).should().refreshAggregate(eq(contentId));
     }
   }
 }
