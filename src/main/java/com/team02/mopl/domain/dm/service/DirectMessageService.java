@@ -1,5 +1,6 @@
 package com.team02.mopl.domain.dm.service;
 
+import static com.team02.mopl.global.exception.ErrorCode.CONVERSATION_ALREADY_EXISTS;
 import static com.team02.mopl.global.exception.ErrorCode.SELF_CONVERSATION;
 import static com.team02.mopl.global.exception.ErrorCode.USER_NOT_FOUND;
 
@@ -34,6 +35,11 @@ public class DirectMessageService {
     if (requesterId.equals(request.withUserId())) {
       throw new BusinessException(SELF_CONVERSATION);
     }
+
+    if (conversationMemberRepository.existsConversationBetween(requesterId, request.withUserId())) {
+      throw new BusinessException(CONVERSATION_ALREADY_EXISTS);
+    }
+
     User requestUser =
         userRepository
             .findById(requesterId)
