@@ -35,7 +35,7 @@ public enum ErrorCode {
 
   // Review
   REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_404", "리뷰를 찾을 수 없습니다."),
-  REVIEW_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "REVIEW_400", "이미 작성한 리뷰가 존재합니다."),
+  REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "REVIEW_409", "이미 작성한 리뷰가 존재합니다."),
 
   // Conversation
   CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "CONVERSATION_404", "대화를 찾을 수 없습니다."),
