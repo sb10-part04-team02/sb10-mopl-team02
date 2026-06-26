@@ -2,6 +2,7 @@ package com.team02.mopl.domain.review.controller;
 
 import com.team02.mopl.domain.review.dto.ReviewCreateRequest;
 import com.team02.mopl.domain.review.dto.ReviewDto;
+import com.team02.mopl.domain.review.dto.ReviewUpdateRequest;
 import com.team02.mopl.global.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -40,4 +41,33 @@ public interface ReviewApi {
   })
   ResponseEntity<ReviewDto> createReview(
       @Parameter(hidden = true) UUID authorId, @RequestBody @Valid ReviewCreateRequest request);
+
+  @Operation(summary = "리뷰 수정", description = "작성자 본인이 자신의 리뷰의 평점·내용을 수정합니다.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "권한 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "리뷰를 찾을 수 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<ReviewDto> updateReview(
+      UUID reviewId,
+      @Parameter(hidden = true) UUID requesterId,
+      @RequestBody @Valid ReviewUpdateRequest request);
 }
