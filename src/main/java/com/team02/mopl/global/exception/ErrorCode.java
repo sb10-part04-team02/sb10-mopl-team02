@@ -35,13 +35,21 @@ public enum ErrorCode {
 
   // Review
   REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_404", "리뷰를 찾을 수 없습니다."),
-  REVIEW_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "REVIEW_400", "이미 작성한 리뷰가 존재합니다."),
+  REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "REVIEW_409", "이미 작성한 리뷰가 존재합니다."),
 
   // Conversation
   CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "CONVERSATION_404", "대화를 찾을 수 없습니다."),
+  SELF_CONVERSATION(HttpStatus.BAD_REQUEST, "CONVERSATION_400", "자기 자신과 대화방을 만들 수 없습니다."),
+  CONVERSATION_ALREADY_EXISTS(HttpStatus.CONFLICT, "CONVERSATION_409", "이미 존재하는 대화방입니다."),
 
   // Watch Room
   WATCH_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "WATCH_ROOM_404", "시청방을 찾을 수 없습니다."),
+
+  // Follow
+  FOLLOW_NOT_FOUND(HttpStatus.NOT_FOUND, "FOLLOW_404", "팔로우 정보를 찾을 수 없습니다."),
+  FOLLOW_FORBIDDEN(HttpStatus.FORBIDDEN, "FOLLOW_403", "해당 팔로우에 접근할 권한이 없습니다."),
+  FOLLOW_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "FOLLOW_400", "이미 팔로우한 사용자입니다."),
+  CANNOT_FOLLOW_SELF(HttpStatus.BAD_REQUEST, "FOLLOW_400", "자기 자신은 팔로우할 수 없습니다."),
 
   // Notification
   NOTIFICATION_FORBIDDEN(HttpStatus.FORBIDDEN, "NOTIFICATION_403", "해당 알림에 접근할 권한이 없습니다."),

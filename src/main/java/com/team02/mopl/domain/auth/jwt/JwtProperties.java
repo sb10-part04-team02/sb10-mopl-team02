@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@ConfigurationProperties(prefix = "mopl.jwt")
+@ConfigurationProperties(prefix = "app.jwt")
 public record JwtProperties(
     String secretKey, Duration accessTokenExpiration, Duration refreshTokenExpiration) {
 
