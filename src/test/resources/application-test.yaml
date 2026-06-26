@@ -10,3 +10,7 @@ spring:
       hibernate:
         format_sql: true
     show-sql: false
+
+app:
+  jwt:
+    secret-key: ${JWT_SECRET_KEY:"this-is-a-dummy-secret-key-for-testing-purposes-only-32bytes"}
