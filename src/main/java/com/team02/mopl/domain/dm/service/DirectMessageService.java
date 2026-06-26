@@ -14,6 +14,7 @@ import com.team02.mopl.domain.dm.repository.DirectMessageRepository;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.exception.BusinessException;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -45,11 +46,21 @@ public class DirectMessageService {
 
     Conversation newConversation = conversationRepository.save(new Conversation());
 
+    Instant now = Instant.now();
+
     ConversationMember requestUserMember =
-        ConversationMember.builder().conversation(newConversation).user(requestUser).build();
+        ConversationMember.builder()
+            .conversation(newConversation)
+            .user(requestUser)
+            .lastReadAt(now)
+            .build();
 
     ConversationMember withUserMember =
-        ConversationMember.builder().conversation(newConversation).user(withUser).build();
+        ConversationMember.builder()
+            .conversation(newConversation)
+            .user(withUser)
+            .lastReadAt(now)
+            .build();
 
     conversationMemberRepository.saveAll(java.util.List.of(requestUserMember, withUserMember));
 
