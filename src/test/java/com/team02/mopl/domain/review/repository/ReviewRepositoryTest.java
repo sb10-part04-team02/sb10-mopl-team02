@@ -8,12 +8,14 @@ import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.review.entity.Review;
 import com.team02.mopl.support.RepositoryTestSupport;
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 
 class ReviewRepositoryTest extends RepositoryTestSupport {
 
@@ -92,6 +94,34 @@ class ReviewRepositoryTest extends RepositoryTestSupport {
 
     assertThat(reviewRepository.existsByAuthorIdAndContentIdAndDeletedAtIsNull(authorId, contentId))
         .isTrue();
+  }
+
+  @Test
+  @DisplayName("countActive는 콘텐츠 필터를 적용해 활성 리뷰 수만 센다")
+  void countActive_filtersByContentAndExcludesDeleted() {
+    reviewRepository.save(new Review(authorId, contentId, "리뷰1", 4.0));
+    Review deleted = reviewRepository.save(new Review(insertUser(), contentId, "삭제", 3.0));
+    em.flush();
+    deleted.delete();
+    em.flush();
+
+    assertThat(reviewRepository.countActive(contentId)).isEqualTo(1L);
+    assertThat(reviewRepository.countActive(UUID.randomUUID())).isEqualTo(0L);
+  }
+
+  @Test
+  @DisplayName("findNextByRatingDesc는 (rating, id) 복합키 비교로 커서 이후 항목만 평점 내림차순 조회한다")
+  void findNextByRatingDesc_returnsItemsAfterCursorByCompositeKey() {
+    Review high = reviewRepository.save(new Review(insertUser(), contentId, "5점", 5.0));
+    Review mid = reviewRepository.save(new Review(insertUser(), contentId, "4점", 4.0));
+    Review low = reviewRepository.save(new Review(insertUser(), contentId, "3점", 3.0));
+    em.flush();
+
+    List<Review> next =
+        reviewRepository.findNextByRatingDesc(
+            contentId, high.getRating(), high.getId(), PageRequest.of(0, 10));
+
+    assertThat(next).extracting(Review::getId).containsExactly(mid.getId(), low.getId());
   }
 
   private UUID insertUser() {

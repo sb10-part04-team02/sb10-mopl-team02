@@ -17,9 +17,12 @@ import com.team02.mopl.domain.review.exception.ReviewAlreadyExistsException;
 import com.team02.mopl.domain.review.mapper.ReviewMapper;
 import com.team02.mopl.domain.review.repository.ReviewRepository;
 import com.team02.mopl.domain.user.dto.UserSummary;
+import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -32,6 +35,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class ReviewServiceTest {
@@ -46,17 +51,127 @@ class ReviewServiceTest {
 
   @Nested
   class GetReviews {
+    private final UUID contentId = UUID.randomUUID();
+
+    private Review review(double rating) {
+      Review review = new Review(UUID.randomUUID(), contentId, "리뷰", rating);
+      ReflectionTestUtils.setField(review, "id", UUID.randomUUID());
+      ReflectionTestUtils.setField(review, "createdAt", Instant.parse("2026-01-01T00:00:00Z"));
+      return review;
+    }
 
     @Test
-    @DisplayName("커서 페이지네이션 미구현 상태에서는 UnsupportedOperationException을 던진다")
-    void fail_whenNotImplemented() {
+    @DisplayName("커서가 없으면 첫 페이지를 createdAt 내림차순으로 조회한다")
+    void firstPage_byCreatedAtDesc() {
       // given
       ReviewSearchRequest request =
           new ReviewSearchRequest(
-              UUID.randomUUID(), null, null, 10, SortDirection.DESCENDING, ReviewSortBy.CREATED_AT);
+              contentId, null, null, 10, SortDirection.DESCENDING, ReviewSortBy.CREATED_AT);
+      given(reviewRepository.findFirstByCreatedAtDesc(eq(contentId), any(Pageable.class)))
+          .willReturn(List.of(review(4.0), review(3.0)));
+      given(reviewRepository.countActive(eq(contentId))).willReturn(2L);
+      given(reviewMapper.toDto(any(Review.class)))
+          .willReturn(
+              new ReviewDto(
+                  UUID.randomUUID(),
+                  contentId,
+                  new UserSummary(UUID.randomUUID(), null, null),
+                  "리뷰",
+                  4.0));
+
+      // when
+      CursorResponse<ReviewDto> response = reviewService.getReviews(request);
+
+      // then
+      assertThat(response.data()).hasSize(2);
+      assertThat(response.hasNext()).isFalse();
+      assertThat(response.nextCursor()).isNull();
+      assertThat(response.nextIdAfter()).isNull();
+      assertThat(response.totalCount()).isEqualTo(2L);
+      assertThat(response.sortBy()).isEqualTo("CREATED_AT");
+      assertThat(response.sortDirection()).isEqualTo("DESCENDING");
+    }
+
+    @Test
+    @DisplayName("limit + 1건이 조회되면 hasNext=true이고 마지막 항목으로 nextCursor를 채운다")
+    void hasNext_whenMoreThanLimit() {
+      // given
+      ReviewSearchRequest request =
+          new ReviewSearchRequest(
+              contentId, null, null, 1, SortDirection.DESCENDING, ReviewSortBy.CREATED_AT);
+      Review first = review(4.0);
+      given(reviewRepository.findFirstByCreatedAtDesc(eq(contentId), any(Pageable.class)))
+          .willReturn(List.of(first, review(3.0)));
+      given(reviewRepository.countActive(eq(contentId))).willReturn(2L);
+      given(reviewMapper.toDto(any(Review.class)))
+          .willReturn(
+              new ReviewDto(
+                  first.getId(),
+                  contentId,
+                  new UserSummary(UUID.randomUUID(), null, null),
+                  "리뷰",
+                  4.0));
+
+      // when
+      CursorResponse<ReviewDto> response = reviewService.getReviews(request);
+
+      // then
+      assertThat(response.data()).hasSize(1);
+      assertThat(response.hasNext()).isTrue();
+      assertThat(response.nextCursor()).isEqualTo(first.getCreatedAt().toString());
+      assertThat(response.nextIdAfter()).isEqualTo(first.getId());
+    }
+
+    @Test
+    @DisplayName("rating 정렬에서 커서가 있으면 다음 페이지를 평점 기준으로 조회한다")
+    void nextPage_byRating() {
+      // given
+      UUID idAfter = UUID.randomUUID();
+      ReviewSearchRequest request =
+          new ReviewSearchRequest(
+              contentId, "4.0", idAfter, 10, SortDirection.DESCENDING, ReviewSortBy.RATING);
+      given(
+              reviewRepository.findNextByRatingDesc(
+                  eq(contentId), eq(4.0), eq(idAfter), any(Pageable.class)))
+          .willReturn(List.of(review(3.0)));
+      given(reviewRepository.countActive(eq(contentId))).willReturn(5L);
+      given(reviewMapper.toDto(any(Review.class)))
+          .willReturn(
+              new ReviewDto(
+                  UUID.randomUUID(),
+                  contentId,
+                  new UserSummary(UUID.randomUUID(), null, null),
+                  "리뷰",
+                  3.0));
+
+      // when
+      CursorResponse<ReviewDto> response = reviewService.getReviews(request);
+
+      // then
+      assertThat(response.data()).hasSize(1);
+      assertThat(response.sortBy()).isEqualTo("RATING");
+      then(reviewRepository)
+          .should()
+          .findNextByRatingDesc(eq(contentId), eq(4.0), eq(idAfter), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("rating 정렬에서 cursor가 숫자가 아니면 INVALID_REQUEST BusinessException을 던진다")
+    void fail_whenRatingCursorNotNumeric() {
+      // given
+      ReviewSearchRequest request =
+          new ReviewSearchRequest(
+              contentId,
+              "not-a-number",
+              UUID.randomUUID(),
+              10,
+              SortDirection.DESCENDING,
+              ReviewSortBy.RATING);
 
       // when & then
-      assertThrows(UnsupportedOperationException.class, () -> reviewService.getReviews(request));
+      BusinessException exception =
+          assertThrows(BusinessException.class, () -> reviewService.getReviews(request));
+      assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST);
     }
   }
 
