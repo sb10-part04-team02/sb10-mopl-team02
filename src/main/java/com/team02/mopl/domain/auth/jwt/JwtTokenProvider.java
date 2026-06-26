@@ -15,9 +15,11 @@ import jakarta.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.util.Date;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -55,12 +57,14 @@ public class JwtTokenProvider {
         };
 
     Date expDate = new Date(System.currentTimeMillis() + expirationTime);
+    List<String> roles =
+        userDetails.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
     JWTClaimsSet claimsSet =
         new Builder()
             .subject(userDetails.getUserDto().email())
             .issueTime(new Date())
             .expirationTime(expDate)
-            .claim("roles", userDetails.getAuthorities())
+            .claim("roles", roles)
             .claim("type", type.name().toLowerCase())
             .claim("userId", userDetails.getUserDto().id())
             .build();
@@ -76,7 +80,27 @@ public class JwtTokenProvider {
   }
 
   // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
-  public JWTClaimsSet verifyAndGetClaims(String token) {
+  public JWTClaimsSet verifyAccessToken(String token) {
+    JWTClaimsSet claimsSet = verifyAndGetClaims(token);
+    if (!claimsSet.getClaim("type").equals(TokenType.ACCESS.name().toLowerCase())) {
+      throw new RuntimeException("유효하지 않은 토큰입니다.");
+    }
+
+    return claimsSet;
+  }
+
+  // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
+  public JWTClaimsSet verifyRefreshToken(String token) {
+    JWTClaimsSet claimsSet = verifyAndGetClaims(token);
+    if (!claimsSet.getClaim("type").equals(TokenType.REFRESH.name().toLowerCase())) {
+      throw new RuntimeException("유효하지 않은 토큰입니다.");
+    }
+
+    return claimsSet;
+  }
+
+  // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
+  private JWTClaimsSet verifyAndGetClaims(String token) {
     try {
       SignedJWT signedJWT = SignedJWT.parse(token);
 

@@ -23,7 +23,7 @@ public class MoplUserDetailsService implements UserDetailsService {
   public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
     User findUser =
         userRepository
-            .findByEmail(username)
+            .findByEmailAndDeletedAtIsNull(username)
             .orElseThrow(
                 () -> new UsernameNotFoundException("email을 찾을 수 없습니다. email=" + username));
 

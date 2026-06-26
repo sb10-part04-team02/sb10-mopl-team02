@@ -30,4 +30,9 @@ public class MoplUserDetails implements UserDetails {
   public String getUsername() {
     return this.userDto.email();
   }
+
+  @Override
+  public boolean isAccountNonLocked() {
+    return !this.userDto.locked();
+  }
 }

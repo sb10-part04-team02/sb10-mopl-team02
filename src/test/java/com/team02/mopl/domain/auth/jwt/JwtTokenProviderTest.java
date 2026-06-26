@@ -14,6 +14,7 @@ import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.JWTClaimsSet.Builder;
 import com.nimbusds.jwt.SignedJWT;
 import com.team02.mopl.domain.auth.entity.MoplUserDetails;
 import com.team02.mopl.domain.auth.jwt.JwtTokenProvider.TokenType;
@@ -44,22 +45,33 @@ class JwtTokenProviderTest {
   @InjectMocks private JwtTokenProvider jwtTokenProvider;
 
   @Nested
-  class VerifyAndGetClaims {
-    @Test
+  class VerifyToken {
+
+    private JWTClaimsSet innerVerify(TokenType type, String token) {
+      return switch (type) {
+        case ACCESS -> jwtTokenProvider.verifyAccessToken(token);
+        case REFRESH -> jwtTokenProvider.verifyRefreshToken(token);
+      };
+    }
+
+    @ParameterizedTest
+    @EnumSource(TokenType.class)
     @DisplayName("parse를 실패해서 ParseException을 던진다")
-    void fail_shouldThrowRuntimeExceptionWrappedParseException_whenTokenParsingFails() {
+    void fail_shouldThrowRuntimeExceptionWrappedParseException_whenTokenParsingFails(
+        TokenType tokenType) {
       // given
       String invalidToken = "invalidToken";
 
       // when
-      assertThrows(RuntimeException.class, () -> jwtTokenProvider.verifyAndGetClaims(invalidToken));
+      assertThrows(RuntimeException.class, () -> innerVerify(tokenType, invalidToken));
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(TokenType.class)
     @DisplayName("verify를 실패해서 JOSEException을 던진다")
     void
-        fail_shouldThrowRuntimeExceptionWrappedJOSEException_whenTokenVerificationFailsWithJOSEException()
-            throws JOSEException {
+        fail_shouldThrowRuntimeExceptionWrappedJOSEException_whenTokenVerificationFailsWithJOSEException(
+            TokenType tokenType) throws JOSEException {
       // given
       String validFormatToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature";
       JWSVerifier mockVerifier = mock(JWSVerifier.class);
@@ -68,13 +80,14 @@ class JwtTokenProviderTest {
       ReflectionTestUtils.setField(jwtTokenProvider, "verifier", mockVerifier);
 
       // when & then
-      assertThrows(
-          RuntimeException.class, () -> jwtTokenProvider.verifyAndGetClaims(validFormatToken));
+      assertThrows(RuntimeException.class, () -> innerVerify(tokenType, validFormatToken));
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(TokenType.class)
     @DisplayName("서명검증에 실패해서 RuntimeException을 던진다")
-    void fail_shouldThrowRuntimeException_whenTokenSignatureIsInvalid() throws JOSEException {
+    void fail_shouldThrowRuntimeException_whenTokenSignatureIsInvalid(TokenType tokenType)
+        throws JOSEException {
       // given
       String validFormatToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature";
       JWSVerifier mockVerifier = mock(JWSVerifier.class);
@@ -82,19 +95,20 @@ class JwtTokenProviderTest {
       ReflectionTestUtils.setField(jwtTokenProvider, "verifier", mockVerifier);
 
       // when & then
-      assertThrows(
-          RuntimeException.class, () -> jwtTokenProvider.verifyAndGetClaims(validFormatToken));
+      assertThrows(RuntimeException.class, () -> innerVerify(tokenType, validFormatToken));
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(TokenType.class)
     @DisplayName("만료시간이 null이라 검증에 실패해서 RuntimeException을 던진다")
-    void fail_shouldThrowRuntimeException_whenTokenExpirationTimeIsNull() throws JOSEException {
+    void fail_shouldThrowRuntimeException_whenTokenExpirationTimeIsNull(TokenType tokenType)
+        throws JOSEException {
       // given
       given(properties.secretKey()).willReturn(validKey);
       jwtTokenProvider.bakeSignerAndVerifier();
 
       // 만료시간 없는 claim 생성
-      JWTClaimsSet claimsSet = new JWTClaimsSet.Builder().issueTime(new Date()).build();
+      JWTClaimsSet claimsSet = new Builder().issueTime(new Date()).build();
 
       // 만료시간 없는 토큰 생성
       SignedJWT signedJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claimsSet);
@@ -102,21 +116,21 @@ class JwtTokenProviderTest {
       String nullExpirationToken = signedJWT.serialize();
 
       // when & then
-      assertThrows(
-          RuntimeException.class, () -> jwtTokenProvider.verifyAndGetClaims(nullExpirationToken));
+      assertThrows(RuntimeException.class, () -> innerVerify(tokenType, nullExpirationToken));
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(TokenType.class)
     @DisplayName("만료시간 검증에 실패해서 RuntimeException을 던진다")
-    void fail_shouldThrowRuntimeException_whenTokenIsExpired() throws JOSEException {
+    void fail_shouldThrowRuntimeException_whenTokenIsExpired(TokenType tokenType)
+        throws JOSEException {
       // given
       given(properties.secretKey()).willReturn(validKey);
       jwtTokenProvider.bakeSignerAndVerifier();
 
       // 만료시간 지난 claim 생성
       Date pastDate = new Date(System.currentTimeMillis() - Duration.ofMinutes(10).toMillis());
-      JWTClaimsSet claimsSet =
-          new JWTClaimsSet.Builder().issueTime(new Date()).expirationTime(pastDate).build();
+      JWTClaimsSet claimsSet = new Builder().issueTime(new Date()).expirationTime(pastDate).build();
 
       // 만료시간 지난 토큰 생성
       SignedJWT signedJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claimsSet);
@@ -124,12 +138,47 @@ class JwtTokenProviderTest {
       String expiredToken = signedJWT.serialize();
 
       // when & then
-      assertThrows(RuntimeException.class, () -> jwtTokenProvider.verifyAndGetClaims(expiredToken));
+      assertThrows(RuntimeException.class, () -> innerVerify(tokenType, expiredToken));
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(TokenType.class)
+    @DisplayName("토큰타입이 맞지 않으면 RuntimeException을 던진다")
+    void fail_shouldThrowRuntimeException_whenTokenTypeIsInvalid(TokenType tokenType)
+        throws JOSEException {
+      // given
+      given(properties.secretKey()).willReturn(validKey);
+      jwtTokenProvider.bakeSignerAndVerifier();
+
+      String invalidTokenTypeString =
+          switch (tokenType) {
+            case ACCESS -> "refresh";
+            case REFRESH -> "access";
+          };
+      // 만료시간이 10분인 claim 생성
+      Date currentPlus10Minute =
+          new Date(System.currentTimeMillis() + Duration.ofMinutes(10).toMillis());
+      JWTClaimsSet expect =
+          new Builder()
+              .issueTime(new Date())
+              .expirationTime(currentPlus10Minute)
+              .claim("type", invalidTokenTypeString)
+              .build();
+
+      // 만료시간 지난 토큰 생성
+      SignedJWT signedJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), expect);
+      signedJWT.sign((JWSSigner) ReflectionTestUtils.getField(jwtTokenProvider, "signer"));
+      String validToken = signedJWT.serialize();
+
+      // when & then
+      assertThrows(RuntimeException.class, () -> innerVerify(tokenType, validToken));
+    }
+
+    @ParameterizedTest
+    @EnumSource(TokenType.class)
     @DisplayName("ClaimSet을 정상적으로 반환한다")
-    void success_shouldReturnJWTClaimsSet_whenTokenIsValid() throws JOSEException {
+    void success_shouldReturnJWTClaimsSet_whenTokenIsValid(TokenType tokenType)
+        throws JOSEException {
       // given
       given(properties.secretKey()).willReturn(validKey);
       jwtTokenProvider.bakeSignerAndVerifier();
@@ -138,9 +187,10 @@ class JwtTokenProviderTest {
       Date currentPlus10Minute =
           new Date(System.currentTimeMillis() + Duration.ofMinutes(10).toMillis());
       JWTClaimsSet expect =
-          new JWTClaimsSet.Builder()
+          new Builder()
               .issueTime(new Date())
               .expirationTime(currentPlus10Minute)
+              .claim("type", tokenType.name().toLowerCase())
               .build();
 
       // 만료시간 지난 토큰 생성
@@ -149,7 +199,7 @@ class JwtTokenProviderTest {
       String validToken = signedJWT.serialize();
 
       // when
-      JWTClaimsSet actual = jwtTokenProvider.verifyAndGetClaims(validToken);
+      JWTClaimsSet actual = innerVerify(tokenType, validToken);
 
       // then
       // JWT토큰은 밀리초단위가 절삭되서 1초내로 비교해야 함

@@ -47,7 +47,7 @@ class MoplUserDetailsServiceTest {
   @DisplayName("email을 가진 유저가 없다면 UsernameNotFoundException을 반환한다")
   void fail_shouldThrowUsernameNotFoundException_whenUserDoesNotExistWithEmail() {
     // given
-    given(userRepository.findByEmail(anyString())).willThrow(UsernameNotFoundException.class);
+    given(userRepository.findByEmailAndDeletedAtIsNull(anyString())).willReturn(Optional.empty());
 
     // when & then
     assertThrows(
@@ -63,7 +63,8 @@ class MoplUserDetailsServiceTest {
         new UserDto(UUID.randomUUID(), Instant.now(), email, "이름", null, Role.USER, false);
 
     given(mockUser.getPassword()).willReturn(encryptedPassword);
-    given(userRepository.findByEmail(anyString())).willReturn(Optional.of(mockUser));
+    given(userRepository.findByEmailAndDeletedAtIsNull(anyString()))
+        .willReturn(Optional.of(mockUser));
     given(userMapper.toDto(any(User.class))).willReturn(userDto);
 
     // when
