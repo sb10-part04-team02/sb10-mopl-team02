@@ -3,6 +3,7 @@ package com.team02.mopl.domain.dm.controller;
 import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
 import com.team02.mopl.domain.dm.service.DirectMessageService;
+import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,8 +22,10 @@ public class DirectMessageController {
 
   @PostMapping
   public ResponseEntity<ConversationDto> createConversation(
-      @RequestHeader("X-USER-ID") UUID userId, @RequestBody ConversationCreateRequest request) {
+      @RequestHeader("X-USER-ID") UUID userId,
+      @RequestBody @Valid ConversationCreateRequest request) {
     // userId는 임시
-    return ResponseEntity.ok(directMessageService.createConversation(request, userId));
+    return ResponseEntity.status(201)
+        .body(directMessageService.createConversation(request, userId));
   }
 }
