@@ -2,6 +2,7 @@ package com.team02.mopl.global.websocket;
 
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
@@ -15,11 +16,17 @@ public class StompChannelInterceptor implements ChannelInterceptor {
     StompHeaderAccessor accessor =
         MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-    if (accessor == null || accessor.getCommand() == null) {
+    if (accessor == null) {
       return message;
     }
 
-    switch (accessor.getCommand()) {
+    StompCommand command = accessor.getCommand();
+
+    if (command == null) {
+      return message;
+    }
+
+    switch (command) {
       case CONNECT -> {
         String sessionId = accessor.getSessionId();
         System.out.println("새로운 STOMP 연결: " + sessionId);
