@@ -49,4 +49,19 @@ public class Content extends BaseMutableEntity {
     this.description = description;
     this.thumbnailUrl = thumbnailUrl;
   }
+
+  public void update(String title, String description) {
+    if (title != null) {
+      this.title = title;
+    }
+    if (description != null) {
+      this.description = description;
+    }
+  }
+
+  public void changeThumbnailUrl(String thumbnailUrl) {
+    if (thumbnailUrl != null) {
+      this.thumbnailUrl = thumbnailUrl;
+    }
+  }
 }
