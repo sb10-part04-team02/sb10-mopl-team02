@@ -9,8 +9,11 @@ import static org.mockito.BDDMockito.then;
 
 import com.team02.mopl.domain.review.dto.ReviewCreateRequest;
 import com.team02.mopl.domain.review.dto.ReviewDto;
+import com.team02.mopl.domain.review.dto.ReviewSearchRequest;
 import com.team02.mopl.domain.review.dto.ReviewUpdateRequest;
 import com.team02.mopl.domain.review.entity.Review;
+import com.team02.mopl.domain.review.enums.ReviewSortBy;
+import com.team02.mopl.domain.review.enums.SortDirection;
 import com.team02.mopl.domain.review.exception.ReviewAlreadyExistsException;
 import com.team02.mopl.domain.review.mapper.ReviewMapper;
 import com.team02.mopl.domain.review.repository.ReviewRepository;
@@ -40,6 +43,22 @@ class ReviewServiceTest {
   @InjectMocks ReviewService reviewService;
 
   @Captor ArgumentCaptor<Review> reviewCaptor;
+
+  @Nested
+  class GetReviews {
+
+    @Test
+    @DisplayName("커서 페이지네이션 미구현 상태에서는 UnsupportedOperationException을 던진다")
+    void fail_whenNotImplemented() {
+      // given
+      ReviewSearchRequest request =
+          new ReviewSearchRequest(
+              UUID.randomUUID(), null, null, 10, SortDirection.DESCENDING, ReviewSortBy.CREATED_AT);
+
+      // when & then
+      assertThrows(UnsupportedOperationException.class, () -> reviewService.getReviews(request));
+    }
+  }
 
   @Nested
   class CreateReview {
