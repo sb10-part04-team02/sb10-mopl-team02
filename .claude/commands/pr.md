@@ -89,7 +89,8 @@ Closes #
 
 ```bash
 mkdir -p .local/claude/prs
-cat > .local/claude/prs/$(date +%Y%m%d)-pr-<이슈번호>.md << 'EOF'
+ISSUE_NO="187"   # 브랜치명에서 추출한 번호 (없으면 제목 slug)
+cat > ".local/claude/prs/$(date +%Y%m%d)-pr-${ISSUE_NO}.md" << 'EOF'
 # <PR 제목>
 
 <채워진 템플릿 내용>
@@ -111,7 +112,7 @@ EOF
 gh pr create \
   --title "<타입>: <한글 제목>" \
   --body-file /tmp/pr_body.md \
-  --base develop
+  --base dev
 
 # 3. 임시 파일 삭제
 rm /tmp/pr_body.md

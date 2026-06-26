@@ -58,7 +58,8 @@ chore: Flyway 마이그레이션 스크립트 추가
 
 ```bash
 mkdir -p .local/claude/commits
-cat > .local/claude/commits/$(date +%Y%m%d)-commit-<slug>.md << 'EOF'
+SLUG="like-feature"   # 커밋 메시지를 소문자 영문/숫자/하이픈으로 정리한 값
+cat > ".local/claude/commits/$(date +%Y%m%d)-commit-${SLUG}.md" << 'EOF'
 # <type>: <한글 메시지>
 
 ## 포함 파일

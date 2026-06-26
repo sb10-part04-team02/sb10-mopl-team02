@@ -71,7 +71,8 @@
 
 ```bash
 mkdir -p .local/claude/issues
-cat > .local/claude/issues/$(date +%Y%m%d)-issue-<slug>.md << 'EOF'
+SLUG="content-list-api"   # 이슈 제목을 소문자 영문/숫자/하이픈으로 정리한 값
+cat > ".local/claude/issues/$(date +%Y%m%d)-issue-${SLUG}.md" << 'EOF'
 # <이슈 제목>
 
 <채워진 템플릿 내용>

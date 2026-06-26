@@ -214,7 +214,8 @@ LLM이 일관되고 실무적인 기준으로 코드 리뷰를 수행하도록 �
 
 ```bash
 mkdir -p .local/claude/reviews
-cat > .local/claude/reviews/$(date +%Y%m%d)-review-pr<PR번호>.md << 'EOF'
+PR_NO="$1"
+cat > ".local/claude/reviews/$(date +%Y%m%d)-review-pr${PR_NO}.md" << 'EOF'
 # 리뷰: <PR 번호 또는 브랜치명>
 
 <리뷰 출력 형식 내용>
