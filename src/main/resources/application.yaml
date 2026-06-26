@@ -4,3 +4,9 @@ spring:
 
   profiles:
     active: dev
+
+mopl:
+  jwt:
+    secret-key: ${JWT_SECRET_KEY}
+    access-token-expiration: 10m  # 10분
+    refresh-token-expiration: 7d  # 일주일
