@@ -33,10 +33,7 @@ public class Review extends BaseMutableEntity {
     this.contentId = Objects.requireNonNull(contentId, "contentId는 null일 수 없습니다.");
     this.text = Objects.requireNonNull(text, "text는 null일 수 없습니다.");
 
-    if (rating < 0.0 || rating > 5.0) {
-      throw new IllegalArgumentException("rating은 0.0 이상 5.0 이하이어야 합니다.");
-    }
-
+    validateRating(rating);
     this.rating = rating;
   }
 
@@ -45,10 +42,14 @@ public class Review extends BaseMutableEntity {
       this.text = text;
     }
     if (rating != null) {
-      if (rating < 0.0 || rating > 5.0) {
-        throw new IllegalArgumentException("rating은 0.0 이상 5.0 이하이어야 합니다.");
-      }
+      validateRating(rating);
       this.rating = rating;
+    }
+  }
+
+  private static void validateRating(double rating) {
+    if (rating < 0.0 || rating > 5.0) {
+      throw new IllegalArgumentException("rating은 0.0 이상 5.0 이하이어야 합니다.");
     }
   }
 }
