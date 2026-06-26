@@ -3,6 +3,10 @@ package com.team02.mopl.domain.follow.service;
 import com.team02.mopl.domain.follow.dto.FollowDto;
 import com.team02.mopl.domain.follow.dto.FollowRequest;
 import com.team02.mopl.domain.follow.entity.Follow;
+import com.team02.mopl.domain.follow.exception.CannotFollowSelfException;
+import com.team02.mopl.domain.follow.exception.FollowAlreadyExistsException;
+import com.team02.mopl.domain.follow.exception.FollowForbiddenException;
+import com.team02.mopl.domain.follow.exception.FollowNotFoundException;
 import com.team02.mopl.domain.follow.repository.FollowRepository;
 import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
@@ -30,7 +34,7 @@ public class FollowService {
   private final UserRepository userRepository;
   private final NotificationService notificationService;
 
-  // 특정 사용자를 팔로우, 팔로우 대상에게 알림을 생성
+  // 특정 사용자를 팔로우하고, 팔로우 대상에게 알림을 생성한다.
   @Transactional
   public FollowDto createFollow(UUID followerId, @Valid FollowRequest request) {
     UUID followeeId = request.followeeId();
@@ -46,7 +50,7 @@ public class FollowService {
     try {
       follow = followRepository.save(new Follow(follower, followee));
     } catch (DataIntegrityViolationException e) {
-      throw new BusinessException(ErrorCode.FOLLOW_ALREADY_EXISTS);
+      throw new FollowAlreadyExistsException();
     }
 
     notificationService.createNotification(
@@ -60,31 +64,32 @@ public class FollowService {
     return FollowDto.from(follow);
   }
 
-  // 팔로우 취소
+  // 요청자가 생성한 팔로우 관계를 취소한다.
   @Transactional
   public void cancelFollow(UUID followId, UUID requesterId) {
     Follow follow =
         followRepository
             .findByIdAndDeletedAtIsNull(followId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.FOLLOW_NOT_FOUND));
+            .orElseThrow(FollowNotFoundException::new);
 
     validateOwner(follow, requesterId);
 
     follow.delete();
   }
 
-  // 특정 사용자를 팔로우 중인지 조회
+  // 로그인 사용자가 특정 사용자를 팔로우 중인지 조회한다.
   public FollowDto getFollowedByMe(UUID followerId, UUID followeeId) {
     getActiveUser(followeeId);
 
     Follow follow =
         followRepository
             .findByFollower_IdAndFollowee_IdAndDeletedAtIsNull(followerId, followeeId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.FOLLOW_NOT_FOUND));
+            .orElseThrow(FollowNotFoundException::new);
 
     return FollowDto.from(follow);
   }
 
+  // 특정 사용자를 팔로우하는 활성 팔로워 수를 조회한다.
   public long getFollowerCount(UUID followeeId) {
     getActiveUser(followeeId);
 
@@ -99,20 +104,20 @@ public class FollowService {
 
   private void validateNotSelfFollow(UUID followerId, UUID followeeId) {
     if (followerId.equals(followeeId)) {
-      throw new BusinessException(ErrorCode.CANNOT_FOLLOW_SELF);
+      throw new CannotFollowSelfException();
     }
   }
 
   private void validateNotAlreadyFollowing(UUID followerId, UUID followeeId) {
     if (followRepository.existsByFollower_IdAndFollowee_IdAndDeletedAtIsNull(
         followerId, followeeId)) {
-      throw new BusinessException(ErrorCode.FOLLOW_ALREADY_EXISTS);
+      throw new FollowAlreadyExistsException();
     }
   }
 
   private void validateOwner(Follow follow, UUID requesterId) {
     if (!follow.getFollower().getId().equals(requesterId)) {
-      throw new BusinessException(ErrorCode.FOLLOW_FORBIDDEN);
+      throw new FollowForbiddenException();
     }
   }
 }
