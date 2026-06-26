@@ -13,9 +13,9 @@ import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.global.storage.FileStorage;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -130,14 +130,19 @@ public class ContentService {
             .map(String::trim)
             .collect(Collectors.toCollection(LinkedHashSet::new));
 
-    List<Tag> saved = new ArrayList<>();
-    for (String name : distinct) {
-      if (tagRepository.existsByContentIdAndNameAndDeletedAtIsNull(content.getId(), name)) {
-        continue;
-      }
-      saved.add(tagRepository.save(new Tag(content, name)));
-    }
-    return saved;
+    // 현재 활성 태그 이름을 한 번만 조회해 메모리에서 중복 제거 (태그별 exists 쿼리 N회 제거)
+    Set<String> existing =
+        tagRepository.findByContentIdAndDeletedAtIsNull(content.getId()).stream()
+            .map(Tag::getName)
+            .collect(Collectors.toSet());
+
+    List<Tag> newTags =
+        distinct.stream()
+            .filter(name -> !existing.contains(name)) // 새로 추가할 태그만 남김
+            .map(name -> new Tag(content, name))
+            .collect(Collectors.toList());
+
+    return tagRepository.saveAll(newTags);
   }
 
   private Content findActiveOrThrow(UUID contentId) {
