@@ -28,7 +28,7 @@ public class UserService {
   public UserDto createUser(UserCreateRequest request) {
     log.debug("유저 생성 시작: email={}", maskValidEmail(request.email()));
 
-    if (userRepository.existsByEmail(request.email())) {
+    if (userRepository.existsByEmailAndDeletedAtIsNull(request.email())) {
       throw new UserEmailDuplicateException();
     }
 
