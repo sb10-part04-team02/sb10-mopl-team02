@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -61,6 +62,7 @@ public class JwtTokenProvider {
         userDetails.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
     JWTClaimsSet claimsSet =
         new Builder()
+            .jwtID(UUID.randomUUID().toString())
             .subject(userDetails.getUserDto().email())
             .issueTime(new Date())
             .expirationTime(expDate)
