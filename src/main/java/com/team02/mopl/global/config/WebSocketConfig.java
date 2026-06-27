@@ -2,7 +2,7 @@ package com.team02.mopl.global.config;
 
 import com.team02.mopl.global.websocket.StompChannelInterceptor;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
@@ -22,6 +22,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   @Override
   public void registerStompEndpoints(StompEndpointRegistry registry) {
     // 클라이언트가 연결할 WebSocket 엔드포인트 정의
+    // FIXME: 추후 JWT 사용한 인증을 요구하도록 수정 필요
     registry
         .addEndpoint("/ws")
         .setAllowedOriginPatterns("*") // CORS 허용
@@ -49,10 +50,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     registration.setSendTimeLimit(20_000);
   }
 
-  @Bean
-  public WebSocketMessageBrokerStats brokerStats() {
-    WebSocketMessageBrokerStats stats = new WebSocketMessageBrokerStats();
-    stats.setLoggingPeriod(6000); // 1분마다 로그 출력
-    return stats;
+  @Autowired
+  public void configureBrokerStats(WebSocketMessageBrokerStats stats) {
+    stats.setLoggingPeriod(60_000); // 1분마다 로그 출력
   }
 }
