@@ -26,4 +26,10 @@
         <Class name="~com\.team02\.mopl\.(.*\.)?(controller|service|config)\..*"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
+
+    <!-- 위와 동일한 문제지만 Registry는 위쪽의 패키지들과 다른 성질의 그룹인것 같아 따로 추가함-->
+    <Match>
+        <Class name="com.team02.mopl.domain.auth.jwt.JwtRegistry"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>
