@@ -68,7 +68,7 @@ public class JwtTokenProvider {
             .expirationTime(expDate)
             .claim("roles", roles)
             .claim("type", type.name().toLowerCase())
-            .claim("userId", userDetails.getUserDto().id())
+            .claim("userId", userDetails.getUserDto().id().toString())
             .build();
     SignedJWT signedJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claimsSet);
 
