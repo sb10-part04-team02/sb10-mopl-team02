@@ -48,10 +48,11 @@ public class SseEmitterService {
           SseEmitter.event()
               .id(UUID.randomUUID().toString())
               .name(CONNECT_EVENT_NAME)
-              .data("SSE connection established."));
+              .data("SSE 연결 성공"));
     } catch (IOException e) {
       sseEmitterRepository.delete(userId, emitter);
-      log.warn("Failed to send SSE connect event. userId={}", userId, e);
+      emitter.completeWithError(e);
+      log.warn("SSE 연결 이벤트 전송 실패. userId={}", userId, e);
     }
   }
 }
