@@ -19,8 +19,13 @@ public class SseEmitterService {
   private final SseEmitterRepository sseEmitterRepository;
 
   // 사용자별 SSE 연결을 생성하고 기존 연결이 있으면 새 연결로 교체
-  public SseEmitter connect(UUID userId) {
+  public SseEmitter connect(UUID userId, UUID lastEventId) {
     SseEmitter emitter = new SseEmitter(DEFAULT_TIMEOUT_MILLIS);
+
+    // LastEventId는 재연결 시 누락 이벤트 재전송에 사용할 수 있도록 우선 파라미터만
+    if (lastEventId != null) {
+      log.debug("SSE reconnect requested. userId={}, lastEventId={}", userId, lastEventId);
+    }
 
     sseEmitterRepository.save(userId, emitter).ifPresent(SseEmitter::complete);
     registerCallbacks(userId, emitter);
