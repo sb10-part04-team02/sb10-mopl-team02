@@ -82,9 +82,16 @@ public class JwtTokenProvider {
   }
 
   // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
-  public JWTClaimsSet verifyAccessToken(String token) throws ParseException {
+  public JWTClaimsSet verifyAccessToken(String token) {
     JWTClaimsSet claimsSet = verifyAndGetClaims(token);
-    if (!TokenType.ACCESS.name().equalsIgnoreCase(claimsSet.getStringClaim("type"))) {
+    String type;
+    try {
+      type = claimsSet.getStringClaim("type");
+    } catch (ParseException e) {
+      throw new RuntimeException("Token을 파싱하는데 실패했습니다.", e);
+    }
+
+    if (!TokenType.ACCESS.name().equalsIgnoreCase(type)) {
       throw new RuntimeException("유효하지 않은 토큰입니다.");
     }
 
@@ -92,9 +99,16 @@ public class JwtTokenProvider {
   }
 
   // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
-  public JWTClaimsSet verifyRefreshToken(String token) throws ParseException {
+  public JWTClaimsSet verifyRefreshToken(String token) {
     JWTClaimsSet claimsSet = verifyAndGetClaims(token);
-    if (!TokenType.REFRESH.name().equalsIgnoreCase(claimsSet.getStringClaim("type"))) {
+    String type;
+    try {
+      type = claimsSet.getStringClaim("type");
+    } catch (ParseException e) {
+      throw new RuntimeException("Token을 파싱하는데 실패했습니다.", e);
+    }
+
+    if (!TokenType.REFRESH.name().equalsIgnoreCase(type)) {
       throw new RuntimeException("유효하지 않은 토큰입니다.");
     }
 
