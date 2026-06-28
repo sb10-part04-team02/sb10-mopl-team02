@@ -72,4 +72,52 @@ class SseEmitterServiceTest {
     assertThat(result).isNotNull();
     verify(sseEmitterRepository).save(eq(userId), any(SseEmitter.class));
   }
+
+  @Test
+  @DisplayName("SSE 연결 시 완료, 타임아웃, 에러 콜백을 등록한다")
+  void connect_registersLifecycleCallbacks() {
+    UUID userId = UUID.randomUUID();
+    SseEmitter emitter = mock(SseEmitter.class);
+    TestableSseEmitterService service =
+        new TestableSseEmitterService(sseEmitterRepository, emitter);
+
+    given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
+
+    service.connect(userId, null);
+
+    verify(emitter).onCompletion(any(Runnable.class));
+    verify(emitter).onTimeout(any(Runnable.class));
+    verify(emitter).onError(any());
+  }
+
+  @Test
+  @DisplayName("SSE 연결 시 초기 connect 이벤트를 전송한다")
+  void connect_sendsConnectEvent() throws Exception {
+    UUID userId = UUID.randomUUID();
+    SseEmitter emitter = mock(SseEmitter.class);
+    TestableSseEmitterService service =
+        new TestableSseEmitterService(sseEmitterRepository, emitter);
+
+    given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
+
+    service.connect(userId, null);
+
+    verify(emitter).send(any(SseEmitter.SseEventBuilder.class));
+  }
+
+  private static class TestableSseEmitterService extends SseEmitterService {
+
+    private final SseEmitter emitter;
+
+    private TestableSseEmitterService(
+        SseEmitterRepository sseEmitterRepository, SseEmitter emitter) {
+      super(sseEmitterRepository);
+      this.emitter = emitter;
+    }
+
+    @Override
+    protected SseEmitter createEmitter() {
+      return emitter;
+    }
+  }
 }
