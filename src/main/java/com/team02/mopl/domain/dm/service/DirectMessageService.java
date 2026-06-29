@@ -16,6 +16,11 @@ import com.team02.mopl.domain.dm.exception.SelfConversationException;
 import com.team02.mopl.domain.dm.repository.ConversationMemberRepository;
 import com.team02.mopl.domain.dm.repository.ConversationRepository;
 import com.team02.mopl.domain.dm.repository.DirectMessageRepository;
+import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
+import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
+import com.team02.mopl.domain.notification.entity.enums.NotificationType;
+import com.team02.mopl.domain.notification.service.NotificationService;
+import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.dto.UserSummary;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -35,6 +40,8 @@ public class DirectMessageService {
   private final ConversationRepository conversationRepository;
   private final ConversationMemberRepository conversationMemberRepository;
   private final UserRepository userRepository;
+  private final SseEventService sseEventService;
+  private final NotificationService notificationService;
 
   @Transactional
   public ConversationDto createConversation(ConversationCreateRequest request, UUID requesterId) {
@@ -166,7 +173,20 @@ public class DirectMessageService {
                 .content(request.content())
                 .build());
 
-    return toDirectMessageDto(saved);
+    DirectMessageDto dto = toDirectMessageDto(saved);
+    UUID receiverUserId = receiverMember.getUser().getId();
+
+    sseEventService.send(receiverUserId, "direct-messages", saved.getId().toString(), dto);
+
+    notificationService.createNotification(
+        new NotificationCreateCommand(
+            receiverUserId,
+            "새 메시지",
+            dto.sender().name() + "님이 메시지를 보냈습니다.",
+            NotificationLevel.INFO,
+            NotificationType.DIRECT_MESSAGE_RECEIVED));
+
+    return dto;
   }
 
   private DirectMessageDto toDirectMessageDto(DirectMessage dm) {

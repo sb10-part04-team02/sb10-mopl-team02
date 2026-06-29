@@ -18,6 +18,8 @@ import com.team02.mopl.domain.dm.entity.DirectMessage;
 import com.team02.mopl.domain.dm.repository.ConversationMemberRepository;
 import com.team02.mopl.domain.dm.repository.ConversationRepository;
 import com.team02.mopl.domain.dm.repository.DirectMessageRepository;
+import com.team02.mopl.domain.notification.service.NotificationService;
+import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.exception.BusinessException;
@@ -29,6 +31,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -43,6 +46,8 @@ class DirectMessageServiceTest {
   @Mock private ConversationRepository conversationRepository;
   @Mock private ConversationMemberRepository conversationMemberRepository;
   @Mock private UserRepository userRepository;
+  @Mock private SseEventService sseEventService;
+  @Mock private NotificationService notificationService;
 
   @InjectMocks private DirectMessageService directMessageService;
 
@@ -475,11 +480,18 @@ class DirectMessageServiceTest {
         directMessageService.sendDirectMessage(
             conversationId, senderId, new DirectMessageSendRequest("안녕하세요"));
 
+    ArgumentCaptor<DirectMessage> captor = ArgumentCaptor.forClass(DirectMessage.class);
+    verify(directMessageRepository).save(captor.capture());
+    DirectMessage persisted = captor.getValue();
+    assertThat(persisted.getConversation()).isSameAs(conversation);
+    assertThat(persisted.getSender()).isSameAs(senderMember);
+    assertThat(persisted.getReceiver()).isSameAs(receiverMember);
+    assertThat(persisted.getContent()).isEqualTo("안녕하세요");
+
     assertThat(result.conversationId()).isEqualTo(conversationId);
     assertThat(result.content()).isEqualTo("안녕하세요");
     assertThat(result.sender().userId()).isEqualTo(senderId);
     assertThat(result.receiver().userId()).isEqualTo(receiverId);
-    verify(directMessageRepository).save(any(DirectMessage.class));
   }
 
   @Test
