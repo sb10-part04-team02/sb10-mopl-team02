@@ -81,6 +81,10 @@ public class DirectMessageService {
 
   @Transactional(readOnly = true)
   public ConversationDto findConversationWith(UUID requesterId, UUID withUserId) {
+    if (requesterId.equals(withUserId)) {
+      throw new BusinessException(SELF_CONVERSATION);
+    }
+
     ConversationMember withUserMember =
         conversationMemberRepository
             .findWithUserMemberByUserIds(requesterId, withUserId)
