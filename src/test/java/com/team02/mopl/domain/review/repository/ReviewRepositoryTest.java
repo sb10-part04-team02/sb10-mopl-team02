@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.enums.ContentType;
-import com.team02.mopl.domain.review.dto.ReviewAggregate;
 import com.team02.mopl.domain.review.entity.Review;
 import com.team02.mopl.domain.review.enums.ReviewSortBy;
 import com.team02.mopl.global.enums.SortDirection;
@@ -230,33 +229,6 @@ class ReviewRepositoryTest extends RepositoryTestSupport {
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.INVALID_REQUEST);
-  }
-
-  @Test
-  @DisplayName("활성 리뷰만으로 리뷰 수와 평균 평점을 집계한다")
-  void aggregateByContentId_countsAndAveragesActiveReviewsOnly() {
-    UUID secondAuthorId = insertUser();
-    reviewRepository.save(new Review(authorId, contentId, "리뷰1", 4.0));
-    reviewRepository.save(new Review(secondAuthorId, contentId, "리뷰2", 2.0));
-    Review deleted = reviewRepository.save(new Review(insertUser(), contentId, "삭제될 리뷰", 5.0));
-    em.flush();
-
-    deleted.delete();
-    em.flush();
-
-    ReviewAggregate aggregate = reviewRepository.aggregateByContentId(contentId);
-
-    assertThat(aggregate.reviewCount()).isEqualTo(2L);
-    assertThat(aggregate.averageRating()).isEqualTo(3.0);
-  }
-
-  @Test
-  @DisplayName("활성 리뷰가 없으면 리뷰 수는 0, 평균 평점은 null로 집계한다")
-  void aggregateByContentId_whenNoActiveReviews_returnsZeroAndNull() {
-    ReviewAggregate aggregate = reviewRepository.aggregateByContentId(contentId);
-
-    assertThat(aggregate.reviewCount()).isEqualTo(0L);
-    assertThat(aggregate.averageRating()).isNull();
   }
 
   private UUID insertUser() {

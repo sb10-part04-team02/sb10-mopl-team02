@@ -64,10 +64,4 @@ public class Content extends BaseMutableEntity {
       this.thumbnailUrl = thumbnailUrl;
     }
   }
-
-  // 리뷰 변경에 따라 재집계된 평균 평점·리뷰 수를 반영
-  public void applyRatingAggregate(double averageRating, int reviewCount) {
-    this.averageRating = averageRating;
-    this.reviewCount = reviewCount;
-  }
 }

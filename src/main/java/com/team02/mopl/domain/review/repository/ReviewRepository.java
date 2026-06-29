@@ -1,6 +1,5 @@
 package com.team02.mopl.domain.review.repository;
 
-import com.team02.mopl.domain.review.dto.ReviewAggregate;
 import com.team02.mopl.domain.review.entity.Review;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,13 +18,4 @@ public interface ReviewRepository extends JpaRepository<Review, UUID>, ReviewRep
       "SELECT COUNT(r) FROM Review r "
           + "WHERE r.deletedAt IS NULL AND (:contentId IS NULL OR r.contentId = :contentId)")
   long countActive(@Param("contentId") UUID contentId);
-
-  // 콘텐츠의 활성(논리 삭제 제외) 리뷰 수·평균 평점 집계
-  // 리뷰가 없으면 count=0, averageRating=null로 반환되므로 호출부에서 0.0 처리
-  @Query(
-      "SELECT new com.team02.mopl.domain.review.dto.ReviewAggregate("
-          + "COUNT(r), AVG(r.rating)) "
-          + "FROM Review r "
-          + "WHERE r.contentId = :contentId AND r.deletedAt IS NULL")
-  ReviewAggregate aggregateByContentId(@Param("contentId") UUID contentId);
 }
