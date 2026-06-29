@@ -241,3 +241,13 @@ CREATE UNIQUE INDEX uk_playlist_contents_content_playlist
 
 CREATE UNIQUE INDEX uk_watching_sessions_content_user
     ON watching_sessions (content_id, user_id) WHERE deleted_at IS NULL;
+
+--==================================================================================================
+-- 리뷰 목록 커서 조회용 복합 인덱스 (활성 행만: deleted_at IS NULL 부분 인덱스)
+--==================================================================================================
+
+CREATE INDEX ix_reviews_content_created_id
+    ON reviews (content_id, created_at, id) WHERE deleted_at IS NULL;
+
+CREATE INDEX ix_reviews_content_rating_id
+    ON reviews (content_id, rating, id) WHERE deleted_at IS NULL;
