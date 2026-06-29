@@ -35,7 +35,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -67,7 +66,14 @@ class ReviewServiceTest {
       ReviewSearchRequest request =
           new ReviewSearchRequest(
               contentId, null, null, 10, SortDirection.DESCENDING, ReviewSortBy.CREATED_AT);
-      given(reviewRepository.findFirstByCreatedAtDesc(eq(contentId), any(Pageable.class)))
+      given(
+              reviewRepository.findReviewsByCursor(
+                  eq(contentId),
+                  eq(ReviewSortBy.CREATED_AT),
+                  eq(SortDirection.DESCENDING),
+                  eq(null),
+                  eq(null),
+                  eq(11)))
           .willReturn(List.of(review(4.0), review(3.0)));
       given(reviewRepository.countActive(eq(contentId))).willReturn(2L);
       given(reviewMapper.toDto(any(Review.class)))
@@ -100,7 +106,14 @@ class ReviewServiceTest {
           new ReviewSearchRequest(
               contentId, null, null, 1, SortDirection.DESCENDING, ReviewSortBy.CREATED_AT);
       Review first = review(4.0);
-      given(reviewRepository.findFirstByCreatedAtDesc(eq(contentId), any(Pageable.class)))
+      given(
+              reviewRepository.findReviewsByCursor(
+                  eq(contentId),
+                  eq(ReviewSortBy.CREATED_AT),
+                  eq(SortDirection.DESCENDING),
+                  eq(null),
+                  eq(null),
+                  eq(2)))
           .willReturn(List.of(first, review(3.0)));
       given(reviewRepository.countActive(eq(contentId))).willReturn(2L);
       given(reviewMapper.toDto(any(Review.class)))
@@ -131,8 +144,13 @@ class ReviewServiceTest {
           new ReviewSearchRequest(
               contentId, "4.0", idAfter, 10, SortDirection.DESCENDING, ReviewSortBy.RATING);
       given(
-              reviewRepository.findNextByRatingDesc(
-                  eq(contentId), eq(4.0), eq(idAfter), any(Pageable.class)))
+              reviewRepository.findReviewsByCursor(
+                  eq(contentId),
+                  eq(ReviewSortBy.RATING),
+                  eq(SortDirection.DESCENDING),
+                  eq("4.0"),
+                  eq(idAfter),
+                  eq(11)))
           .willReturn(List.of(review(3.0)));
       given(reviewRepository.countActive(eq(contentId))).willReturn(5L);
       given(reviewMapper.toDto(any(Review.class)))
@@ -152,26 +170,13 @@ class ReviewServiceTest {
       assertThat(response.sortBy()).isEqualTo("RATING");
       then(reviewRepository)
           .should()
-          .findNextByRatingDesc(eq(contentId), eq(4.0), eq(idAfter), any(Pageable.class));
-    }
-
-    @Test
-    @DisplayName("rating 정렬에서 cursor가 숫자가 아니면 INVALID_REQUEST BusinessException을 던진다")
-    void fail_whenRatingCursorNotNumeric() {
-      // given
-      ReviewSearchRequest request =
-          new ReviewSearchRequest(
-              contentId,
-              "not-a-number",
-              UUID.randomUUID(),
-              10,
-              SortDirection.DESCENDING,
-              ReviewSortBy.RATING);
-
-      // when & then
-      BusinessException exception =
-          assertThrows(BusinessException.class, () -> reviewService.getReviews(request));
-      assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST);
+          .findReviewsByCursor(
+              eq(contentId),
+              eq(ReviewSortBy.RATING),
+              eq(SortDirection.DESCENDING),
+              eq("4.0"),
+              eq(idAfter),
+              eq(11));
     }
   }
 
