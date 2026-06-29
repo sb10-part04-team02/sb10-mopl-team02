@@ -17,6 +17,8 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.validation.annotation.Validated;
 
 @Service
@@ -46,11 +48,7 @@ public class NotificationService {
     Notification savedNotification = notificationRepository.save(notification);
     NotificationDto notificationDto = NotificationDto.from(savedNotification);
 
-    sseEventService.send(
-        notificationDto.receiverId(),
-        NOTIFICATION_EVENT_NAME,
-        notificationDto.id().toString(),
-        notificationDto);
+    sendNotificationAfterCommit(notificationDto);
 
     return notificationDto;
   }
@@ -87,5 +85,29 @@ public class NotificationService {
     if (!notification.getReceiver().getId().equals(receiverId)) {
       throw new NotificationForbiddenException();
     }
+  }
+
+  // 알림 저장 직후, 트랜잭션 안에서 SSE 전송으로
+  private void sendNotificationAfterCommit(NotificationDto notificationDto) {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      sendNotification(notificationDto);
+      return;
+    }
+
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            sendNotification(notificationDto);
+          }
+        });
+  }
+
+  private void sendNotification(NotificationDto notificationDto) {
+    sseEventService.send(
+        notificationDto.receiverId(),
+        NOTIFICATION_EVENT_NAME,
+        notificationDto.id().toString(),
+        notificationDto);
   }
 }
