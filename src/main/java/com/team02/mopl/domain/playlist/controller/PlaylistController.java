@@ -21,6 +21,8 @@ public class PlaylistController implements PlaylistApi {
 
   private final PlaylistService playlistService;
 
+  // TODO: JWT 인증 연결 후 이 엔드포인트를 인증 필수로 보호한다.
+  //       현재 SecurityConfig가 anyRequest().permitAll() 상태라 ownerId(principal)를 신뢰할 수 없음.
   @PostMapping
   public ResponseEntity<PlaylistDto> createPlaylist(
       @AuthenticationPrincipal UUID ownerId, @RequestBody @Valid PlaylistCreateRequest request) {

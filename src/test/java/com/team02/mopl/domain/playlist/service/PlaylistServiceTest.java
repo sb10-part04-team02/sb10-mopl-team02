@@ -25,6 +25,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+// TODO: JWT 인증 연결 후 PlaylistController @WebMvcTest 추가
+//       (201 응답 / @Valid 검증 실패 400 / 인증된 요청자 UUID 바인딩 검증).
 @ExtendWith(MockitoExtension.class)
 class PlaylistServiceTest {
 
