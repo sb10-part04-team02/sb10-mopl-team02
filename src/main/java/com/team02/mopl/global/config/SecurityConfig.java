@@ -44,7 +44,7 @@ public class SecurityConfig {
         // 수동으로 만든걸 추가해야 formLogin에서 Provider가 제대로 인식됨
         .authenticationManager(authenticationManager)
         .addFilterBefore(
-            new JwtAuthenticationFilter(authenticationManager),
+            new JwtAuthenticationFilter(authenticationManager, jwtAuthenticationEntryPoint),
             UsernamePasswordAuthenticationFilter.class)
         .csrf(
             csrf ->
@@ -74,7 +74,11 @@ public class SecurityConfig {
                     // 외의 것들은 인증 필요
                     .anyRequest()
                     .authenticated())
-        .exceptionHandling(except -> except.authenticationEntryPoint(jwtAuthenticationEntryPoint));
+        .exceptionHandling(
+            except ->
+                except
+                    // 토큰이 없거나(익명), 인증에 실패한 채로 보호된 리소스에 접근할 때
+                    .authenticationEntryPoint(jwtAuthenticationEntryPoint));
     return http.build();
   }
 

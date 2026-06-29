@@ -9,7 +9,9 @@ import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -17,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   private final AuthenticationManager authenticationManager;
+  private final AuthenticationEntryPoint authenticationEntryPoint;
 
   @Override
   protected void doFilterInternal(
@@ -25,12 +28,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     String token = resolveToken(request);
     if (StringUtils.hasText(token)) {
-      // 인증 전 토큰
-      JwtAuthenticationToken authToken = new JwtAuthenticationToken(token);
+      try {
+        // 인증 전 토큰
+        JwtAuthenticationToken authToken = new JwtAuthenticationToken(token);
 
-      // 인증된 토큰
-      Authentication authentication = authenticationManager.authenticate(authToken);
-      SecurityContextHolder.getContext().setAuthentication(authentication);
+        // 인증된 토큰
+        Authentication authentication = authenticationManager.authenticate(authToken);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+      } catch (AuthenticationException e) {
+        SecurityContextHolder.clearContext();
+        authenticationEntryPoint.commence(request, response, e);
+        return;
+      }
     }
 
     filterChain.doFilter(request, response);
