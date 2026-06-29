@@ -133,6 +133,38 @@ class ReviewRepositoryTest extends RepositoryTestSupport {
   }
 
   @Test
+  @DisplayName("findReviewsByCursor는 동점 평점에서 (rating, id) 비교로 같은 평점 커서 이후 항목만 조회한다")
+  void findReviewsByCursor_ratingDesc_tieBreaksById() {
+    // 같은 rating 두 건 + 더 낮은 rating 한 건을 만들어 (rating, id) 타이브레이커를 검증한다
+    reviewRepository.save(new Review(insertUser(), contentId, "동점A", 4.0));
+    reviewRepository.save(new Review(insertUser(), contentId, "동점B", 4.0));
+    reviewRepository.save(new Review(insertUser(), contentId, "3점", 3.0));
+    em.flush();
+
+    // DB 정렬 순서(uuid 비교는 PostgreSQL 기준)를 신뢰하기 위해 첫 페이지로 실제 순서를 확보한다
+    List<Review> firstPage =
+        reviewRepository.findReviewsByCursor(
+            contentId, ReviewSortBy.RATING, SortDirection.DESCENDING, null, null, 10);
+    assertThat(firstPage).hasSize(3);
+
+    // 첫 동점 항목을 커서로 두면 나머지 동점 1건 + 낮은 평점 1건이 이어서 조회된다
+    Review cursor = firstPage.get(0);
+    Review afterTie = firstPage.get(1);
+    Review low = firstPage.get(2);
+
+    List<Review> next =
+        reviewRepository.findReviewsByCursor(
+            contentId,
+            ReviewSortBy.RATING,
+            SortDirection.DESCENDING,
+            Double.toString(cursor.getRating()),
+            cursor.getId(),
+            10);
+
+    assertThat(next).extracting(Review::getId).containsExactly(afterTie.getId(), low.getId());
+  }
+
+  @Test
   @DisplayName("findReviewsByCursor는 커서가 없으면 (createdAt, id) 내림차순 첫 페이지를 조회한다")
   void findReviewsByCursor_firstPage_returnsByCreatedAtDesc() {
     Review first = reviewRepository.save(new Review(insertUser(), contentId, "리뷰1", 4.0));
@@ -159,6 +191,23 @@ class ReviewRepositoryTest extends RepositoryTestSupport {
                     SortDirection.DESCENDING,
                     "not-a-number",
                     idAfter,
+                    10))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.INVALID_REQUEST);
+  }
+
+  @Test
+  @DisplayName("findReviewsByCursor는 cursor·idAfter 중 하나만 전달되면 INVALID_REQUEST 예외를 던진다")
+  void findReviewsByCursor_partialCursor_throwsInvalidRequest() {
+    assertThatThrownBy(
+            () ->
+                reviewRepository.findReviewsByCursor(
+                    contentId,
+                    ReviewSortBy.CREATED_AT,
+                    SortDirection.DESCENDING,
+                    null,
+                    UUID.randomUUID(),
                     10))
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())

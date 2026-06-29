@@ -36,7 +36,11 @@ public class ReviewRepositoryImpl implements ReviewRepositoryCustom {
       UUID idAfter,
       int limit) {
     boolean ascending = direction == SortDirection.ASCENDING;
-    boolean firstPage = cursor == null || idAfter == null;
+    // cursor·idAfter는 항상 함께 와야 한다. 둘 다 없으면 첫 페이지, 하나만 있으면 잘못된 요청
+    boolean firstPage = cursor == null && idAfter == null;
+    if (!firstPage && (cursor == null || idAfter == null)) {
+      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+    }
 
     return queryFactory
         .selectFrom(review)
@@ -102,7 +106,12 @@ public class ReviewRepositoryImpl implements ReviewRepositoryCustom {
 
   private double parseDoubleCursor(String cursor) {
     try {
-      return Double.parseDouble(cursor);
+      double value = Double.parseDouble(cursor);
+      // NaN·Infinity는 (rating, id) 비교에서 무의미하므로 차단한다
+      if (!Double.isFinite(value)) {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      }
+      return value;
     } catch (NumberFormatException e) {
       throw new BusinessException(ErrorCode.INVALID_REQUEST);
     }
