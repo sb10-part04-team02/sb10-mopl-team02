@@ -50,6 +50,10 @@ public interface DirectMessageApi {
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "성공"),
     @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 요청 (자기 자신과의 대화방 조회 시도 포함)",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
         responseCode = "401",
         description = "인증 오류",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
