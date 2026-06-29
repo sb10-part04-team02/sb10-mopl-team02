@@ -48,7 +48,6 @@ CREATE TABLE users
     role              VARCHAR(10)                 NOT NULL DEFAULT 'USER',
     is_locked         BOOLEAN                     NOT NULL DEFAULT FALSE,
 
-    CONSTRAINT uk_users_email UNIQUE (email),
     CONSTRAINT chk_users_role CHECK (role IN ('USER', 'ADMIN'))
 );
 
@@ -224,6 +223,9 @@ CREATE UNIQUE INDEX uk_follows_follower_followee
 
 CREATE UNIQUE INDEX uk_reviews_user_content
     ON reviews (author_id, content_id) WHERE deleted_at IS NULL;
+
+CREATE UNIQUE INDEX uk_users_email
+    ON users (email) WHERE deleted_at IS NULL;
 
 CREATE UNIQUE INDEX uk_tags_content_name
     ON tags (content_id, name) WHERE deleted_at IS NULL;
