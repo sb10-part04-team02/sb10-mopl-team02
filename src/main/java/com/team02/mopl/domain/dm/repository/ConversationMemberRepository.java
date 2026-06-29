@@ -18,4 +18,15 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
       )
       """)
   boolean existsConversationBetween(@Param("userAId") UUID userAId, @Param("userBId") UUID userBId);
+
+  // 대화방에서 요청자가 아닌 상대방 멤버 조회
+  @Query(
+      """
+      SELECT cm FROM ConversationMember cm
+      JOIN FETCH cm.user
+      WHERE cm.conversation.id = :conversationId
+      AND cm.user.id != :requesterId
+      """)
+  java.util.Optional<ConversationMember> findWithUserMember(
+      @Param("conversationId") UUID conversationId, @Param("requesterId") UUID requesterId);
 }

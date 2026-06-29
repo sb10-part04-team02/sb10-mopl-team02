@@ -1,17 +1,19 @@
 package com.team02.mopl.domain.dm.service;
 
 import static com.team02.mopl.global.exception.ErrorCode.CONVERSATION_ALREADY_EXISTS;
+import static com.team02.mopl.global.exception.ErrorCode.CONVERSATION_NOT_FOUND;
+import static com.team02.mopl.global.exception.ErrorCode.FORBIDDEN;
 import static com.team02.mopl.global.exception.ErrorCode.SELF_CONVERSATION;
 import static com.team02.mopl.global.exception.ErrorCode.USER_NOT_FOUND;
 
 import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
-import com.team02.mopl.domain.dm.dto.ConversationDto.UserSummary;
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.domain.dm.entity.ConversationMember;
 import com.team02.mopl.domain.dm.repository.ConversationMemberRepository;
 import com.team02.mopl.domain.dm.repository.ConversationRepository;
 import com.team02.mopl.domain.dm.repository.DirectMessageRepository;
+import com.team02.mopl.domain.user.dto.UserSummary;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.exception.BusinessException;
@@ -72,6 +74,26 @@ public class DirectMessageService {
 
     return new ConversationDto(
         newConversation.getId(),
+        new UserSummary(withUser.getId(), withUser.getName(), withUser.getProfileImageUrl()),
+        null,
+        false);
+  }
+
+  @Transactional(readOnly = true)
+  public ConversationDto findConversation(UUID conversationId, UUID requesterId) {
+    if (!conversationRepository.existsById(conversationId)) {
+      throw new BusinessException(CONVERSATION_NOT_FOUND);
+    }
+
+    ConversationMember withUserMember =
+        conversationMemberRepository
+            .findWithUserMember(conversationId, requesterId)
+            .orElseThrow(() -> new BusinessException(FORBIDDEN));
+
+    User withUser = withUserMember.getUser();
+
+    return new ConversationDto(
+        conversationId,
         new UserSummary(withUser.getId(), withUser.getName(), withUser.getProfileImageUrl()),
         null,
         false);
