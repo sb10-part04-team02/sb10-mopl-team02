@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -143,11 +142,23 @@ class JwtUtilsTest {
     }
 
     @Test
+    @DisplayName("roles에 부적합한 권한이 와서 제거후 리스트가 비어있으면 예외를 던진다")
+    void fail_shouldThrowBadCredentialsException_whenRoleIsInvalid() throws ParseException {
+      // given
+      JWTClaimsSet claimsSet = mock(JWTClaimsSet.class);
+      given(claimsSet.getStringListClaim(anyString())).willReturn(List.of("ROLE_INVALID_ROLE"));
+
+      // when & then
+      assertThrows(BadCredentialsException.class, () -> jwtUtils.getAuthorities(claimsSet));
+    }
+
+    @Test
     @DisplayName("roles의 파싱이 성공한다면 GrantedAuthority 객체목록을 반환한다")
     void success_shouldReturnAuthorities_whenRolesClaimIsValid() throws ParseException {
       // given
       JWTClaimsSet claimsSet = mock(JWTClaimsSet.class);
-      doReturn(List.of("ROLE_USER")).when(claimsSet).getStringListClaim(anyString());
+      given(claimsSet.getStringListClaim(anyString()))
+          .willReturn(List.of("ROLE_USER", "ROLE_INVALID_ROLE"));
 
       // when
       Collection<? extends GrantedAuthority> actual = jwtUtils.getAuthorities(claimsSet);

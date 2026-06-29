@@ -19,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team02.mopl.domain.auth.dto.JwtDto;
 import com.team02.mopl.domain.auth.dto.SignInRequest;
+import com.team02.mopl.domain.auth.exception.AuthException;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.global.config.SecurityConfig;
@@ -92,7 +93,7 @@ class AuthControllerTest {
       SignInRequest request = new SignInRequest("example@gmail.com", "password");
 
       // when & then
-      assertThrows(IllegalStateException.class, () -> authController.signIn(request));
+      assertThrows(AuthException.class, () -> authController.signIn(request));
     }
 
     @Test

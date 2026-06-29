@@ -145,7 +145,7 @@ public class JwtTokenProvider {
       return claimsSet;
 
     } catch (ParseException | JOSEException e) {
-      throw new BadCredentialsException("올바르지 않은 토큰입니다.");
+      throw new BadCredentialsException("올바르지 않은 토큰입니다.", e);
     }
   }
 

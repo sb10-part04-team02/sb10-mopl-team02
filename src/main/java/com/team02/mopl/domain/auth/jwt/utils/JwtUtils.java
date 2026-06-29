@@ -2,6 +2,7 @@ package com.team02.mopl.domain.auth.jwt.utils;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.team02.mopl.domain.auth.jwt.JwtProperties;
+import com.team02.mopl.domain.user.entity.enums.Role;
 import java.text.ParseException;
 import java.util.Collection;
 import java.util.List;
@@ -52,10 +53,26 @@ public class JwtUtils {
         throw new InsufficientAuthenticationException("Token 내에 권한이 누락되었습니다.");
       }
 
-      return roles.stream().map(SimpleGrantedAuthority::new).toList();
+      List<SimpleGrantedAuthority> authorities =
+          roles.stream().filter(this::isValidRole).map(SimpleGrantedAuthority::new).toList();
+      if (authorities.isEmpty()) {
+        throw new BadCredentialsException("허용되지 않은 권한이 포함되었습니다.");
+      }
+
+      return authorities;
 
     } catch (ParseException e) {
       throw new BadCredentialsException("Token의 role 클레임을 파싱하는데 실패했습니다.", e);
+    }
+  }
+
+  private boolean isValidRole(String role) {
+    try {
+      String cleanRole = role.replace("ROLE_", "");
+      Role.valueOf(cleanRole);
+      return true;
+    } catch (IllegalArgumentException e) {
+      return false;
     }
   }
 }
