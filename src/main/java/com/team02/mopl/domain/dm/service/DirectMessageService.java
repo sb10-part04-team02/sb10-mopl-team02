@@ -80,6 +80,22 @@ public class DirectMessageService {
   }
 
   @Transactional(readOnly = true)
+  public ConversationDto findConversationWith(UUID requesterId, UUID withUserId) {
+    ConversationMember withUserMember =
+        conversationMemberRepository
+            .findWithUserMemberByUserIds(requesterId, withUserId)
+            .orElseThrow(() -> new BusinessException(CONVERSATION_NOT_FOUND));
+
+    User withUser = withUserMember.getUser();
+
+    return new ConversationDto(
+        withUserMember.getConversation().getId(),
+        new UserSummary(withUser.getId(), withUser.getName(), withUser.getProfileImageUrl()),
+        null,
+        false);
+  }
+
+  @Transactional(readOnly = true)
   public ConversationDto findConversation(UUID conversationId, UUID requesterId) {
     if (!conversationRepository.existsById(conversationId)) {
       throw new BusinessException(CONVERSATION_NOT_FOUND);

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -27,6 +28,12 @@ public class DirectMessageController {
       @AuthenticationPrincipal UUID userId, @RequestBody @Valid ConversationCreateRequest request) {
     return ResponseEntity.status(201)
         .body(directMessageService.createConversation(request, userId));
+  }
+
+  @GetMapping("/with")
+  public ResponseEntity<ConversationDto> findConversationWith(
+      @AuthenticationPrincipal UUID userId, @RequestParam UUID withUserId) {
+    return ResponseEntity.ok(directMessageService.findConversationWith(userId, withUserId));
   }
 
   @GetMapping("/{conversationId}")

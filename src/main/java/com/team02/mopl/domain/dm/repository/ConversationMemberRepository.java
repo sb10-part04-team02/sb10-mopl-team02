@@ -29,4 +29,18 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
       """)
   java.util.Optional<ConversationMember> findWithUserMember(
       @Param("conversationId") UUID conversationId, @Param("requesterId") UUID requesterId);
+
+  // 두 유저가 공유하는 대화방에서 상대방 멤버 조회
+  @Query(
+      """
+      SELECT cm FROM ConversationMember cm
+      JOIN FETCH cm.user
+      WHERE cm.user.id = :withUserId
+      AND cm.conversation IN (
+        SELECT cm2.conversation FROM ConversationMember cm2
+        WHERE cm2.user.id = :requesterId
+      )
+      """)
+  java.util.Optional<ConversationMember> findWithUserMemberByUserIds(
+      @Param("requesterId") UUID requesterId, @Param("withUserId") UUID withUserId);
 }
