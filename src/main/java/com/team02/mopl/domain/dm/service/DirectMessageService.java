@@ -17,10 +17,6 @@ import com.team02.mopl.domain.dm.exception.SelfConversationException;
 import com.team02.mopl.domain.dm.repository.ConversationMemberRepository;
 import com.team02.mopl.domain.dm.repository.ConversationRepository;
 import com.team02.mopl.domain.dm.repository.DirectMessageRepository;
-import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
-import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
-import com.team02.mopl.domain.notification.entity.enums.NotificationType;
-import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.user.dto.UserSummary;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -41,7 +37,6 @@ public class DirectMessageService {
   private final ConversationRepository conversationRepository;
   private final ConversationMemberRepository conversationMemberRepository;
   private final UserRepository userRepository;
-  private final NotificationService notificationService;
   private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
@@ -177,16 +172,8 @@ public class DirectMessageService {
     DirectMessageDto dto = toDirectMessageDto(saved);
     UUID receiverUserId = receiverMember.getUser().getId();
 
-    // SSE 전송은 커밋 성공 후에만 발행 (AFTER_COMMIT)
+    // SSE 전송 및 알림 생성은 커밋 성공 후에만 실행 (AFTER_COMMIT)
     eventPublisher.publishEvent(new DmSentEvent(receiverUserId, saved.getId().toString(), dto));
-
-    notificationService.createNotification(
-        new NotificationCreateCommand(
-            receiverUserId,
-            "새 메시지",
-            dto.sender().name() + "님이 메시지를 보냈습니다.",
-            NotificationLevel.INFO,
-            NotificationType.DIRECT_MESSAGE_RECEIVED));
 
     return dto;
   }

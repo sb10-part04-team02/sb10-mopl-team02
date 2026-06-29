@@ -19,9 +19,6 @@ import com.team02.mopl.domain.dm.entity.DirectMessage;
 import com.team02.mopl.domain.dm.repository.ConversationMemberRepository;
 import com.team02.mopl.domain.dm.repository.ConversationRepository;
 import com.team02.mopl.domain.dm.repository.DirectMessageRepository;
-import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
-import com.team02.mopl.domain.notification.entity.enums.NotificationType;
-import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.exception.BusinessException;
@@ -49,7 +46,6 @@ class DirectMessageServiceTest {
   @Mock private ConversationRepository conversationRepository;
   @Mock private ConversationMemberRepository conversationMemberRepository;
   @Mock private UserRepository userRepository;
-  @Mock private NotificationService notificationService;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private DirectMessageService directMessageService;
@@ -501,13 +497,6 @@ class DirectMessageServiceTest {
     assertThat(eventCaptor.getValue().receiverUserId()).isEqualTo(receiverId);
     assertThat(eventCaptor.getValue().eventId()).isEqualTo(messageId.toString());
     assertThat(eventCaptor.getValue().dto()).isEqualTo(result);
-
-    ArgumentCaptor<NotificationCreateCommand> notifCaptor =
-        ArgumentCaptor.forClass(NotificationCreateCommand.class);
-    verify(notificationService).createNotification(notifCaptor.capture());
-    assertThat(notifCaptor.getValue().receiverId()).isEqualTo(receiverId);
-    assertThat(notifCaptor.getValue().notificationType())
-        .isEqualTo(NotificationType.DIRECT_MESSAGE_RECEIVED);
   }
 
   @Test
@@ -529,7 +518,6 @@ class DirectMessageServiceTest {
 
     verify(directMessageRepository, never()).save(any());
     verify(eventPublisher, never()).publishEvent(any());
-    verify(notificationService, never()).createNotification(any());
   }
 
   @Test
@@ -555,7 +543,6 @@ class DirectMessageServiceTest {
 
     verify(directMessageRepository, never()).save(any());
     verify(eventPublisher, never()).publishEvent(any());
-    verify(notificationService, never()).createNotification(any());
   }
 
   // ──────────────────────────────────────────────

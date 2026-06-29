@@ -2,15 +2,20 @@ package com.team02.mopl.domain.dm.controller;
 
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
+import com.team02.mopl.domain.dm.exception.ConversationForbiddenException;
 import com.team02.mopl.domain.dm.service.DirectMessageService;
+import com.team02.mopl.global.exception.ErrorResponse;
 import jakarta.validation.Valid;
 import java.security.Principal;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Controller;
 
 @Slf4j
@@ -36,5 +41,18 @@ public class DirectMessageWebSocketController {
         directMessageService.sendDirectMessage(conversationId, senderId, request);
     messagingTemplate.convertAndSend(
         "/sub/conversations/" + conversationId + "/direct-messages", messageDto);
+  }
+
+  @MessageExceptionHandler(ConversationForbiddenException.class)
+  @SendToUser("/queue/errors")
+  public ErrorResponse handleForbidden(ConversationForbiddenException e) {
+    return new ErrorResponse(e.getClass().getSimpleName(), e.getMessage(), Map.of());
+  }
+
+  @MessageExceptionHandler(Exception.class)
+  @SendToUser("/queue/errors")
+  public ErrorResponse handleException(Exception e) {
+    log.warn("WebSocket 메시지 처리 중 예외 발생: {}", e.getMessage(), e);
+    return new ErrorResponse(e.getClass().getSimpleName(), e.getMessage(), Map.of());
   }
 }
