@@ -101,13 +101,16 @@ public class DirectMessageService {
 
     User withUser = withUserMember.getUser();
     Optional<DirectMessage> lastDm =
-        directMessageRepository.findLastByConversationId(conversationId);
+        directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversationId);
 
     return new ConversationDto(
         conversationId,
         new UserSummary(withUser.getId(), withUser.getName(), withUser.getProfileImageUrl()),
         lastDm.map(this::toDirectMessageDto).orElse(null),
-        lastDm.map(dm -> dm.getCreatedAt().isAfter(requesterMember.getLastReadAt())).orElse(false));
+        lastDm
+            .filter(dm -> !dm.getSender().getUser().getId().equals(requesterId))
+            .map(dm -> dm.getCreatedAt().isAfter(requesterMember.getLastReadAt()))
+            .orElse(false));
   }
 
   @Transactional(readOnly = true)
@@ -128,13 +131,16 @@ public class DirectMessageService {
 
     User withUser = withUserMember.getUser();
     Optional<DirectMessage> lastDm =
-        directMessageRepository.findLastByConversationId(conversationId);
+        directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversationId);
 
     return new ConversationDto(
         conversationId,
         new UserSummary(withUser.getId(), withUser.getName(), withUser.getProfileImageUrl()),
         lastDm.map(this::toDirectMessageDto).orElse(null),
-        lastDm.map(dm -> dm.getCreatedAt().isAfter(requesterMember.getLastReadAt())).orElse(false));
+        lastDm
+            .filter(dm -> !dm.getSender().getUser().getId().equals(requesterId))
+            .map(dm -> dm.getCreatedAt().isAfter(requesterMember.getLastReadAt()))
+            .orElse(false));
   }
 
   private DirectMessageDto toDirectMessageDto(DirectMessage dm) {

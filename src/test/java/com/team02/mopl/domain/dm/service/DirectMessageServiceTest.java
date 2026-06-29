@@ -227,7 +227,9 @@ class DirectMessageServiceTest {
         .willReturn(Optional.of(withUserMember));
     given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
         .willReturn(Optional.of(requesterMember));
-    given(directMessageRepository.findLastByConversationId(conversationId))
+    given(
+            directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(
+                conversationId))
         .willReturn(Optional.empty());
 
     ConversationDto result = directMessageService.findConversationWith(requesterId, withUserId);
@@ -237,8 +239,64 @@ class DirectMessageServiceTest {
   }
 
   @Test
-  @DisplayName("마지막 메시지가 lastReadAt 이후면 hasUnread=true로 반환한다")
+  @DisplayName("상대방이 보낸 마지막 메시지가 lastReadAt 이후면 hasUnread=true로 반환한다")
   void findConversationWith_lastMessageAfterLastReadAt_hasUnreadTrue() {
+    UUID requesterId = UUID.randomUUID();
+    UUID withUserId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+    Instant lastReadAt = Instant.parse("2024-01-01T00:00:00Z");
+    Instant messageAt = Instant.parse("2024-01-02T00:00:00Z");
+
+    ConversationMember withUserMember = mockWithUserMember(conversationId, withUserId, "상대방", null);
+    ConversationMember requesterMember = mockConversationMember(requesterId, lastReadAt);
+    DirectMessage lastDm = mockDirectMessage(conversationId, withUserId, requesterId, messageAt);
+
+    given(conversationMemberRepository.findWithUserMemberByUserIds(requesterId, withUserId))
+        .willReturn(Optional.of(withUserMember));
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(Optional.of(requesterMember));
+    given(
+            directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(
+                conversationId))
+        .willReturn(Optional.of(lastDm));
+
+    ConversationDto result = directMessageService.findConversationWith(requesterId, withUserId);
+
+    assertThat(result.hasUnread()).isTrue();
+    assertThat(result.lastMessage()).isNotNull();
+    assertThat(result.lastMessage().content()).isEqualTo("안녕하세요");
+  }
+
+  @Test
+  @DisplayName("상대방이 보낸 마지막 메시지가 lastReadAt 이전이면 hasUnread=false로 반환한다")
+  void findConversationWith_lastMessageBeforeLastReadAt_hasUnreadFalse() {
+    UUID requesterId = UUID.randomUUID();
+    UUID withUserId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+    Instant messageAt = Instant.parse("2024-01-01T00:00:00Z");
+    Instant lastReadAt = Instant.parse("2024-01-02T00:00:00Z");
+
+    ConversationMember withUserMember = mockWithUserMember(conversationId, withUserId, "상대방", null);
+    ConversationMember requesterMember = mockConversationMember(requesterId, lastReadAt);
+    DirectMessage lastDm = mockDirectMessage(conversationId, withUserId, requesterId, messageAt);
+
+    given(conversationMemberRepository.findWithUserMemberByUserIds(requesterId, withUserId))
+        .willReturn(Optional.of(withUserMember));
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(Optional.of(requesterMember));
+    given(
+            directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(
+                conversationId))
+        .willReturn(Optional.of(lastDm));
+
+    ConversationDto result = directMessageService.findConversationWith(requesterId, withUserId);
+
+    assertThat(result.hasUnread()).isFalse();
+  }
+
+  @Test
+  @DisplayName("마지막 메시지가 요청자 본인이 보낸 것이면 lastReadAt 이후여도 hasUnread=false로 반환한다")
+  void findConversationWith_selfSentLastMessage_hasUnreadFalseEvenIfAfterLastReadAt() {
     UUID requesterId = UUID.randomUUID();
     UUID withUserId = UUID.randomUUID();
     UUID conversationId = UUID.randomUUID();
@@ -253,34 +311,9 @@ class DirectMessageServiceTest {
         .willReturn(Optional.of(withUserMember));
     given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
         .willReturn(Optional.of(requesterMember));
-    given(directMessageRepository.findLastByConversationId(conversationId))
-        .willReturn(Optional.of(lastDm));
-
-    ConversationDto result = directMessageService.findConversationWith(requesterId, withUserId);
-
-    assertThat(result.hasUnread()).isTrue();
-    assertThat(result.lastMessage()).isNotNull();
-    assertThat(result.lastMessage().content()).isEqualTo("안녕하세요");
-  }
-
-  @Test
-  @DisplayName("마지막 메시지가 lastReadAt 이전이면 hasUnread=false로 반환한다")
-  void findConversationWith_lastMessageBeforeLastReadAt_hasUnreadFalse() {
-    UUID requesterId = UUID.randomUUID();
-    UUID withUserId = UUID.randomUUID();
-    UUID conversationId = UUID.randomUUID();
-    Instant messageAt = Instant.parse("2024-01-01T00:00:00Z");
-    Instant lastReadAt = Instant.parse("2024-01-02T00:00:00Z");
-
-    ConversationMember withUserMember = mockWithUserMember(conversationId, withUserId, "상대방", null);
-    ConversationMember requesterMember = mockConversationMember(requesterId, lastReadAt);
-    DirectMessage lastDm = mockDirectMessage(conversationId, requesterId, withUserId, messageAt);
-
-    given(conversationMemberRepository.findWithUserMemberByUserIds(requesterId, withUserId))
-        .willReturn(Optional.of(withUserMember));
-    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
-        .willReturn(Optional.of(requesterMember));
-    given(directMessageRepository.findLastByConversationId(conversationId))
+    given(
+            directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(
+                conversationId))
         .willReturn(Optional.of(lastDm));
 
     ConversationDto result = directMessageService.findConversationWith(requesterId, withUserId);
@@ -333,14 +366,16 @@ class DirectMessageServiceTest {
 
     ConversationMember withUserMember = mockConversationMemberWithUser(withUserId, "상대방", null);
     ConversationMember requesterMember = mockConversationMember(requesterId, lastReadAt);
-    DirectMessage lastDm = mockDirectMessage(conversationId, requesterId, withUserId, messageAt);
+    DirectMessage lastDm = mockDirectMessage(conversationId, withUserId, requesterId, messageAt);
 
     given(conversationRepository.existsById(conversationId)).willReturn(true);
     given(conversationMemberRepository.findWithUserMember(conversationId, requesterId))
         .willReturn(Optional.of(withUserMember));
     given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
         .willReturn(Optional.of(requesterMember));
-    given(directMessageRepository.findLastByConversationId(conversationId))
+    given(
+            directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(
+                conversationId))
         .willReturn(Optional.of(lastDm));
 
     ConversationDto result = directMessageService.findConversation(conversationId, requesterId);
@@ -350,6 +385,34 @@ class DirectMessageServiceTest {
     assertThat(result.hasUnread()).isTrue();
     assertThat(result.lastMessage()).isNotNull();
     assertThat(result.lastMessage().content()).isEqualTo("안녕하세요");
+  }
+
+  @Test
+  @DisplayName("마지막 메시지가 요청자 본인이 보낸 것이면 lastReadAt 이후여도 hasUnread=false로 반환한다")
+  void findConversation_selfSentLastMessage_hasUnreadFalseEvenIfAfterLastReadAt() {
+    UUID conversationId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+    UUID withUserId = UUID.randomUUID();
+    Instant lastReadAt = Instant.parse("2024-01-01T00:00:00Z");
+    Instant messageAt = Instant.parse("2024-01-02T00:00:00Z");
+
+    ConversationMember withUserMember = mockConversationMemberWithUser(withUserId, "상대방", null);
+    ConversationMember requesterMember = mockConversationMember(requesterId, lastReadAt);
+    DirectMessage lastDm = mockDirectMessage(conversationId, requesterId, withUserId, messageAt);
+
+    given(conversationRepository.existsById(conversationId)).willReturn(true);
+    given(conversationMemberRepository.findWithUserMember(conversationId, requesterId))
+        .willReturn(Optional.of(withUserMember));
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(Optional.of(requesterMember));
+    given(
+            directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(
+                conversationId))
+        .willReturn(Optional.of(lastDm));
+
+    ConversationDto result = directMessageService.findConversation(conversationId, requesterId);
+
+    assertThat(result.hasUnread()).isFalse();
   }
 
   @Test
@@ -367,7 +430,9 @@ class DirectMessageServiceTest {
         .willReturn(Optional.of(withUserMember));
     given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
         .willReturn(Optional.of(requesterMember));
-    given(directMessageRepository.findLastByConversationId(conversationId))
+    given(
+            directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(
+                conversationId))
         .willReturn(Optional.empty());
 
     ConversationDto result = directMessageService.findConversation(conversationId, requesterId);
