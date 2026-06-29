@@ -9,10 +9,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class PlaylistMapper {
 
-  // TODO: 사용자 조회 연동 시 UserService를 주입하여 owner의 name/profileImageUrl을 채운다.
-  //             현재는 ownerId만 채운 스텁으로 생성한다.
-  // TODO: 콘텐츠 조회 연동 시 playlistContents의 contentId로 ContentSummary를 채운다.
-  //             현재는 빈 리스트 스텁으로 생성한다.
+  // TODO: 사용자/콘텐츠 조회는 서비스 계층에서 수행하고, 이미 조회된 UserSummary/ContentSummary를
+  //             매퍼 인자로 넘기도록 시그니처를 확장한다(매퍼는 조립만 담당).
+  //             현재는 owner를 ownerId 스텁, contents를 빈 리스트 스텁으로 생성한다.
   public PlaylistDto toDto(Playlist playlist, boolean subscribedByMe) {
     return new PlaylistDto(
         playlist.getId(),
