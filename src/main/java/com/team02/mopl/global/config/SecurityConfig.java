@@ -15,6 +15,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -31,6 +32,7 @@ public class SecurityConfig {
 
   private final AuthenticationSuccessHandler jwtLoginSuccessHandler;
   private final AuthenticationFailureHandler jwtLoginFailureHandler;
+  private final AuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
   @Bean
   public SecurityFilterChain filterChain(
@@ -71,8 +73,8 @@ public class SecurityConfig {
 
                     // 외의 것들은 인증 필요
                     .anyRequest()
-                    .permitAll());
-
+                    .authenticated())
+        .exceptionHandling(except -> except.authenticationEntryPoint(jwtAuthenticationEntryPoint));
     return http.build();
   }
 
