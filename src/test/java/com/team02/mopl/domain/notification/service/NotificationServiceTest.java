@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -257,6 +258,48 @@ class NotificationServiceTest {
     } finally {
       TransactionSynchronizationManager.clearSynchronization();
     }
+  }
+
+  @Test
+  @DisplayName("SSE 전송에 실패해도 알림 생성 결과를 반환한다")
+  void createNotification_sseSendFails_stillReturnsNotificationDto() {
+    UUID receiverId = UUID.randomUUID();
+    UUID notificationId = UUID.randomUUID();
+    User receiver = mockUser(receiverId);
+    NotificationCreateCommand command =
+        new NotificationCreateCommand(
+            receiverId, "알림 제목", "알림 내용", NotificationLevel.INFO, NotificationType.USER_FOLLOWED);
+
+    given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
+    given(notificationRepository.save(any(Notification.class)))
+        .willAnswer(
+            invocation -> {
+              Notification notification = invocation.getArgument(0);
+              ReflectionTestUtils.setField(notification, "id", notificationId);
+              return notification;
+            });
+
+    doThrow(new RuntimeException("SSE 전송 실패"))
+        .when(sseEventService)
+        .send(
+            eq(receiverId),
+            eq("notifications"),
+            eq(notificationId.toString()),
+            any(NotificationDto.class));
+
+    NotificationDto result = notificationService.createNotification(command);
+
+    assertThat(result.id()).isEqualTo(notificationId);
+    assertThat(result.receiverId()).isEqualTo(receiverId);
+    assertThat(result.title()).isEqualTo("알림 제목");
+
+    verify(notificationRepository).save(any(Notification.class));
+    verify(sseEventService)
+        .send(
+            eq(receiverId),
+            eq("notifications"),
+            eq(notificationId.toString()),
+            any(NotificationDto.class));
   }
 
   private User mockUser(UUID id) {

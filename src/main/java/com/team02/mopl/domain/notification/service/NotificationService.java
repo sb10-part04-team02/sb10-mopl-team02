@@ -15,12 +15,14 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.validation.annotation.Validated;
 
+@Slf4j
 @Service
 @Validated
 @RequiredArgsConstructor
@@ -104,10 +106,18 @@ public class NotificationService {
   }
 
   private void sendNotification(NotificationDto notificationDto) {
-    sseEventService.send(
-        notificationDto.receiverId(),
-        NOTIFICATION_EVENT_NAME,
-        notificationDto.id().toString(),
-        notificationDto);
+    try {
+      sseEventService.send(
+          notificationDto.receiverId(),
+          NOTIFICATION_EVENT_NAME,
+          notificationDto.id().toString(),
+          notificationDto);
+    } catch (RuntimeException e) {
+      log.warn(
+          "알림 SSE event 전송 실패. notificationId={}, receiverId={}",
+          notificationDto.id(),
+          notificationDto.receiverId(),
+          e);
+    }
   }
 }
