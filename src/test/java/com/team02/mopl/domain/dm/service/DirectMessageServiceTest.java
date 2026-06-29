@@ -500,6 +500,7 @@ class DirectMessageServiceTest {
     verify(eventPublisher).publishEvent(eventCaptor.capture());
     assertThat(eventCaptor.getValue().receiverUserId()).isEqualTo(receiverId);
     assertThat(eventCaptor.getValue().eventId()).isEqualTo(messageId.toString());
+    assertThat(eventCaptor.getValue().dto()).isEqualTo(result);
 
     ArgumentCaptor<NotificationCreateCommand> notifCaptor =
         ArgumentCaptor.forClass(NotificationCreateCommand.class);
