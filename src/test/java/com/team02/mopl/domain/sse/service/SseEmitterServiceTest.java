@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -184,6 +186,25 @@ class SseEmitterServiceTest {
     service.connect(userId, null);
 
     verify(emitter).completeWithError(exception);
+  }
+
+  @Test
+  @DisplayName("SSE 연결은 콜백을 등록한 뒤 emitter를 저장한다")
+  void connect_registersCallbacksBeforeSave() {
+    UUID userId = UUID.randomUUID();
+    SseEmitter emitter = mock(SseEmitter.class);
+    TestableSseEmitterService service =
+        new TestableSseEmitterService(sseEmitterRepository, emitter);
+
+    given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
+
+    service.connect(userId, null);
+
+    InOrder inOrder = inOrder(emitter, sseEmitterRepository);
+    inOrder.verify(emitter).onCompletion(any(Runnable.class));
+    inOrder.verify(emitter).onTimeout(any(Runnable.class));
+    inOrder.verify(emitter).onError(any());
+    inOrder.verify(sseEmitterRepository).save(userId, emitter);
   }
 
   private static class TestableSseEmitterService extends SseEmitterService {
