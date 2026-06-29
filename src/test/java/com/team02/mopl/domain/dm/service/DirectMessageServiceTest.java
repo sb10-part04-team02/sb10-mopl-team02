@@ -65,7 +65,7 @@ class DirectMessageServiceTest {
             new ConversationCreateRequest(withUserId), requesterId);
 
     assertThat(result.id()).isEqualTo(conversationId);
-    assertThat(result.with().id()).isEqualTo(withUserId);
+    assertThat(result.with().userId()).isEqualTo(withUserId);
     assertThat(result.with().name()).isEqualTo("상대방");
     assertThat(result.with().profileImageUrl()).isEqualTo("https://img.example.com/profile.png");
     assertThat(result.lastMessage()).isNull();
