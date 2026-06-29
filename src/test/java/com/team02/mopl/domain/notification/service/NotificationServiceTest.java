@@ -3,6 +3,7 @@ package com.team02.mopl.domain.notification.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -13,6 +14,7 @@ import com.team02.mopl.domain.notification.entity.Notification;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
+import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.exception.BusinessException;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
@@ -34,12 +37,15 @@ class NotificationServiceTest {
 
   @Mock private UserRepository userRepository;
 
+  @Mock private SseEventService sseEventService;
+
   @InjectMocks private NotificationService notificationService;
 
   @Test
   @DisplayName("알림 생성 요청을 저장하고 응답 DTO를 반환한다")
   void createNotification_success() {
     UUID receiverId = UUID.randomUUID();
+    UUID notificationId = UUID.randomUUID();
     User receiver = mockUser(receiverId);
     NotificationCreateCommand command =
         new NotificationCreateCommand(
@@ -47,10 +53,16 @@ class NotificationServiceTest {
 
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
     given(notificationRepository.save(any(Notification.class)))
-        .willAnswer(invocation -> invocation.getArgument(0));
+        .willAnswer(
+            invocation -> {
+              Notification notification = invocation.getArgument(0);
+              ReflectionTestUtils.setField(notification, "id", notificationId);
+              return notification;
+            });
 
     NotificationDto result = notificationService.createNotification(command);
 
+    assertThat(result.id()).isEqualTo(notificationId);
     assertThat(result.receiverId()).isEqualTo(receiverId);
     assertThat(result.title()).isEqualTo("알림 제목");
     assertThat(result.content()).isEqualTo("알림 내용");
@@ -58,6 +70,31 @@ class NotificationServiceTest {
 
     verify(userRepository).findByIdAndDeletedAtIsNull(receiverId);
     verify(notificationRepository).save(any(Notification.class));
+  }
+
+  @Test
+  @DisplayName("알림 생성 후 notifications SSE 이벤트를 전송한다")
+  void createNotification_sendsSseEvent() {
+    UUID receiverId = UUID.randomUUID();
+    UUID notificationId = UUID.randomUUID();
+    User receiver = mockUser(receiverId);
+    NotificationCreateCommand command =
+        new NotificationCreateCommand(
+            receiverId, "알림 제목", "알림 내용", NotificationLevel.INFO, NotificationType.USER_FOLLOWED);
+
+    given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
+    given(notificationRepository.save(any(Notification.class)))
+        .willAnswer(
+            invocation -> {
+              Notification notification = invocation.getArgument(0);
+              ReflectionTestUtils.setField(notification, "id", notificationId);
+              return notification;
+            });
+
+    NotificationDto result = notificationService.createNotification(command);
+
+    verify(sseEventService)
+        .send(eq(receiverId), eq("notifications"), eq(notificationId.toString()), eq(result));
   }
 
   @Test
@@ -80,6 +117,7 @@ class NotificationServiceTest {
   @DisplayName("알림 생성 시 level이 null이면 INFO로 기본 설정된다")
   void createNotification_levelNull_defaultsToInfo() {
     UUID receiverId = UUID.randomUUID();
+    UUID notificationId = UUID.randomUUID();
     User receiver = mockUser(receiverId);
     NotificationCreateCommand command =
         new NotificationCreateCommand(
@@ -87,7 +125,12 @@ class NotificationServiceTest {
 
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
     given(notificationRepository.save(any(Notification.class)))
-        .willAnswer(invocation -> invocation.getArgument(0));
+        .willAnswer(
+            invocation -> {
+              Notification notification = invocation.getArgument(0);
+              ReflectionTestUtils.setField(notification, "id", notificationId);
+              return notification;
+            });
 
     NotificationDto result = notificationService.createNotification(command);
 

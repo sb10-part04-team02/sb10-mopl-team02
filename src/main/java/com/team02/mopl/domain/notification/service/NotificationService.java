@@ -3,7 +3,10 @@ package com.team02.mopl.domain.notification.service;
 import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
 import com.team02.mopl.domain.notification.dto.NotificationDto;
 import com.team02.mopl.domain.notification.entity.Notification;
+import com.team02.mopl.domain.notification.exception.NotificationForbiddenException;
+import com.team02.mopl.domain.notification.exception.NotificationNotFoundException;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
+import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.exception.BusinessException;
@@ -22,8 +25,11 @@ import org.springframework.validation.annotation.Validated;
 @Transactional(readOnly = true)
 public class NotificationService {
 
+  private static final String NOTIFICATION_EVENT_NAME = "notifications";
+
   private final NotificationRepository notificationRepository;
   private final UserRepository userRepository;
+  private final SseEventService sseEventService;
 
   @Transactional
   public NotificationDto createNotification(@Valid NotificationCreateCommand command) {
@@ -37,7 +43,16 @@ public class NotificationService {
             command.level(),
             command.notificationType());
 
-    return NotificationDto.from(notificationRepository.save(notification));
+    Notification savedNotification = notificationRepository.save(notification);
+    NotificationDto notificationDto = NotificationDto.from(savedNotification);
+
+    sseEventService.send(
+        notificationDto.receiverId(),
+        NOTIFICATION_EVENT_NAME,
+        notificationDto.id().toString(),
+        notificationDto);
+
+    return notificationDto;
   }
 
   // TODO: 커서 페이지네이션 구현 후 수정 예정
@@ -55,7 +70,7 @@ public class NotificationService {
     Notification notification =
         notificationRepository
             .findByIdAndDeletedAtIsNull(notificationId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOTIFICATION_NOT_FOUND));
+            .orElseThrow(NotificationNotFoundException::new);
 
     validateOwner(notification, receiverId);
 
@@ -70,7 +85,7 @@ public class NotificationService {
 
   private void validateOwner(Notification notification, UUID receiverId) {
     if (!notification.getReceiver().getId().equals(receiverId)) {
-      throw new BusinessException(ErrorCode.NOTIFICATION_FORBIDDEN);
+      throw new NotificationForbiddenException();
     }
   }
 }
