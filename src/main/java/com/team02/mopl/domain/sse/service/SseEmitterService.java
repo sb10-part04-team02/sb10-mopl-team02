@@ -24,11 +24,11 @@ public class SseEmitterService {
 
     // LastEventId는 재연결 시 누락 이벤트 재전송에 사용할 수 있도록 우선 파라미터만
     if (lastEventId != null) {
-      log.debug("SSE reconnect requested. userId={}, lastEventId={}", userId, lastEventId);
+      log.debug("SSE 재연결 요청. userId={}, lastEventId={}", userId, lastEventId);
     }
 
-    sseEmitterRepository.save(userId, emitter).ifPresent(SseEmitter::complete);
     registerCallbacks(userId, emitter);
+    sseEmitterRepository.save(userId, emitter).ifPresent(SseEmitter::complete);
     sendConnectEvent(userId, emitter);
 
     return emitter;
@@ -50,7 +50,6 @@ public class SseEmitterService {
               .name(CONNECT_EVENT_NAME)
               .data("SSE 연결 성공"));
     } catch (IOException e) {
-      sseEmitterRepository.delete(userId, emitter);
       emitter.completeWithError(e);
       log.warn("SSE 연결 이벤트 전송 실패. userId={}", userId, e);
     }

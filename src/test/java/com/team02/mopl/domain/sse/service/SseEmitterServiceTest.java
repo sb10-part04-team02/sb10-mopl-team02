@@ -4,12 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.team02.mopl.domain.sse.repository.SseEmitterRepository;
+import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -103,6 +106,84 @@ class SseEmitterServiceTest {
     service.connect(userId, null);
 
     verify(emitter).send(any(SseEmitter.SseEventBuilder.class));
+  }
+
+  @Test
+  @DisplayName("SSE 연결 완료 콜백이 실행되면 emitter를 제거한다")
+  void connect_completionCallback_deletesEmitter() {
+    UUID userId = UUID.randomUUID();
+    SseEmitter emitter = mock(SseEmitter.class);
+    TestableSseEmitterService service =
+        new TestableSseEmitterService(sseEmitterRepository, emitter);
+    ArgumentCaptor<Runnable> completionCaptor = ArgumentCaptor.forClass(Runnable.class);
+
+    given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
+
+    service.connect(userId, null);
+
+    verify(emitter).onCompletion(completionCaptor.capture());
+
+    completionCaptor.getValue().run();
+
+    verify(sseEmitterRepository).delete(userId, emitter);
+  }
+
+  @Test
+  @DisplayName("SSE 타임아웃 콜백이 실행되면 emitter를 제거한다")
+  void connect_timeoutCallback_deletesEmitter() {
+    UUID userId = UUID.randomUUID();
+    SseEmitter emitter = mock(SseEmitter.class);
+    TestableSseEmitterService service =
+        new TestableSseEmitterService(sseEmitterRepository, emitter);
+    ArgumentCaptor<Runnable> timeoutCaptor = ArgumentCaptor.forClass(Runnable.class);
+
+    given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
+
+    service.connect(userId, null);
+
+    verify(emitter).onTimeout(timeoutCaptor.capture());
+
+    timeoutCaptor.getValue().run();
+
+    verify(sseEmitterRepository).delete(userId, emitter);
+  }
+
+  @Test
+  @DisplayName("SSE 에러 콜백이 실행되면 emitter를 제거한다")
+  @SuppressWarnings("unchecked")
+  void connect_errorCallback_deletesEmitter() {
+    UUID userId = UUID.randomUUID();
+    SseEmitter emitter = mock(SseEmitter.class);
+    TestableSseEmitterService service =
+        new TestableSseEmitterService(sseEmitterRepository, emitter);
+    ArgumentCaptor<Consumer<Throwable>> errorCaptor = ArgumentCaptor.forClass(Consumer.class);
+
+    given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
+
+    service.connect(userId, null);
+
+    verify(emitter).onError(errorCaptor.capture());
+
+    errorCaptor.getValue().accept(new RuntimeException("SSE error"));
+
+    verify(sseEmitterRepository).delete(userId, emitter);
+  }
+
+  @Test
+  @DisplayName("초기 connect 이벤트 전송에 실패하면 emitter를 에러로 종료한다")
+  void connect_sendConnectEventFails_completesEmitterWithError() throws Exception {
+    UUID userId = UUID.randomUUID();
+    IOException exception = new IOException("SSE send failed");
+    SseEmitter emitter = mock(SseEmitter.class);
+    TestableSseEmitterService service =
+        new TestableSseEmitterService(sseEmitterRepository, emitter);
+
+    given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
+    doThrow(exception).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
+
+    service.connect(userId, null);
+
+    verify(emitter).completeWithError(exception);
   }
 
   private static class TestableSseEmitterService extends SseEmitterService {
