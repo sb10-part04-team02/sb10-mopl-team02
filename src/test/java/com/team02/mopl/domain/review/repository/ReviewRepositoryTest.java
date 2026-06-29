@@ -18,6 +18,8 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
 class ReviewRepositoryTest extends RepositoryTestSupport {
@@ -192,6 +194,21 @@ class ReviewRepositoryTest extends RepositoryTestSupport {
                     "not-a-number",
                     idAfter,
                     10))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.INVALID_REQUEST);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"NaN", "Infinity", "-Infinity"})
+  @DisplayName("findReviewsByCursor는 rating 커서가 NaN·Infinity면 INVALID_REQUEST 예외를 던진다")
+  void findReviewsByCursor_nonFiniteRatingCursor_throwsInvalidRequest(String cursor) {
+    UUID idAfter = UUID.randomUUID();
+
+    assertThatThrownBy(
+            () ->
+                reviewRepository.findReviewsByCursor(
+                    contentId, ReviewSortBy.RATING, SortDirection.DESCENDING, cursor, idAfter, 10))
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.INVALID_REQUEST);
