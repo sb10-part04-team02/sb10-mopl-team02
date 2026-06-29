@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
@@ -29,6 +30,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
@@ -217,6 +220,43 @@ class NotificationServiceTest {
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.NOTIFICATION_FORBIDDEN));
+  }
+
+  @Test
+  @DisplayName("트랜잭션 동기화가 활성화되어 있으면 커밋 이후 SSE 이벤트를 전송한다")
+  void createNotification_transactionActive_sendsSseAfterCommit() {
+    UUID receiverId = UUID.randomUUID();
+    UUID notificationId = UUID.randomUUID();
+    User receiver = mockUser(receiverId);
+    NotificationCreateCommand command =
+        new NotificationCreateCommand(
+            receiverId, "알림 제목", "알림 내용", NotificationLevel.INFO, NotificationType.USER_FOLLOWED);
+
+    given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
+    given(notificationRepository.save(any(Notification.class)))
+        .willAnswer(
+            invocation -> {
+              Notification notification = invocation.getArgument(0);
+              ReflectionTestUtils.setField(notification, "id", notificationId);
+              return notification;
+            });
+
+    TransactionSynchronizationManager.initSynchronization();
+
+    try {
+      NotificationDto result = notificationService.createNotification(command);
+
+      verify(sseEventService, never())
+          .send(any(UUID.class), any(String.class), any(String.class), any(NotificationDto.class));
+
+      TransactionSynchronizationManager.getSynchronizations()
+          .forEach(TransactionSynchronization::afterCommit);
+
+      verify(sseEventService)
+          .send(eq(receiverId), eq("notifications"), eq(notificationId.toString()), eq(result));
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
   }
 
   private User mockUser(UUID id) {
