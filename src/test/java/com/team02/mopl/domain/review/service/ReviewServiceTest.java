@@ -6,7 +6,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.inOrder;
 
+import com.team02.mopl.domain.content.service.ContentRatingService;
 import com.team02.mopl.domain.review.dto.ReviewCreateRequest;
 import com.team02.mopl.domain.review.dto.ReviewDto;
 import com.team02.mopl.domain.review.dto.ReviewSearchRequest;
@@ -31,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -43,6 +46,8 @@ class ReviewServiceTest {
   @Mock ReviewRepository reviewRepository;
 
   @Mock ReviewMapper reviewMapper;
+
+  @Mock ContentRatingService contentRatingService;
 
   @InjectMocks ReviewService reviewService;
 
@@ -243,7 +248,10 @@ class ReviewServiceTest {
       then(reviewRepository)
           .should()
           .existsByAuthorIdAndContentIdAndDeletedAtIsNull(eq(authorId), eq(contentId));
-      then(reviewRepository).should().saveAndFlush(reviewCaptor.capture());
+      // 재집계가 저장 이후 최신 값을 보도록 saveAndFlush()가 refreshAggregate()보다 먼저 호출돼야 한다
+      InOrder inOrder = inOrder(reviewRepository, contentRatingService);
+      inOrder.verify(reviewRepository).saveAndFlush(reviewCaptor.capture());
+      inOrder.verify(contentRatingService).refreshAggregate(eq(contentId));
       then(reviewMapper).should().toDto(any(Review.class));
 
       Review captured = reviewCaptor.getValue();
@@ -312,6 +320,10 @@ class ReviewServiceTest {
       assertThat(actual).isEqualTo(expect);
       assertThat(review.getText()).isEqualTo("수정된 내용");
       assertThat(review.getRating()).isEqualTo(2.0);
+      // 재집계가 DB 반영 이후 최신 값을 보도록 flush()가 refreshAggregate()보다 먼저 호출돼야 한다
+      InOrder inOrder = inOrder(reviewRepository, contentRatingService);
+      inOrder.verify(reviewRepository).flush();
+      inOrder.verify(contentRatingService).refreshAggregate(eq(contentId));
       then(reviewMapper).should().toDto(any(Review.class));
     }
 
@@ -383,6 +395,10 @@ class ReviewServiceTest {
 
       // then
       assertThat(review.isDeleted()).isTrue();
+      // 재집계가 DB 반영 이후 최신 값을 보도록 flush()가 refreshAggregate()보다 먼저 호출돼야 한다
+      InOrder inOrder = inOrder(reviewRepository, contentRatingService);
+      inOrder.verify(reviewRepository).flush();
+      inOrder.verify(contentRatingService).refreshAggregate(eq(contentId));
     }
   }
 }
