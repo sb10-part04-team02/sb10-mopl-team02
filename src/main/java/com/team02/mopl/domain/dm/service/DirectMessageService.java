@@ -5,6 +5,7 @@ import static com.team02.mopl.global.exception.ErrorCode.USER_NOT_FOUND;
 import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
+import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.domain.dm.entity.ConversationMember;
 import com.team02.mopl.domain.dm.entity.DirectMessage;
@@ -141,6 +142,31 @@ public class DirectMessageService {
             .filter(dm -> !dm.getSender().getUser().getId().equals(requesterId))
             .map(dm -> dm.getCreatedAt().isAfter(requesterMember.getLastReadAt()))
             .orElse(false));
+  }
+
+  @Transactional
+  public DirectMessageDto sendDirectMessage(
+      UUID conversationId, UUID senderId, DirectMessageSendRequest request) {
+    ConversationMember senderMember =
+        conversationMemberRepository
+            .findByConversationIdAndUserId(conversationId, senderId)
+            .orElseThrow(ConversationForbiddenException::new);
+
+    ConversationMember receiverMember =
+        conversationMemberRepository
+            .findWithUserMember(conversationId, senderId)
+            .orElseThrow(ConversationForbiddenException::new);
+
+    DirectMessage saved =
+        directMessageRepository.save(
+            DirectMessage.builder()
+                .conversation(senderMember.getConversation())
+                .sender(senderMember)
+                .receiver(receiverMember)
+                .content(request.content())
+                .build());
+
+    return toDirectMessageDto(saved);
   }
 
   private DirectMessageDto toDirectMessageDto(DirectMessage dm) {
