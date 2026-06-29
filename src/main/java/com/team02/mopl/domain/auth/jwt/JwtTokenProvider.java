@@ -11,6 +11,7 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTClaimsSet.Builder;
 import com.nimbusds.jwt.SignedJWT;
 import com.team02.mopl.domain.auth.entity.MoplUserDetails;
+import com.team02.mopl.domain.auth.exception.TokenGenerationException;
 import jakarta.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
@@ -20,6 +21,9 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.CredentialsExpiredException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
@@ -49,7 +53,6 @@ public class JwtTokenProvider {
     return generateToken(userDetails, TokenType.REFRESH);
   }
 
-  // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
   private String generateToken(MoplUserDetails userDetails, TokenType type) {
     long expirationTime =
         switch (type) {
@@ -76,72 +79,73 @@ public class JwtTokenProvider {
       signedJWT.sign(signer);
       return signedJWT.serialize();
     } catch (JOSEException e) {
-      log.error("Token을 생성하는데 실패했습니다.");
-      throw new RuntimeException("Token을 생성하는데 실패했습니다.", e);
+      throw new TokenGenerationException(e);
     }
   }
 
-  // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
   public JWTClaimsSet verifyAccessToken(String token) {
     JWTClaimsSet claimsSet = verifyAndGetClaims(token);
-    String type;
+
     try {
-      type = claimsSet.getStringClaim("type");
+      String type = claimsSet.getStringClaim("type");
+      if (type == null) {
+        throw new BadCredentialsException("Token 내에 type이 존재하지 않습니다.");
+      }
+
+      if (!TokenType.ACCESS.name().equalsIgnoreCase(type)) {
+        throw new BadCredentialsException("Access 토큰이 아닙니다.");
+      }
+
+      return claimsSet;
+
     } catch (ParseException e) {
-      throw new RuntimeException("Token을 파싱하는데 실패했습니다.", e);
+      throw new BadCredentialsException("Token의 type을 파싱하는데 실패했습니다.", e);
     }
-
-    if (!TokenType.ACCESS.name().equalsIgnoreCase(type)) {
-      throw new RuntimeException("유효하지 않은 토큰입니다.");
-    }
-
-    return claimsSet;
   }
 
-  // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
   public JWTClaimsSet verifyRefreshToken(String token) {
     JWTClaimsSet claimsSet = verifyAndGetClaims(token);
-    String type;
+
     try {
-      type = claimsSet.getStringClaim("type");
+      String type = claimsSet.getStringClaim("type");
+      if (type == null) {
+        throw new BadCredentialsException("Token 내에 type이 존재하지 않습니다.");
+      }
+
+      if (!TokenType.REFRESH.name().equalsIgnoreCase(type)) {
+        throw new BadCredentialsException("Refresh 토큰이 아닙니다.");
+      }
+
+      return claimsSet;
+
     } catch (ParseException e) {
-      throw new RuntimeException("Token을 파싱하는데 실패했습니다.", e);
+      throw new BadCredentialsException("Token의 type을 파싱하는데 실패했습니다.", e);
     }
-
-    if (!TokenType.REFRESH.name().equalsIgnoreCase(type)) {
-      throw new RuntimeException("유효하지 않은 토큰입니다.");
-    }
-
-    return claimsSet;
   }
 
-  // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
   private JWTClaimsSet verifyAndGetClaims(String token) {
     try {
       SignedJWT signedJWT = SignedJWT.parse(token);
 
       // 서명 검증
       if (!signedJWT.verify(verifier)) {
-        log.debug("JWT 검증 실패: 서명");
-        throw new RuntimeException("서명이 올바르지 않은 토큰입니다.");
+        throw new BadCredentialsException("서명이 올바르지 않은 토큰입니다.");
       }
 
       // 만료시간 검증
       JWTClaimsSet claimsSet = signedJWT.getJWTClaimsSet();
       Date tokenExpirationTime = claimsSet.getExpirationTime();
-      if (tokenExpirationTime == null || tokenExpirationTime.before(new Date())) {
-        log.debug("JWT 검증 실패: 만료시간이 없거나 만료됨");
-        throw new RuntimeException("만료되었거나 올바르지 않은 토큰입니다.");
+      if (tokenExpirationTime == null) {
+        throw new InsufficientAuthenticationException("Token 내에 만료시간이 누락되었습니다.");
+      }
+      if (tokenExpirationTime.before(new Date())) {
+        throw new CredentialsExpiredException("만료된 토큰입니다.");
       }
 
       return claimsSet;
 
-    } catch (ParseException e) {
-      log.debug("Token을 파싱하는데 실패했습니다.");
-      throw new RuntimeException("Token을 파싱하는데 실패했습니다.", e);
-    } catch (JOSEException e) {
-      log.debug("Token을 검증하는데 실패했습니다.");
-      throw new RuntimeException("Token을 검증하는데 실패했습니다.", e);
+    } catch (ParseException | JOSEException e) {
+      throw new BadCredentialsException("올바르지 않은 토큰입니다.");
     }
   }
 

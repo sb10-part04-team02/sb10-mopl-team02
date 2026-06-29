@@ -1,18 +1,19 @@
 package com.team02.mopl.domain.auth.controller;
 
+import com.team02.mopl.domain.auth.dto.JwtDto;
 import com.team02.mopl.domain.auth.dto.SignInRequest;
-import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.global.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.web.csrf.CsrfToken;
-import org.springframework.web.bind.annotation.RequestBody;
 
 @Tag(name = "인증 관리")
 public interface AuthApi {
@@ -25,17 +26,33 @@ public interface AuthApi {
   })
   ResponseEntity<Void> getCsrfToken(CsrfToken csrfToken);
 
-  @Operation(summary = "로그인", description = "SecurityFilterChain에서 처리합니다.")
+  @Operation(
+      summary = "로그인",
+      description = "SecurityFilterChain에서 처리합니다.",
+      requestBody =
+          @RequestBody(
+              required = true,
+              content =
+                  @io.swagger.v3.oas.annotations.media.Content(
+                      mediaType = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+                      schema = @Schema(implementation = SignInRequest.class))))
   @ApiResponses({
-    @ApiResponse(responseCode = "201", description = "성공"),
+    @ApiResponse(
+        responseCode = "200",
+        description = "성공",
+        content = @Content(schema = @Schema(implementation = JwtDto.class))),
     @ApiResponse(
         responseCode = "400",
         description = "잘못된 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     @ApiResponse(
         responseCode = "500",
         description = "서버 오류",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   })
-  ResponseEntity<UserDto> signIn(@RequestBody @Valid SignInRequest request);
+  void signIn(@Valid SignInRequest request);
 }

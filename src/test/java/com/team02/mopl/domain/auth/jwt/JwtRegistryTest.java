@@ -15,8 +15,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -59,10 +57,9 @@ class JwtRegistryTest {
     then(zSetOperations).should(never()).removeRange(eq(key), anyLong(), anyLong());
   }
 
-  @ParameterizedTest
-  @ValueSource(longs = {1L, 2L})
+  @Test
   @DisplayName("현재개수가 maxAccountCount보다 많으면 maxAccountCount 될때까지 삭제한다")
-  void success_shouldRemoveOldestToken_whenExceedMaxAccountCount(Long currentCount) {
+  void success_shouldRemoveOldestToken_whenExceedMaxAccountCount() {
     // given
     UUID userId = UUID.randomUUID();
     String key = "jwt:refresh:" + userId;
@@ -70,7 +67,7 @@ class JwtRegistryTest {
     Duration expiration = Duration.ofMinutes(10);
 
     given(properties.refreshTokenExpiration()).willReturn(expiration);
-    given(zSetOperations.size(anyString())).willReturn(3L);
+    given(zSetOperations.size(anyString())).willReturn(2L);
 
     // when
     jwtRegistry.registerRefreshToken(userId, refreshToken);

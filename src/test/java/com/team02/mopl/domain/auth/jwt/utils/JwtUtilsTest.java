@@ -23,6 +23,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,23 +47,48 @@ class JwtUtilsTest {
     // then
     assertThat(cookie.getValue()).isEqualTo(refreshToken);
     assertThat(cookie.getMaxAge()).isEqualTo(expiration);
+    assertThat(cookie.isHttpOnly()).isEqualTo(true);
+    assertThat(cookie.isSecure()).isEqualTo(true);
+    assertThat(cookie.getSameSite()).isEqualTo("Lax");
   }
 
   @Nested
   class GetUserId {
     @Test
-    @DisplayName("claimSet의 파싱이 실패한다면 에러를 던진다")
-    void fail_shouldThrowException_whenClaimSetIsInvalid() throws ParseException {
+    @DisplayName("userId의 파싱이 실패한다면 예외를 던진다")
+    void fail_shouldThrowBadCredentialException_whenParseExceptionOccurs() throws ParseException {
       // given
       JWTClaimsSet claimsSet = mock(JWTClaimsSet.class);
       given(claimsSet.getStringClaim(anyString())).willThrow(ParseException.class);
 
       // when & then
-      assertThrows(RuntimeException.class, () -> jwtUtils.getUserId(claimsSet));
+      assertThrows(BadCredentialsException.class, () -> jwtUtils.getUserId(claimsSet));
     }
 
     @Test
-    @DisplayName("claimSet의 파싱이 성공한다면 UUID를 반환한다")
+    @DisplayName("userId의 파싱값이 null이라면 예외를 던진다")
+    void fail_shouldThrowBadCredentialException_whenUserIdIsNull() throws ParseException {
+      // given
+      JWTClaimsSet claimsSet = mock(JWTClaimsSet.class);
+      given(claimsSet.getStringClaim(anyString())).willReturn(null);
+
+      // when & then
+      assertThrows(BadCredentialsException.class, () -> jwtUtils.getUserId(claimsSet));
+    }
+
+    @Test
+    @DisplayName("UUID의 파싱이 실패한다면 예외를 던진다")
+    void fail_shouldThrowBadCredentialException_whenInvalidUUID() throws ParseException {
+      // given
+      JWTClaimsSet claimsSet = mock(JWTClaimsSet.class);
+      given(claimsSet.getStringClaim(anyString())).willReturn("Invalid UUID");
+
+      // when & then
+      assertThrows(BadCredentialsException.class, () -> jwtUtils.getUserId(claimsSet));
+    }
+
+    @Test
+    @DisplayName("userId의 파싱이 성공한다면 UUID를 반환한다")
     void success_shouldReturnUUID_whenClaimSetIsValid() throws ParseException {
       // given
       UUID userId = UUID.randomUUID();
@@ -79,49 +106,44 @@ class JwtUtilsTest {
   @Nested
   class GetAuthorities {
     @Test
-    @DisplayName("claimSet의 파싱이 실패한다면 빈 권한목록을 반환한다")
-    void fail_shouldReturnEmptyList_whenParseExceptionOccurs() throws ParseException {
+    @DisplayName("roles의 파싱이 실패한다면 예외를 던진다")
+    void fail_shouldThrowBadCredentialsException_whenParseExceptionOccurs() throws ParseException {
       // given
       JWTClaimsSet claimsSet = mock(JWTClaimsSet.class);
       given(claimsSet.getStringListClaim(anyString())).willThrow(ParseException.class);
 
-      // when
-      Collection<? extends GrantedAuthority> authorities = jwtUtils.getAuthorities(claimsSet);
-
-      // then
-      assertThat(authorities).isEmpty();
+      // when & then
+      assertThrows(BadCredentialsException.class, () -> jwtUtils.getAuthorities(claimsSet));
     }
 
     @Test
-    @DisplayName("role 클레임 자체가 없을 때 빈 권한목록을 반환한다")
-    void fail_shouldReturnEmptyList_whenRolesClaimIsNull() throws ParseException {
+    @DisplayName("roles의 파싱값이 null이면 예외를 던진다")
+    void fail_shouldThrowInsufficientAuthenticationException_whenRolesIsNull()
+        throws ParseException {
       // given
       JWTClaimsSet claimsSet = mock(JWTClaimsSet.class);
       given(claimsSet.getStringListClaim(anyString())).willReturn(null);
 
-      // when
-      Collection<? extends GrantedAuthority> authorities = jwtUtils.getAuthorities(claimsSet);
-
-      // then
-      assertThat(authorities).isEmpty();
+      // when & then
+      assertThrows(
+          InsufficientAuthenticationException.class, () -> jwtUtils.getAuthorities(claimsSet));
     }
 
     @Test
-    @DisplayName("role 클레임에 권한이 비어있으면 빈 권한목록을 반환한다")
-    void fail_shouldReturnEmptyList_whenRolesClaimIsEmpty() throws ParseException {
+    @DisplayName("roles의 파싱값이 비어있으면 예외를 던진다")
+    void fail_shouldThrowInsufficientAuthenticationException_whenRolesIsEmpty()
+        throws ParseException {
       // given
       JWTClaimsSet claimsSet = mock(JWTClaimsSet.class);
       given(claimsSet.getStringListClaim(anyString())).willReturn(Collections.emptyList());
 
-      // when
-      Collection<? extends GrantedAuthority> authorities = jwtUtils.getAuthorities(claimsSet);
-
-      // then
-      assertThat(authorities).isEmpty();
+      // when & then
+      assertThrows(
+          InsufficientAuthenticationException.class, () -> jwtUtils.getAuthorities(claimsSet));
     }
 
     @Test
-    @DisplayName("올바른 권한목록이 있으면 GrantedAuthority 객체목록을 반환한다")
+    @DisplayName("roles의 파싱이 성공한다면 GrantedAuthority 객체목록을 반환한다")
     void success_shouldReturnAuthorities_whenRolesClaimIsValid() throws ParseException {
       // given
       JWTClaimsSet claimsSet = mock(JWTClaimsSet.class);

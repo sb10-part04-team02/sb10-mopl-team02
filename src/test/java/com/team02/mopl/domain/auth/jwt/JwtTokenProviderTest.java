@@ -17,6 +17,7 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTClaimsSet.Builder;
 import com.nimbusds.jwt.SignedJWT;
 import com.team02.mopl.domain.auth.entity.MoplUserDetails;
+import com.team02.mopl.domain.auth.exception.TokenGenerationException;
 import com.team02.mopl.domain.auth.jwt.JwtTokenProvider.TokenType;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.entity.enums.Role;
@@ -24,6 +25,7 @@ import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,6 +36,9 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.CredentialsExpiredException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,22 +62,20 @@ class JwtTokenProviderTest {
 
     @ParameterizedTest
     @EnumSource(TokenType.class)
-    @DisplayName("parse를 실패해서 ParseException을 던진다")
-    void fail_shouldThrowRuntimeExceptionWrappedParseException_whenTokenParsingFails(
-        TokenType tokenType) {
+    @DisplayName("Token 파싱이 실패한다면 예외를 던진다")
+    void fail_shouldThrowBadCredentialsException_whenTokenParsingFails(TokenType tokenType) {
       // given
       String invalidToken = "invalidToken";
 
       // when
-      assertThrows(RuntimeException.class, () -> innerVerify(tokenType, invalidToken));
+      assertThrows(BadCredentialsException.class, () -> innerVerify(tokenType, invalidToken));
     }
 
     @ParameterizedTest
     @EnumSource(TokenType.class)
-    @DisplayName("verify를 실패해서 JOSEException을 던진다")
-    void
-        fail_shouldThrowRuntimeExceptionWrappedJOSEException_whenTokenVerificationFailsWithJOSEException(
-            TokenType tokenType) throws JOSEException {
+    @DisplayName("verify를 실패한다면 예외를 던진다")
+    void fail_shouldThrowBadCredentialsException_whenTokenVerificationFails(TokenType tokenType)
+        throws JOSEException {
       // given
       String validFormatToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature";
       JWSVerifier mockVerifier = mock(JWSVerifier.class);
@@ -81,13 +84,13 @@ class JwtTokenProviderTest {
       ReflectionTestUtils.setField(jwtTokenProvider, "verifier", mockVerifier);
 
       // when & then
-      assertThrows(RuntimeException.class, () -> innerVerify(tokenType, validFormatToken));
+      assertThrows(BadCredentialsException.class, () -> innerVerify(tokenType, validFormatToken));
     }
 
     @ParameterizedTest
     @EnumSource(TokenType.class)
-    @DisplayName("서명검증에 실패해서 RuntimeException을 던진다")
-    void fail_shouldThrowRuntimeException_whenTokenSignatureIsInvalid(TokenType tokenType)
+    @DisplayName("서명검증에 실패한다면 예외를 던진다")
+    void fail_shouldThrowBadCredentialsException_whenTokenSignatureIsInvalid(TokenType tokenType)
         throws JOSEException {
       // given
       String validFormatToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature";
@@ -96,14 +99,14 @@ class JwtTokenProviderTest {
       ReflectionTestUtils.setField(jwtTokenProvider, "verifier", mockVerifier);
 
       // when & then
-      assertThrows(RuntimeException.class, () -> innerVerify(tokenType, validFormatToken));
+      assertThrows(BadCredentialsException.class, () -> innerVerify(tokenType, validFormatToken));
     }
 
     @ParameterizedTest
     @EnumSource(TokenType.class)
-    @DisplayName("만료시간이 null이라 검증에 실패해서 RuntimeException을 던진다")
-    void fail_shouldThrowRuntimeException_whenTokenExpirationTimeIsNull(TokenType tokenType)
-        throws JOSEException {
+    @DisplayName("만료시간이 null이라면 예외를 던진다")
+    void fail_shouldThrowInsufficientAuthenticationException_whenTokenExpirationTimeIsNull(
+        TokenType tokenType) throws JOSEException {
       // given
       given(properties.secretKey()).willReturn(validKey);
       jwtTokenProvider.bakeSignerAndVerifier();
@@ -117,13 +120,15 @@ class JwtTokenProviderTest {
       String nullExpirationToken = signedJWT.serialize();
 
       // when & then
-      assertThrows(RuntimeException.class, () -> innerVerify(tokenType, nullExpirationToken));
+      assertThrows(
+          InsufficientAuthenticationException.class,
+          () -> innerVerify(tokenType, nullExpirationToken));
     }
 
     @ParameterizedTest
     @EnumSource(TokenType.class)
-    @DisplayName("만료시간 검증에 실패해서 RuntimeException을 던진다")
-    void fail_shouldThrowRuntimeException_whenTokenIsExpired(TokenType tokenType)
+    @DisplayName("만료된 토큰이라면 예외를 던진다")
+    void fail_shouldThrowCredentialsExpiredException_whenTokenIsExpired(TokenType tokenType)
         throws JOSEException {
       // given
       given(properties.secretKey()).willReturn(validKey);
@@ -139,13 +144,65 @@ class JwtTokenProviderTest {
       String expiredToken = signedJWT.serialize();
 
       // when & then
-      assertThrows(RuntimeException.class, () -> innerVerify(tokenType, expiredToken));
+      assertThrows(CredentialsExpiredException.class, () -> innerVerify(tokenType, expiredToken));
     }
 
     @ParameterizedTest
     @EnumSource(TokenType.class)
-    @DisplayName("토큰타입이 맞지 않으면 RuntimeException을 던진다")
-    void fail_shouldThrowRuntimeException_whenTokenTypeIsInvalid(TokenType tokenType)
+    @DisplayName("타입 파싱이 실패한다면 예외를 던진다")
+    void fail_shouldThrowBadCredentialsException_whenParseExceptionOccurs(TokenType tokenType)
+        throws JOSEException {
+      // given
+      given(properties.secretKey()).willReturn(validKey);
+      jwtTokenProvider.bakeSignerAndVerifier();
+
+      // 만료시간이 10분인 claim 생성
+      Date currentPlus10Minute =
+          new Date(System.currentTimeMillis() + Duration.ofMinutes(10).toMillis());
+      JWTClaimsSet expect =
+          new Builder()
+              .issueTime(new Date())
+              .claim("type", List.of("String이 아닌 List"))
+              .expirationTime(currentPlus10Minute)
+              .build();
+
+      // 만료시간 지난 토큰 생성
+      SignedJWT signedJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), expect);
+      signedJWT.sign((JWSSigner) ReflectionTestUtils.getField(jwtTokenProvider, "signer"));
+      String validToken = signedJWT.serialize();
+
+      // when & then
+      assertThrows(BadCredentialsException.class, () -> innerVerify(tokenType, validToken));
+    }
+
+    @ParameterizedTest
+    @EnumSource(TokenType.class)
+    @DisplayName("토큰 타입이 null이라면 예외를 던진다")
+    void fail_shouldThrowBadCredentialsException_whenTokenTypeIsNull(TokenType tokenType)
+        throws JOSEException {
+      // given
+      given(properties.secretKey()).willReturn(validKey);
+      jwtTokenProvider.bakeSignerAndVerifier();
+
+      // 만료시간이 10분인 claim 생성
+      Date currentPlus10Minute =
+          new Date(System.currentTimeMillis() + Duration.ofMinutes(10).toMillis());
+      JWTClaimsSet expect =
+          new Builder().issueTime(new Date()).expirationTime(currentPlus10Minute).build();
+
+      // 만료시간 지난 토큰 생성
+      SignedJWT signedJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), expect);
+      signedJWT.sign((JWSSigner) ReflectionTestUtils.getField(jwtTokenProvider, "signer"));
+      String validToken = signedJWT.serialize();
+
+      // when & then
+      assertThrows(BadCredentialsException.class, () -> innerVerify(tokenType, validToken));
+    }
+
+    @ParameterizedTest
+    @EnumSource(TokenType.class)
+    @DisplayName("토큰타입이 맞지 않으면 예외를 던진다")
+    void fail_shouldThrowBadCredentialsException_whenTokenTypeIsMissMatch(TokenType tokenType)
         throws JOSEException {
       // given
       given(properties.secretKey()).willReturn(validKey);
@@ -172,7 +229,7 @@ class JwtTokenProviderTest {
       String validToken = signedJWT.serialize();
 
       // when & then
-      assertThrows(RuntimeException.class, () -> innerVerify(tokenType, validToken));
+      assertThrows(BadCredentialsException.class, () -> innerVerify(tokenType, validToken));
     }
 
     @ParameterizedTest
@@ -215,8 +272,8 @@ class JwtTokenProviderTest {
     private static final String email = "example@gmail.com";
 
     @Test
-    @DisplayName("토큰 서명중 JOSEException이 발생하면 RuntimeException을 던진다")
-    void fail_shouldThrowRuntimeException_whenSigningFailsWithJOSEException() throws JOSEException {
+    @DisplayName("토큰 서명에 실패하면 예외를 던진다")
+    void fail_shouldThrowTokenGenerationException_whenSigningFails() throws JOSEException {
       // given
       UserDto userDto = new UserDto(userId, Instant.now(), email, "이름", null, Role.USER, false);
       MoplUserDetails userDetails = new MoplUserDetails(userDto, "encryptedPassword");
@@ -227,7 +284,8 @@ class JwtTokenProviderTest {
       ReflectionTestUtils.setField(jwtTokenProvider, "signer", mockSigner);
 
       // when & then
-      assertThrows(RuntimeException.class, () -> jwtTokenProvider.generateAccessToken(userDetails));
+      assertThrows(
+          TokenGenerationException.class, () -> jwtTokenProvider.generateAccessToken(userDetails));
     }
 
     @ParameterizedTest
@@ -272,6 +330,7 @@ class JwtTokenProviderTest {
 
   @Nested
   class BakeSignerAndVerifier {
+
     @Test
     @DisplayName("키 길이가 짧아 JOSEException을 던진다")
     void fail_shouldThrowJOSEException_whenSecretKeyUnder32Bytes() {

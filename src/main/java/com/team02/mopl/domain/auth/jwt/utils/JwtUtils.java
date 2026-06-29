@@ -4,11 +4,12 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.team02.mopl.domain.auth.jwt.JwtProperties;
 import java.text.ParseException;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
@@ -32,25 +33,29 @@ public class JwtUtils {
 
   public UUID getUserId(JWTClaimsSet claimsSet) {
     try {
-      return UUID.fromString(claimsSet.getStringClaim("userId"));
-    } catch (ParseException e) {
-      // TODO:  Exception을 어떻게 처리해야할지 나중에 구현(임시)
-      throw new RuntimeException("Token을 파싱하는데 실패했습니다.", e);
+      String userIdStr = claimsSet.getStringClaim("userId");
+      if (userIdStr == null) {
+        throw new BadCredentialsException("Token 내에 userId가 존재하지 않습니다.");
+      }
+
+      return UUID.fromString(userIdStr);
+
+    } catch (ParseException | IllegalArgumentException e) {
+      throw new BadCredentialsException("Token의 userId를 파싱하는데 실패했습니다.", e);
     }
   }
 
   public Collection<? extends GrantedAuthority> getAuthorities(JWTClaimsSet claimsSet) {
     try {
       List<String> roles = claimsSet.getStringListClaim("roles");
-
       if (roles == null || roles.isEmpty()) {
-        return Collections.emptyList();
+        throw new InsufficientAuthenticationException("Token 내에 권한이 누락되었습니다.");
       }
 
       return roles.stream().map(SimpleGrantedAuthority::new).toList();
 
     } catch (ParseException e) {
-      return Collections.emptyList();
+      throw new BadCredentialsException("Token의 role 클레임을 파싱하는데 실패했습니다.", e);
     }
   }
 }

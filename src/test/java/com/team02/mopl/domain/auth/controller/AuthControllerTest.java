@@ -94,6 +94,18 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("csrf토큰이 없으면 403을 반환한다")
+    void fail_shouldReturn403Forbidden_whenNoCsrfToken() throws Exception {
+      // when & then
+      mockMvc
+          .perform(
+              post("/api/auth/sign-in")
+                  .param("username", "example@gmail.com")
+                  .param("password", "password"))
+          .andExpect(status().isForbidden());
+    }
+
+    @Test
     @DisplayName("이메일을 가진 계정이 없어 로그인에 실패한다")
     void fail_shouldReturnUnauthorized_whenEmailIsAbsent() throws Exception {
       // given

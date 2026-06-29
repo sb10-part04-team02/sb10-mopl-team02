@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.auth.jwt.filter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -19,7 +20,9 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 @ExtendWith(MockitoExtension.class)
@@ -70,6 +73,27 @@ class JwtAuthenticationFilterTest {
     // then
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
     assertThat(authentication).isNull();
+  }
+
+  @Test
+  @DisplayName("authenticate 함수가 실패해서 예외를 던지면 그대로 전파한다")
+  void fail_shouldThrowAuthenticationException_whenAuthenticateFails()
+      throws ServletException, IOException {
+    // given
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    FilterChain filterChain = new MockFilterChain();
+
+    String accessToken = "accessToken";
+    request.addHeader("Authorization", "Bearer " + accessToken);
+
+    given(authenticationManager.authenticate(any(Authentication.class)))
+        .willThrow(BadCredentialsException.class);
+
+    // when & then
+    assertThrows(
+        AuthenticationException.class,
+        () -> jwtAuthenticationFilter.doFilterInternal(request, response, filterChain));
   }
 
   @Test

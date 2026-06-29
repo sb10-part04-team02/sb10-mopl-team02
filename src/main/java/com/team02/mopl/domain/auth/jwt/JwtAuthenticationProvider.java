@@ -28,6 +28,8 @@ public class JwtAuthenticationProvider implements AuthenticationProvider {
     UUID userId = jwtUtils.getUserId(claimsSet);
     Collection<? extends GrantedAuthority> authorities = jwtUtils.getAuthorities(claimsSet);
 
+    // TODO: 계정잠금된 계정은 로그인 불가 기능 추가
+
     // @AuthenticationPrincipal사용을 UUID타입 userId을 사용하기로 되어있음
     return new JwtAuthenticationToken(userId, token, authorities);
   }
