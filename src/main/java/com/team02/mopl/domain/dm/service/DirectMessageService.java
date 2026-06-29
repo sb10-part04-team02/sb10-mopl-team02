@@ -1,9 +1,5 @@
 package com.team02.mopl.domain.dm.service;
 
-import static com.team02.mopl.global.exception.ErrorCode.CONVERSATION_ALREADY_EXISTS;
-import static com.team02.mopl.global.exception.ErrorCode.CONVERSATION_NOT_FOUND;
-import static com.team02.mopl.global.exception.ErrorCode.FORBIDDEN;
-import static com.team02.mopl.global.exception.ErrorCode.SELF_CONVERSATION;
 import static com.team02.mopl.global.exception.ErrorCode.USER_NOT_FOUND;
 
 import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
@@ -12,6 +8,10 @@ import com.team02.mopl.domain.dm.dto.DirectMessageDto;
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.domain.dm.entity.ConversationMember;
 import com.team02.mopl.domain.dm.entity.DirectMessage;
+import com.team02.mopl.domain.dm.exception.ConversationAlreadyExistsException;
+import com.team02.mopl.domain.dm.exception.ConversationForbiddenException;
+import com.team02.mopl.domain.dm.exception.ConversationNotFoundException;
+import com.team02.mopl.domain.dm.exception.SelfConversationException;
 import com.team02.mopl.domain.dm.repository.ConversationMemberRepository;
 import com.team02.mopl.domain.dm.repository.ConversationRepository;
 import com.team02.mopl.domain.dm.repository.DirectMessageRepository;
@@ -38,11 +38,11 @@ public class DirectMessageService {
   @Transactional
   public ConversationDto createConversation(ConversationCreateRequest request, UUID requesterId) {
     if (requesterId.equals(request.withUserId())) {
-      throw new BusinessException(SELF_CONVERSATION);
+      throw new SelfConversationException();
     }
 
     if (conversationMemberRepository.existsConversationBetween(requesterId, request.withUserId())) {
-      throw new BusinessException(CONVERSATION_ALREADY_EXISTS);
+      throw new ConversationAlreadyExistsException();
     }
 
     User requestUser =
@@ -85,19 +85,19 @@ public class DirectMessageService {
   @Transactional(readOnly = true)
   public ConversationDto findConversationWith(UUID requesterId, UUID withUserId) {
     if (requesterId.equals(withUserId)) {
-      throw new BusinessException(SELF_CONVERSATION);
+      throw new SelfConversationException();
     }
 
     ConversationMember withUserMember =
         conversationMemberRepository
             .findWithUserMemberByUserIds(requesterId, withUserId)
-            .orElseThrow(() -> new BusinessException(CONVERSATION_NOT_FOUND));
+            .orElseThrow(ConversationNotFoundException::new);
 
     UUID conversationId = withUserMember.getConversation().getId();
     ConversationMember requesterMember =
         conversationMemberRepository
             .findByConversationIdAndUserId(conversationId, requesterId)
-            .orElseThrow(() -> new BusinessException(FORBIDDEN));
+            .orElseThrow(ConversationForbiddenException::new);
 
     User withUser = withUserMember.getUser();
     Optional<DirectMessage> lastDm =
@@ -116,18 +116,18 @@ public class DirectMessageService {
   @Transactional(readOnly = true)
   public ConversationDto findConversation(UUID conversationId, UUID requesterId) {
     if (!conversationRepository.existsById(conversationId)) {
-      throw new BusinessException(CONVERSATION_NOT_FOUND);
+      throw new ConversationNotFoundException();
     }
 
     ConversationMember withUserMember =
         conversationMemberRepository
             .findWithUserMember(conversationId, requesterId)
-            .orElseThrow(() -> new BusinessException(FORBIDDEN));
+            .orElseThrow(ConversationForbiddenException::new);
 
     ConversationMember requesterMember =
         conversationMemberRepository
             .findByConversationIdAndUserId(conversationId, requesterId)
-            .orElseThrow(() -> new BusinessException(FORBIDDEN));
+            .orElseThrow(ConversationForbiddenException::new);
 
     User withUser = withUserMember.getUser();
     Optional<DirectMessage> lastDm =
