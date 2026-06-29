@@ -248,8 +248,10 @@ class ReviewServiceTest {
       then(reviewRepository)
           .should()
           .existsByAuthorIdAndContentIdAndDeletedAtIsNull(eq(authorId), eq(contentId));
-      then(reviewRepository).should().saveAndFlush(reviewCaptor.capture());
-      then(contentRatingService).should().refreshAggregate(eq(contentId));
+      // 재집계가 저장 이후 최신 값을 보도록 saveAndFlush()가 refreshAggregate()보다 먼저 호출돼야 한다
+      InOrder inOrder = inOrder(reviewRepository, contentRatingService);
+      inOrder.verify(reviewRepository).saveAndFlush(reviewCaptor.capture());
+      inOrder.verify(contentRatingService).refreshAggregate(eq(contentId));
       then(reviewMapper).should().toDto(any(Review.class));
 
       Review captured = reviewCaptor.getValue();
