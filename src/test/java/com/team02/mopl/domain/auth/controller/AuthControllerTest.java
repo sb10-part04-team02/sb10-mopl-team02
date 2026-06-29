@@ -36,6 +36,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.test.annotation.DirtiesContext;
@@ -48,6 +49,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class AuthControllerTest {
 
+  @MockitoBean private AuthenticationEntryPoint jwtAuthenticationEntryPoint;
   @MockitoBean private AuthenticationSuccessHandler jwtLoginSuccessHandler;
   @MockitoBean private AuthenticationFailureHandler jwtLoginFailureHandler;
   @MockitoBean private AuthenticationManager authenticationManager;
