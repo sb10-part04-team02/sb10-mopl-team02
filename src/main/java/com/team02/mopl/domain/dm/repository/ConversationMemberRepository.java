@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.dm.repository;
 
 import com.team02.mopl.domain.dm.entity.ConversationMember;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -34,6 +35,8 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
       """)
   java.util.Optional<ConversationMember> findWithUserMember(
       @Param("conversationId") UUID conversationId, @Param("requesterId") UUID requesterId);
+
+  Optional<ConversationMember> findByConversationIdAndUserId(UUID conversationId, UUID userId);
 
   // 두 유저가 공유하는 대화방에서 상대방 멤버 조회
   @Query(
