@@ -6,6 +6,7 @@ import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
+import com.team02.mopl.domain.dm.dto.DmSentEvent;
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.domain.dm.entity.ConversationMember;
 import com.team02.mopl.domain.dm.entity.DirectMessage;
@@ -20,7 +21,6 @@ import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.service.NotificationService;
-import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.dto.UserSummary;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,8 +41,8 @@ public class DirectMessageService {
   private final ConversationRepository conversationRepository;
   private final ConversationMemberRepository conversationMemberRepository;
   private final UserRepository userRepository;
-  private final SseEventService sseEventService;
   private final NotificationService notificationService;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
   public ConversationDto createConversation(ConversationCreateRequest request, UUID requesterId) {
@@ -176,7 +177,8 @@ public class DirectMessageService {
     DirectMessageDto dto = toDirectMessageDto(saved);
     UUID receiverUserId = receiverMember.getUser().getId();
 
-    sseEventService.send(receiverUserId, "direct-messages", saved.getId().toString(), dto);
+    // SSE 전송은 커밋 성공 후에만 발행 (AFTER_COMMIT)
+    eventPublisher.publishEvent(new DmSentEvent(receiverUserId, saved.getId().toString(), dto));
 
     notificationService.createNotification(
         new NotificationCreateCommand(

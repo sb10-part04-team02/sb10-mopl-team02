@@ -12,14 +12,16 @@ import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
+import com.team02.mopl.domain.dm.dto.DmSentEvent;
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.domain.dm.entity.ConversationMember;
 import com.team02.mopl.domain.dm.entity.DirectMessage;
 import com.team02.mopl.domain.dm.repository.ConversationMemberRepository;
 import com.team02.mopl.domain.dm.repository.ConversationRepository;
 import com.team02.mopl.domain.dm.repository.DirectMessageRepository;
+import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
+import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.service.NotificationService;
-import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.exception.BusinessException;
@@ -37,6 +39,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -46,8 +49,8 @@ class DirectMessageServiceTest {
   @Mock private ConversationRepository conversationRepository;
   @Mock private ConversationMemberRepository conversationMemberRepository;
   @Mock private UserRepository userRepository;
-  @Mock private SseEventService sseEventService;
   @Mock private NotificationService notificationService;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private DirectMessageService directMessageService;
 
@@ -492,6 +495,18 @@ class DirectMessageServiceTest {
     assertThat(result.content()).isEqualTo("안녕하세요");
     assertThat(result.sender().userId()).isEqualTo(senderId);
     assertThat(result.receiver().userId()).isEqualTo(receiverId);
+
+    ArgumentCaptor<DmSentEvent> eventCaptor = ArgumentCaptor.forClass(DmSentEvent.class);
+    verify(eventPublisher).publishEvent(eventCaptor.capture());
+    assertThat(eventCaptor.getValue().receiverUserId()).isEqualTo(receiverId);
+    assertThat(eventCaptor.getValue().eventId()).isEqualTo(messageId.toString());
+
+    ArgumentCaptor<NotificationCreateCommand> notifCaptor =
+        ArgumentCaptor.forClass(NotificationCreateCommand.class);
+    verify(notificationService).createNotification(notifCaptor.capture());
+    assertThat(notifCaptor.getValue().receiverId()).isEqualTo(receiverId);
+    assertThat(notifCaptor.getValue().notificationType())
+        .isEqualTo(NotificationType.DIRECT_MESSAGE_RECEIVED);
   }
 
   @Test
@@ -512,6 +527,8 @@ class DirectMessageServiceTest {
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
 
     verify(directMessageRepository, never()).save(any());
+    verify(eventPublisher, never()).publishEvent(any());
+    verify(notificationService, never()).createNotification(any());
   }
 
   @Test
@@ -536,6 +553,8 @@ class DirectMessageServiceTest {
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
 
     verify(directMessageRepository, never()).save(any());
+    verify(eventPublisher, never()).publishEvent(any());
+    verify(notificationService, never()).createNotification(any());
   }
 
   // ──────────────────────────────────────────────
