@@ -5,6 +5,8 @@ import static com.team02.mopl.global.exception.ErrorCode.USER_NOT_FOUND;
 import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
+import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
+import com.team02.mopl.domain.dm.dto.DmSentEvent;
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.domain.dm.entity.ConversationMember;
 import com.team02.mopl.domain.dm.entity.DirectMessage;
@@ -23,6 +25,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +37,7 @@ public class DirectMessageService {
   private final ConversationRepository conversationRepository;
   private final ConversationMemberRepository conversationMemberRepository;
   private final UserRepository userRepository;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
   public ConversationDto createConversation(ConversationCreateRequest request, UUID requesterId) {
@@ -141,6 +145,37 @@ public class DirectMessageService {
             .filter(dm -> !dm.getSender().getUser().getId().equals(requesterId))
             .map(dm -> dm.getCreatedAt().isAfter(requesterMember.getLastReadAt()))
             .orElse(false));
+  }
+
+  @Transactional
+  public DirectMessageDto sendDirectMessage(
+      UUID conversationId, UUID senderId, DirectMessageSendRequest request) {
+    ConversationMember senderMember =
+        conversationMemberRepository
+            .findByConversationIdAndUserId(conversationId, senderId)
+            .orElseThrow(ConversationForbiddenException::new);
+
+    ConversationMember receiverMember =
+        conversationMemberRepository
+            .findWithUserMember(conversationId, senderId)
+            .orElseThrow(ConversationForbiddenException::new);
+
+    DirectMessage saved =
+        directMessageRepository.save(
+            DirectMessage.builder()
+                .conversation(senderMember.getConversation())
+                .sender(senderMember)
+                .receiver(receiverMember)
+                .content(request.content())
+                .build());
+
+    DirectMessageDto dto = toDirectMessageDto(saved);
+    UUID receiverUserId = receiverMember.getUser().getId();
+
+    // SSE 전송 및 알림 생성은 커밋 성공 후에만 실행 (AFTER_COMMIT)
+    eventPublisher.publishEvent(new DmSentEvent(receiverUserId, saved.getId().toString(), dto));
+
+    return dto;
   }
 
   private DirectMessageDto toDirectMessageDto(DirectMessage dm) {

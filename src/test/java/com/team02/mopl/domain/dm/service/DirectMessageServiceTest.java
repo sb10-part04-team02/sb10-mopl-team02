@@ -10,6 +10,9 @@ import static org.mockito.Mockito.verify;
 
 import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
+import com.team02.mopl.domain.dm.dto.DirectMessageDto;
+import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
+import com.team02.mopl.domain.dm.dto.DmSentEvent;
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.domain.dm.entity.ConversationMember;
 import com.team02.mopl.domain.dm.entity.DirectMessage;
@@ -27,11 +30,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -41,6 +46,7 @@ class DirectMessageServiceTest {
   @Mock private ConversationRepository conversationRepository;
   @Mock private ConversationMemberRepository conversationMemberRepository;
   @Mock private UserRepository userRepository;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private DirectMessageService directMessageService;
 
@@ -439,6 +445,104 @@ class DirectMessageServiceTest {
 
     assertThat(result.lastMessage()).isNull();
     assertThat(result.hasUnread()).isFalse();
+  }
+
+  // ──────────────────────────────────────────────
+  // sendDirectMessage
+  // ──────────────────────────────────────────────
+
+  @Test
+  @DisplayName("정상적으로 메시지를 전송하고 DirectMessageDto를 반환한다")
+  void sendDirectMessage_success() {
+    UUID conversationId = UUID.randomUUID();
+    UUID senderId = UUID.randomUUID();
+    UUID receiverId = UUID.randomUUID();
+    UUID messageId = UUID.randomUUID();
+
+    ConversationMember senderMember = mock(ConversationMember.class);
+    ConversationMember receiverMember = mockConversationMemberWithUser(receiverId, "수신자", null);
+    Conversation conversation = mock(Conversation.class);
+    given(conversation.getId()).willReturn(conversationId);
+    given(senderMember.getConversation()).willReturn(conversation);
+
+    DirectMessage saved = mockDirectMessage(conversationId, senderId, receiverId, Instant.now());
+    given(saved.getId()).willReturn(messageId);
+    given(saved.getContent()).willReturn("안녕하세요");
+
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, senderId))
+        .willReturn(Optional.of(senderMember));
+    given(conversationMemberRepository.findWithUserMember(conversationId, senderId))
+        .willReturn(Optional.of(receiverMember));
+    given(directMessageRepository.save(any(DirectMessage.class))).willReturn(saved);
+
+    DirectMessageDto result =
+        directMessageService.sendDirectMessage(
+            conversationId, senderId, new DirectMessageSendRequest("안녕하세요"));
+
+    ArgumentCaptor<DirectMessage> captor = ArgumentCaptor.forClass(DirectMessage.class);
+    verify(directMessageRepository).save(captor.capture());
+    DirectMessage persisted = captor.getValue();
+    assertThat(persisted.getConversation()).isSameAs(conversation);
+    assertThat(persisted.getSender()).isSameAs(senderMember);
+    assertThat(persisted.getReceiver()).isSameAs(receiverMember);
+    assertThat(persisted.getContent()).isEqualTo("안녕하세요");
+
+    assertThat(result.conversationId()).isEqualTo(conversationId);
+    assertThat(result.content()).isEqualTo("안녕하세요");
+    assertThat(result.sender().userId()).isEqualTo(senderId);
+    assertThat(result.receiver().userId()).isEqualTo(receiverId);
+
+    ArgumentCaptor<DmSentEvent> eventCaptor = ArgumentCaptor.forClass(DmSentEvent.class);
+    verify(eventPublisher).publishEvent(eventCaptor.capture());
+    assertThat(eventCaptor.getValue().receiverUserId()).isEqualTo(receiverId);
+    assertThat(eventCaptor.getValue().eventId()).isEqualTo(messageId.toString());
+    assertThat(eventCaptor.getValue().dto()).isEqualTo(result);
+  }
+
+  @Test
+  @DisplayName("발신자가 대화방 멤버가 아니면 FORBIDDEN 예외가 발생한다")
+  void sendDirectMessage_senderNotMember_throwsForbidden() {
+    UUID conversationId = UUID.randomUUID();
+    UUID senderId = UUID.randomUUID();
+
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, senderId))
+        .willReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                directMessageService.sendDirectMessage(
+                    conversationId, senderId, new DirectMessageSendRequest("안녕하세요")))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+
+    verify(directMessageRepository, never()).save(any());
+    verify(eventPublisher, never()).publishEvent(any());
+  }
+
+  @Test
+  @DisplayName("수신자를 찾지 못하면 FORBIDDEN 예외가 발생한다")
+  void sendDirectMessage_receiverNotFound_throwsForbidden() {
+    UUID conversationId = UUID.randomUUID();
+    UUID senderId = UUID.randomUUID();
+
+    ConversationMember senderMember = mock(ConversationMember.class);
+
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, senderId))
+        .willReturn(Optional.of(senderMember));
+    given(conversationMemberRepository.findWithUserMember(conversationId, senderId))
+        .willReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                directMessageService.sendDirectMessage(
+                    conversationId, senderId, new DirectMessageSendRequest("안녕하세요")))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+
+    verify(directMessageRepository, never()).save(any());
+    verify(eventPublisher, never()).publishEvent(any());
   }
 
   // ──────────────────────────────────────────────
