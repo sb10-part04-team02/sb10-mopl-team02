@@ -5,10 +5,12 @@ import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
 import com.team02.mopl.domain.dm.exception.ConversationForbiddenException;
 import com.team02.mopl.domain.dm.service.DirectMessageService;
 import com.team02.mopl.global.exception.ErrorResponse;
+import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -47,6 +49,17 @@ public class DirectMessageWebSocketController {
   @SendToUser("/queue/errors")
   public ErrorResponse handleForbidden(ConversationForbiddenException e) {
     return new ErrorResponse(e.getClass().getSimpleName(), e.getMessage(), Map.of());
+  }
+
+  @MessageExceptionHandler(ConstraintViolationException.class)
+  @SendToUser("/queue/errors")
+  public ErrorResponse handleValidation(ConstraintViolationException e) {
+    Map<String, String> details =
+        e.getConstraintViolations().stream()
+            .collect(
+                Collectors.toMap(
+                    v -> v.getPropertyPath().toString(), v -> v.getMessage(), (a, b) -> a));
+    return new ErrorResponse(e.getClass().getSimpleName(), "입력값 검증에 실패했습니다.", details);
   }
 
   @MessageExceptionHandler(Exception.class)
