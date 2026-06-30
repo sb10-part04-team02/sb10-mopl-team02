@@ -1,5 +1,6 @@
 package com.team02.mopl.domain.review.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -18,10 +19,12 @@ import com.team02.mopl.domain.review.dto.ReviewCreateRequest;
 import com.team02.mopl.domain.review.dto.ReviewDto;
 import com.team02.mopl.domain.review.dto.ReviewSearchRequest;
 import com.team02.mopl.domain.review.dto.ReviewUpdateRequest;
+import com.team02.mopl.domain.review.enums.ReviewSortBy;
 import com.team02.mopl.domain.review.exception.ReviewAlreadyExistsException;
 import com.team02.mopl.domain.review.service.ReviewService;
 import com.team02.mopl.domain.user.dto.UserSummary;
 import com.team02.mopl.global.dto.CursorResponse;
+import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.global.exception.GlobalExceptionHandler;
@@ -30,6 +33,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -84,6 +88,39 @@ class ReviewControllerTest {
         .andExpect(jsonPath("$.sortDirection").value("DESCENDING"));
 
     verify(reviewService).getReviews(any(ReviewSearchRequest.class));
+  }
+
+  @Test
+  @DisplayName("커서 페이지네이션 파라미터가 ReviewSearchRequest로 그대로 바인딩된다")
+  void getReviews_bindsPaginationParams() throws Exception {
+    // given
+    UUID contentId = UUID.randomUUID();
+    UUID idAfter = UUID.randomUUID();
+    given(reviewService.getReviews(any(ReviewSearchRequest.class)))
+        .willReturn(new CursorResponse<>(List.of(), null, null, false, 0L, "RATING", "ASCENDING"));
+
+    // when
+    mockMvc
+        .perform(
+            get("/api/reviews")
+                .param("contentId", contentId.toString())
+                .param("cursor", "4.0")
+                .param("idAfter", idAfter.toString())
+                .param("limit", "20")
+                .param("sortBy", "RATING")
+                .param("sortDirection", "ASCENDING"))
+        .andExpect(status().isOk());
+
+    // then
+    ArgumentCaptor<ReviewSearchRequest> captor = ArgumentCaptor.forClass(ReviewSearchRequest.class);
+    verify(reviewService).getReviews(captor.capture());
+    ReviewSearchRequest bound = captor.getValue();
+    assertThat(bound.contentId()).isEqualTo(contentId);
+    assertThat(bound.cursor()).isEqualTo("4.0");
+    assertThat(bound.idAfter()).isEqualTo(idAfter);
+    assertThat(bound.limit()).isEqualTo(20);
+    assertThat(bound.sortBy()).isEqualTo(ReviewSortBy.RATING);
+    assertThat(bound.sortDirection()).isEqualTo(SortDirection.ASCENDING);
   }
 
   @Test
