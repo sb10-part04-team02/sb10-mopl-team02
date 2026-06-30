@@ -87,7 +87,7 @@ class NotificationControllerTest {
         .andExpect(jsonPath("$.nextIdAfter").value(nextIdAfter.toString()))
         .andExpect(jsonPath("$.hasNext").value(true))
         .andExpect(jsonPath("$.totalCount").value(3))
-        .andExpect(jsonPath("$.sortBy").value("CREATED_AT"))
+        .andExpect(jsonPath("$.sortBy").value("createdAt"))
         .andExpect(jsonPath("$.sortDirection").value("DESCENDING"));
 
     verify(notificationService)
