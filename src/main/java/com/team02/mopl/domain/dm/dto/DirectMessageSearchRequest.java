@@ -4,15 +4,10 @@ import com.team02.mopl.domain.dm.enums.DirectMessageSortBy;
 import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.enums.SortDirection;
 import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.Pattern;
 import java.util.UUID;
 
 public record DirectMessageSearchRequest(
-    @Pattern(
-            regexp =
-                "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$",
-            message = "cursor는 ISO-8601 date-time 형식이어야 합니다")
-        String cursor,
+    String cursor,
     UUID idAfter,
     Integer limit,
     SortDirection sortDirection,
