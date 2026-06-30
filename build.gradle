@@ -68,16 +68,33 @@ jacoco {
     toolVersion = '0.8.12'
 }
 
+// 커버리지 측정에서 제외할 자동 생성·측정 불가 코드
+def jacocoExcludes = [
+    '**/entity/Q*.class',       // QueryDSL 자동생성
+    '**/*MapperImpl.class',     // MapStruct 자동생성(@Generated가 SOURCE 유지라 자동제외 안 됨)
+    '**/MoplApplication.class'  // 부트스트랩(main 메서드만 존재)
+]
+
 jacocoTestReport {
     dependsOn test
     reports {
         xml.required = true
         html.required = true
     }
+    afterEvaluate {
+        classDirectories.setFrom(classDirectories.files.collect {
+            fileTree(dir: it, exclude: jacocoExcludes)
+        })
+    }
 }
 
 jacocoTestCoverageVerification {
     dependsOn test
+    afterEvaluate {
+        classDirectories.setFrom(classDirectories.files.collect {
+            fileTree(dir: it, exclude: jacocoExcludes)
+        })
+    }
     violationRules {
         rule {
             limit {
