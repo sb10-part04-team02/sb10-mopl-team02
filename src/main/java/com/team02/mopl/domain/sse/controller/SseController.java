@@ -29,6 +29,8 @@ public class SseController implements SseApi {
       @RequestHeader(name = "Last-Event-ID", required = false) String lastEventIdHeader) {
     String lastEventId = lastEventIdHeader != null ? lastEventIdHeader : lastEventIdParam;
 
-    return ResponseEntity.ok(sseEmitterService.connect(userId, lastEventId));
+    return ResponseEntity.ok()
+        .contentType(MediaType.TEXT_EVENT_STREAM)
+        .body(sseEmitterService.connect(userId, lastEventId));
   }
 }
