@@ -48,14 +48,15 @@ jobs:
       - name: 커버리지 리포트 (JaCoCo)
         run: ./gradlew jacocoTestReport
 
-      # 테스트가 쌓이면 주석 해제 — 커버리지 미달 시 빌드 실패
-      # - name: ✅ 커버리지 검증
-      #   run: ./gradlew jacocoTestCoverageVerification
+      - name: ✅ 커버리지 검증
+        run: ./gradlew jacocoTestCoverageVerification
 
       - name: 빌드/패키징 (bootJar)
         run: ./gradlew assemble
 
       - name: Codecov 리포트 업로드
+        # 커버리지 검증 실패와 무관하게 뱃지 갱신을 위해 항상 업로드
+        if: ${{ always() }}
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

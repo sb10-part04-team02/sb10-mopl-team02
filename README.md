@@ -1,5 +1,7 @@
 # 모두의 플리
 # {팀 이름}
+
+[![codecov](https://codecov.io/gh/sb10-part04-team02/sb10-mopl-team02/graph/badge.svg?token=9J2Y96NIRM)](https://codecov.io/gh/sb10-part04-team02/sb10-mopl-team02)
 ### [팀 노션 페이지 링크](https://tar-sandwich-ba0.notion.site/_-04_-02-404f1e38171183698be38177e52096db?pvs=74)
 ## 팀원 구성
 웨인 (개인 Github 링크)  
