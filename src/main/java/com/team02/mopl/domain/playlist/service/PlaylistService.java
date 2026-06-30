@@ -2,7 +2,10 @@ package com.team02.mopl.domain.playlist.service;
 
 import com.team02.mopl.domain.playlist.dto.PlaylistCreateRequest;
 import com.team02.mopl.domain.playlist.dto.PlaylistDto;
+import com.team02.mopl.domain.playlist.dto.PlaylistUpdateRequest;
 import com.team02.mopl.domain.playlist.entity.Playlist;
+import com.team02.mopl.domain.playlist.exception.PlaylistForbiddenException;
+import com.team02.mopl.domain.playlist.exception.PlaylistNotFoundException;
 import com.team02.mopl.domain.playlist.mapper.PlaylistMapper;
 import com.team02.mopl.domain.playlist.repository.PlaylistRepository;
 import java.util.UUID;
@@ -31,6 +34,26 @@ public class PlaylistService {
     PlaylistDto playlistDto = playlistMapper.toDto(saved, false);
 
     log.info("플레이리스트 생성 성공: playlistId={}, ownerId={}", playlistDto.id(), ownerId);
+    return playlistDto;
+  }
+
+  @Transactional
+  public PlaylistDto update(UUID playlistId, UUID requesterId, PlaylistUpdateRequest request) {
+    log.debug("플레이리스트 수정 시작: playlistId={}, requesterId={}", playlistId, requesterId);
+
+    Playlist playlist =
+        playlistRepository.findById(playlistId).orElseThrow(PlaylistNotFoundException::new);
+
+    if (!playlist.getOwnerId().equals(requesterId)) {
+      throw new PlaylistForbiddenException();
+    }
+
+    playlist.update(request.title(), request.description());
+
+    // 소유자 본인의 플레이리스트이므로 subscribedByMe는 false
+    PlaylistDto playlistDto = playlistMapper.toDto(playlist, false);
+
+    log.info("플레이리스트 수정 성공: playlistId={}, requesterId={}", playlistId, requesterId);
     return playlistDto;
   }
 }

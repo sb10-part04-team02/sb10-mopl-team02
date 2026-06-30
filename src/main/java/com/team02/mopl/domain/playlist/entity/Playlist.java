@@ -40,4 +40,13 @@ public class Playlist extends BaseMutableEntity {
     this.title = Objects.requireNonNull(title, "title은 null일 수 없습니다.");
     this.description = Objects.requireNonNull(description, "description은 null일 수 없습니다.");
   }
+
+  public void update(String title, String description) {
+    if (title != null) {
+      this.title = title;
+    }
+    if (description != null) {
+      this.description = description;
+    }
+  }
 }
