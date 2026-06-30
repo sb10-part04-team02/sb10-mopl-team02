@@ -1,6 +1,10 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - dev
+      - main
   pull_request:
     branches:
       - dev
@@ -49,6 +53,8 @@ jobs:
         run: ./gradlew jacocoTestReport
 
       - name: ✅ 커버리지 검증
+        # 게이트는 PR에서만 실행 — dev/main push(merge)는 뱃지 갱신만 하고 막지 않음
+        if: ${{ github.event_name == 'pull_request' }}
         run: ./gradlew jacocoTestCoverageVerification
 
       - name: 빌드/패키징 (bootJar)
