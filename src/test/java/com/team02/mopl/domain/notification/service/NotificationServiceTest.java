@@ -12,15 +12,20 @@ import static org.mockito.Mockito.verify;
 
 import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
 import com.team02.mopl.domain.notification.dto.NotificationDto;
+import com.team02.mopl.domain.notification.dto.NotificationSearchRequest;
 import com.team02.mopl.domain.notification.entity.Notification;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
+import com.team02.mopl.domain.notification.enums.NotificationSortBy;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
 import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.global.dto.CursorResponse;
+import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -118,7 +123,7 @@ class NotificationServiceTest {
   }
 
   @Test
-  @DisplayName("알림 생성 시 level이 null이면 INFO로 기본 설정된다")
+  @DisplayName("알림 생성 시 level이 null이면 INFO로 기본 설정한다")
   void createNotification_levelNull_defaultsToInfo() {
     UUID receiverId = UUID.randomUUID();
     UUID notificationId = UUID.randomUUID();
@@ -144,10 +149,11 @@ class NotificationServiceTest {
   }
 
   @Test
-  @DisplayName("수신자의 활성 알림 목록을 조회한다")
+  @DisplayName("수신자의 활성 알림 목록을 커서 응답으로 조회한다")
   void getNotifications_success() {
     UUID receiverId = UUID.randomUUID();
     User receiver = mockUser(receiverId);
+
     Notification notification1 =
         new Notification(
             receiver, "첫 번째 알림", "첫 번째 내용", NotificationLevel.INFO, NotificationType.USER_FOLLOWED);
@@ -159,15 +165,73 @@ class NotificationServiceTest {
             NotificationLevel.WARNING,
             NotificationType.ROLE_UPDATED);
 
+    NotificationSearchRequest request = new NotificationSearchRequest(null, null, null, null, null);
+
     given(
-            notificationRepository.findByReceiver_IdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(
-                receiverId))
+            notificationRepository.findNotificationsByCursor(
+                eq(receiverId),
+                eq(NotificationSortBy.CREATED_AT),
+                eq(SortDirection.DESCENDING),
+                eq(null),
+                eq(null),
+                eq(21)))
         .willReturn(List.of(notification1, notification2));
+    given(notificationRepository.countByReceiver_IdAndDeletedAtIsNull(receiverId)).willReturn(2L);
 
-    List<NotificationDto> result = notificationService.getNotifications(receiverId);
+    CursorResponse<NotificationDto> result =
+        notificationService.getNotifications(receiverId, request);
 
-    assertThat(result).hasSize(2);
-    assertThat(result).extracting(NotificationDto::title).containsExactly("첫 번째 알림", "두 번째 알림");
+    assertThat(result.data()).hasSize(2);
+    assertThat(result.data())
+        .extracting(NotificationDto::title)
+        .containsExactly("첫 번째 알림", "두 번째 알림");
+    assertThat(result.hasNext()).isFalse();
+    assertThat(result.nextCursor()).isNull();
+    assertThat(result.nextIdAfter()).isNull();
+    assertThat(result.totalCount()).isEqualTo(2L);
+    assertThat(result.sortBy()).isEqualTo("CREATED_AT");
+    assertThat(result.sortDirection()).isEqualTo("DESCENDING");
+  }
+
+  @Test
+  @DisplayName("알림 목록 조회 시 limit보다 하나 더 조회해 다음 페이지 여부를 판단한다")
+  void getNotifications_hasNext_success() {
+    UUID receiverId = UUID.randomUUID();
+    User receiver = mockUser(receiverId);
+
+    Notification notification1 =
+        createNotificationWithIdAndCreatedAt(
+            receiver, UUID.randomUUID(), Instant.parse("2026-06-29T03:00:00Z"), "첫 번째 알림");
+    Notification notification2 =
+        createNotificationWithIdAndCreatedAt(
+            receiver, UUID.randomUUID(), Instant.parse("2026-06-29T02:00:00Z"), "두 번째 알림");
+    Notification notification3 =
+        createNotificationWithIdAndCreatedAt(
+            receiver, UUID.randomUUID(), Instant.parse("2026-06-29T01:00:00Z"), "세 번째 알림");
+
+    NotificationSearchRequest request =
+        new NotificationSearchRequest(
+            null, null, 2, SortDirection.DESCENDING, NotificationSortBy.CREATED_AT);
+
+    given(
+            notificationRepository.findNotificationsByCursor(
+                eq(receiverId),
+                eq(NotificationSortBy.CREATED_AT),
+                eq(SortDirection.DESCENDING),
+                eq(null),
+                eq(null),
+                eq(3)))
+        .willReturn(List.of(notification1, notification2, notification3));
+    given(notificationRepository.countByReceiver_IdAndDeletedAtIsNull(receiverId)).willReturn(3L);
+
+    CursorResponse<NotificationDto> result =
+        notificationService.getNotifications(receiverId, request);
+
+    assertThat(result.data()).hasSize(2);
+    assertThat(result.hasNext()).isTrue();
+    assertThat(result.nextCursor()).isEqualTo("2026-06-29T02:00:00Z");
+    assertThat(result.nextIdAfter()).isEqualTo(notification2.getId());
+    assertThat(result.totalCount()).isEqualTo(3L);
   }
 
   @Test
@@ -300,6 +364,16 @@ class NotificationServiceTest {
             eq("notifications"),
             eq(notificationId.toString()),
             any(NotificationDto.class));
+  }
+
+  private Notification createNotificationWithIdAndCreatedAt(
+      User receiver, UUID id, Instant createdAt, String title) {
+    Notification notification =
+        new Notification(
+            receiver, title, "알림 내용", NotificationLevel.INFO, NotificationType.USER_FOLLOWED);
+    ReflectionTestUtils.setField(notification, "id", id);
+    ReflectionTestUtils.setField(notification, "createdAt", createdAt);
+    return notification;
   }
 
   private User mockUser(UUID id) {
