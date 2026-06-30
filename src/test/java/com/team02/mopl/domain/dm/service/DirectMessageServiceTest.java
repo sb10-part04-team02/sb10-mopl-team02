@@ -11,16 +11,20 @@ import static org.mockito.Mockito.verify;
 import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
+import com.team02.mopl.domain.dm.dto.DirectMessageSearchRequest;
 import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
 import com.team02.mopl.domain.dm.dto.DmSentEvent;
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.domain.dm.entity.ConversationMember;
 import com.team02.mopl.domain.dm.entity.DirectMessage;
+import com.team02.mopl.domain.dm.enums.DirectMessageSortBy;
 import com.team02.mopl.domain.dm.repository.ConversationMemberRepository;
 import com.team02.mopl.domain.dm.repository.ConversationRepository;
 import com.team02.mopl.domain.dm.repository.DirectMessageRepository;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.global.dto.CursorResponse;
+import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import java.time.Instant;
@@ -445,6 +449,95 @@ class DirectMessageServiceTest {
 
     assertThat(result.lastMessage()).isNull();
     assertThat(result.hasUnread()).isFalse();
+  }
+
+  // ──────────────────────────────────────────────
+  // getDirectMessages
+  // ──────────────────────────────────────────────
+
+  @Test
+  @DisplayName("참여자가 DM 목록을 조회하면 CursorResponse를 반환한다")
+  void getDirectMessages_success_returnsCursorResponse() {
+    UUID conversationId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+    UUID senderId = UUID.randomUUID();
+    UUID receiverId = UUID.randomUUID();
+
+    DirectMessage dm1 = mockDirectMessage(conversationId, senderId, receiverId, Instant.now());
+    DirectMessage dm2 = mockDirectMessage(conversationId, senderId, receiverId, Instant.now());
+
+    given(conversationMemberRepository.existsByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(true);
+    given(
+            directMessageRepository.findDirectMessagesByCursor(
+                conversationId, SortDirection.DESCENDING, null, null, 21))
+        .willReturn(List.of(dm1, dm2));
+    given(directMessageRepository.countByConversationId(conversationId)).willReturn(2L);
+
+    DirectMessageSearchRequest request =
+        new DirectMessageSearchRequest(null, null, null, null, null);
+    CursorResponse<DirectMessageDto> result =
+        directMessageService.getDirectMessages(conversationId, requesterId, request);
+
+    assertThat(result.data()).hasSize(2);
+    assertThat(result.hasNext()).isFalse();
+    assertThat(result.totalCount()).isEqualTo(2L);
+    assertThat(result.sortBy()).isEqualTo(DirectMessageSortBy.CREATED_AT.name());
+    assertThat(result.sortDirection()).isEqualTo(SortDirection.DESCENDING.name());
+  }
+
+  @Test
+  @DisplayName("조회 결과가 limit+1개이면 hasNext=true이고 nextCursor가 설정된다")
+  void getDirectMessages_hasNext_whenResultsExceedLimit() {
+    UUID conversationId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+    UUID senderId = UUID.randomUUID();
+    UUID receiverId = UUID.randomUUID();
+
+    Instant now = Instant.now();
+    DirectMessage dm1 = mockDirectMessage(conversationId, senderId, receiverId, now);
+    DirectMessage dm2 = mockDirectMessage(conversationId, senderId, receiverId, now);
+    UUID lastId = UUID.randomUUID();
+    given(dm2.getId()).willReturn(lastId);
+    given(dm2.getCreatedAt()).willReturn(now);
+
+    given(conversationMemberRepository.existsByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(true);
+    // limit=1 → limit+1=2개 요청, 2개 반환 → hasNext=true
+    given(
+            directMessageRepository.findDirectMessagesByCursor(
+                conversationId, SortDirection.DESCENDING, null, null, 2))
+        .willReturn(List.of(dm1, dm2));
+    given(directMessageRepository.countByConversationId(conversationId)).willReturn(5L);
+
+    DirectMessageSearchRequest request = new DirectMessageSearchRequest(null, null, 1, null, null);
+    CursorResponse<DirectMessageDto> result =
+        directMessageService.getDirectMessages(conversationId, requesterId, request);
+
+    assertThat(result.data()).hasSize(1);
+    assertThat(result.hasNext()).isTrue();
+    assertThat(result.nextIdAfter()).isEqualTo(dm1.getId());
+    assertThat(result.nextCursor()).isEqualTo(dm1.getCreatedAt().toString());
+  }
+
+  @Test
+  @DisplayName("대화방 참여자가 아니면 FORBIDDEN 예외가 발생한다")
+  void getDirectMessages_notMember_throwsForbidden() {
+    UUID conversationId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+
+    given(conversationMemberRepository.existsByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(false);
+
+    assertThatThrownBy(
+            () ->
+                directMessageService.getDirectMessages(
+                    conversationId,
+                    requesterId,
+                    new DirectMessageSearchRequest(null, null, null, null, null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
   }
 
   // ──────────────────────────────────────────────
