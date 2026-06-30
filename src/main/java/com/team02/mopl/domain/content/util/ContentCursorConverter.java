@@ -2,7 +2,9 @@ package com.team02.mopl.domain.content.util;
 
 import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.enums.SortBy;
+import com.team02.mopl.domain.content.exception.InvalidCursorException;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 
 // sortBy 별 커서 문자열 <-> 정렬 키 값 변환. toSortKey 와 toCursor 의 타입을 한 곳에서 짝지어 보장한다.
 // 어디까지 읽었는지 기록하는 커서 문자열을 실제 정렬 키 값으로 바꾸거나(toSortKey), 반대로 만들어주는(toCursor) 변환기
@@ -21,11 +23,17 @@ public final class ContentCursorConverter {
     if (cursor == null || cursor.isBlank()) {
       return null;
     }
-    return switch (sortBy) {
-      case CREATED_AT -> Instant.parse(cursor);
-      case RATE -> Double.valueOf(cursor);
-      case WATCHER_COUNT -> Long.valueOf(cursor);
-    };
+    try {
+      return switch (sortBy) {
+        case CREATED_AT -> Instant.parse(cursor);
+        case RATE -> Double.valueOf(cursor);
+        case WATCHER_COUNT -> Long.valueOf(cursor);
+      };
+    } catch (DateTimeParseException | NumberFormatException e) {
+      throw new InvalidCursorException(sortBy, cursor);
+      // DateTimeParseException: 문자열을 날짜나 시간 객체로 변환(파싱)할 때 형식이 맞지 않아 발생하는 에러
+      // NumberFormatException: 숫자가 아닌 문자열을 숫자로 변환하려고 할 때 발생하는 예외
+    }
   }
 
   // 마지막 행의 정렬 키 값 -> 다음 커서 문자열
