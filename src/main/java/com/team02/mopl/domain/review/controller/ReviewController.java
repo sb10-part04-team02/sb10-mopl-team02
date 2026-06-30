@@ -2,15 +2,20 @@ package com.team02.mopl.domain.review.controller;
 
 import com.team02.mopl.domain.review.dto.ReviewCreateRequest;
 import com.team02.mopl.domain.review.dto.ReviewDto;
+import com.team02.mopl.domain.review.dto.ReviewSearchRequest;
 import com.team02.mopl.domain.review.dto.ReviewUpdateRequest;
 import com.team02.mopl.domain.review.service.ReviewService;
+import com.team02.mopl.global.dto.CursorResponse;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +29,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReviewController implements ReviewApi {
 
   private final ReviewService reviewService;
+
+  @GetMapping
+  public ResponseEntity<CursorResponse<ReviewDto>> getReviews(
+      @ParameterObject @ModelAttribute @Valid ReviewSearchRequest request) {
+    return ResponseEntity.ok(reviewService.getReviews(request));
+  }
 
   @PostMapping
   public ResponseEntity<ReviewDto> createReview(

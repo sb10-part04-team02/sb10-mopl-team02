@@ -5,6 +5,11 @@ spring:
   profiles:
     active: dev
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
   servlet:
     multipart:
       max-file-size: 10MB     # 업로드 가능한 개별 파일의 최대 크기
@@ -17,3 +22,10 @@ app:
       base-url: /files   # 저장된 파일에 접근할 때 사용하는 URL 접두사
     # 썸네일 미제공 시 내려줄 기본 URL.
     default-thumbnail-url: "" # TODO: S3 전환 후속 이슈에서 실제 기본 이미지의 절대 URL로 교체
+  jwt:
+    secret-key: ${JWT_SECRET_KEY}
+    access-token-expiration: 10m  # 10분
+    refresh-token-expiration: 7d  # 일주일
+    redis:
+      refresh-prefix: "jwt:refresh:"
+      max-account-count: 1

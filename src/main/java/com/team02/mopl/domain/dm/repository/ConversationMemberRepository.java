@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.dm.repository;
 
 import com.team02.mopl.domain.dm.entity.ConversationMember;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -18,4 +19,36 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
       )
       """)
   boolean existsConversationBetween(@Param("userAId") UUID userAId, @Param("userBId") UUID userBId);
+
+  // 대화방에서 요청자가 아닌 상대방 멤버 조회 (요청자 멤버십 검증 포함)
+  @Query(
+      """
+      SELECT cm FROM ConversationMember cm
+      JOIN FETCH cm.user
+      WHERE cm.conversation.id = :conversationId
+      AND cm.user.id != :requesterId
+      AND EXISTS (
+        SELECT 1 FROM ConversationMember requesterMember
+        WHERE requesterMember.conversation = cm.conversation
+        AND requesterMember.user.id = :requesterId
+      )
+      """)
+  java.util.Optional<ConversationMember> findWithUserMember(
+      @Param("conversationId") UUID conversationId, @Param("requesterId") UUID requesterId);
+
+  Optional<ConversationMember> findByConversationIdAndUserId(UUID conversationId, UUID userId);
+
+  // 두 유저가 공유하는 대화방에서 상대방 멤버 조회
+  @Query(
+      """
+      SELECT cm FROM ConversationMember cm
+      JOIN FETCH cm.user
+      WHERE cm.user.id = :withUserId
+      AND cm.conversation IN (
+        SELECT cm2.conversation FROM ConversationMember cm2
+        WHERE cm2.user.id = :requesterId
+      )
+      """)
+  java.util.Optional<ConversationMember> findWithUserMemberByUserIds(
+      @Param("requesterId") UUID requesterId, @Param("withUserId") UUID withUserId);
 }

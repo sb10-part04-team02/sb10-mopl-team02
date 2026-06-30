@@ -48,7 +48,6 @@ CREATE TABLE users
     role              VARCHAR(10)                 NOT NULL DEFAULT 'USER',
     is_locked         BOOLEAN                     NOT NULL DEFAULT FALSE,
 
-    CONSTRAINT uk_users_email UNIQUE (email),
     CONSTRAINT chk_users_role CHECK (role IN ('USER', 'ADMIN'))
 );
 
@@ -225,6 +224,9 @@ CREATE UNIQUE INDEX uk_follows_follower_followee
 CREATE UNIQUE INDEX uk_reviews_user_content
     ON reviews (author_id, content_id) WHERE deleted_at IS NULL;
 
+CREATE UNIQUE INDEX uk_users_email
+    ON users (email) WHERE deleted_at IS NULL;
+
 CREATE UNIQUE INDEX uk_tags_content_name
     ON tags (content_id, name) WHERE deleted_at IS NULL;
 
@@ -239,3 +241,13 @@ CREATE UNIQUE INDEX uk_playlist_contents_content_playlist
 
 CREATE UNIQUE INDEX uk_watching_sessions_content_user
     ON watching_sessions (content_id, user_id) WHERE deleted_at IS NULL;
+
+--==================================================================================================
+-- 리뷰 목록 커서 조회용 복합 인덱스 (활성 행만: deleted_at IS NULL 부분 인덱스)
+--==================================================================================================
+
+CREATE INDEX ix_reviews_content_created_id
+    ON reviews (content_id, created_at, id) WHERE deleted_at IS NULL;
+
+CREATE INDEX ix_reviews_content_rating_id
+    ON reviews (content_id, rating, id) WHERE deleted_at IS NULL;

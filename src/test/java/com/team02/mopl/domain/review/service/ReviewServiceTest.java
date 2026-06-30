@@ -6,17 +6,25 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.inOrder;
 
+import com.team02.mopl.domain.content.service.ContentRatingService;
 import com.team02.mopl.domain.review.dto.ReviewCreateRequest;
 import com.team02.mopl.domain.review.dto.ReviewDto;
+import com.team02.mopl.domain.review.dto.ReviewSearchRequest;
 import com.team02.mopl.domain.review.dto.ReviewUpdateRequest;
 import com.team02.mopl.domain.review.entity.Review;
+import com.team02.mopl.domain.review.enums.ReviewSortBy;
 import com.team02.mopl.domain.review.exception.ReviewAlreadyExistsException;
 import com.team02.mopl.domain.review.mapper.ReviewMapper;
 import com.team02.mopl.domain.review.repository.ReviewRepository;
 import com.team02.mopl.domain.user.dto.UserSummary;
+import com.team02.mopl.global.dto.CursorResponse;
+import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -25,10 +33,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class ReviewServiceTest {
@@ -37,9 +47,143 @@ class ReviewServiceTest {
 
   @Mock ReviewMapper reviewMapper;
 
+  @Mock ContentRatingService contentRatingService;
+
   @InjectMocks ReviewService reviewService;
 
   @Captor ArgumentCaptor<Review> reviewCaptor;
+
+  @Nested
+  class GetReviews {
+    private final UUID contentId = UUID.randomUUID();
+
+    private Review review(double rating) {
+      Review review = new Review(UUID.randomUUID(), contentId, "리뷰", rating);
+      ReflectionTestUtils.setField(review, "id", UUID.randomUUID());
+      ReflectionTestUtils.setField(review, "createdAt", Instant.parse("2026-01-01T00:00:00Z"));
+      return review;
+    }
+
+    @Test
+    @DisplayName("커서가 없으면 첫 페이지를 createdAt 내림차순으로 조회한다")
+    void firstPage_byCreatedAtDesc() {
+      // given
+      ReviewSearchRequest request =
+          new ReviewSearchRequest(
+              contentId, null, null, 10, SortDirection.DESCENDING, ReviewSortBy.CREATED_AT);
+      given(
+              reviewRepository.findReviewsByCursor(
+                  eq(contentId),
+                  eq(ReviewSortBy.CREATED_AT),
+                  eq(SortDirection.DESCENDING),
+                  eq(null),
+                  eq(null),
+                  eq(11)))
+          .willReturn(List.of(review(4.0), review(3.0)));
+      given(reviewRepository.countActive(eq(contentId))).willReturn(2L);
+      given(reviewMapper.toDto(any(Review.class)))
+          .willReturn(
+              new ReviewDto(
+                  UUID.randomUUID(),
+                  contentId,
+                  new UserSummary(UUID.randomUUID(), null, null),
+                  "리뷰",
+                  4.0));
+
+      // when
+      CursorResponse<ReviewDto> response = reviewService.getReviews(request);
+
+      // then
+      assertThat(response.data()).hasSize(2);
+      assertThat(response.hasNext()).isFalse();
+      assertThat(response.nextCursor()).isNull();
+      assertThat(response.nextIdAfter()).isNull();
+      assertThat(response.totalCount()).isEqualTo(2L);
+      assertThat(response.sortBy()).isEqualTo("CREATED_AT");
+      assertThat(response.sortDirection()).isEqualTo("DESCENDING");
+    }
+
+    @Test
+    @DisplayName("limit + 1건이 조회되면 hasNext=true이고 마지막 항목으로 nextCursor를 채운다")
+    void hasNext_whenMoreThanLimit() {
+      // given
+      ReviewSearchRequest request =
+          new ReviewSearchRequest(
+              contentId, null, null, 1, SortDirection.DESCENDING, ReviewSortBy.CREATED_AT);
+      Review first = review(4.0);
+      given(
+              reviewRepository.findReviewsByCursor(
+                  eq(contentId),
+                  eq(ReviewSortBy.CREATED_AT),
+                  eq(SortDirection.DESCENDING),
+                  eq(null),
+                  eq(null),
+                  eq(2)))
+          .willReturn(List.of(first, review(3.0)));
+      given(reviewRepository.countActive(eq(contentId))).willReturn(2L);
+      given(reviewMapper.toDto(any(Review.class)))
+          .willReturn(
+              new ReviewDto(
+                  first.getId(),
+                  contentId,
+                  new UserSummary(UUID.randomUUID(), null, null),
+                  "리뷰",
+                  4.0));
+
+      // when
+      CursorResponse<ReviewDto> response = reviewService.getReviews(request);
+
+      // then
+      assertThat(response.data()).hasSize(1);
+      assertThat(response.hasNext()).isTrue();
+      assertThat(response.nextCursor()).isEqualTo(first.getCreatedAt().toString());
+      assertThat(response.nextIdAfter()).isEqualTo(first.getId());
+    }
+
+    @Test
+    @DisplayName("rating 정렬에서 커서가 있으면 다음 페이지를 평점 기준으로 조회한다")
+    void nextPage_byRating() {
+      // given
+      UUID idAfter = UUID.randomUUID();
+      ReviewSearchRequest request =
+          new ReviewSearchRequest(
+              contentId, "4.0", idAfter, 10, SortDirection.DESCENDING, ReviewSortBy.RATING);
+      given(
+              reviewRepository.findReviewsByCursor(
+                  eq(contentId),
+                  eq(ReviewSortBy.RATING),
+                  eq(SortDirection.DESCENDING),
+                  eq("4.0"),
+                  eq(idAfter),
+                  eq(11)))
+          .willReturn(List.of(review(3.0)));
+      given(reviewRepository.countActive(eq(contentId))).willReturn(5L);
+      given(reviewMapper.toDto(any(Review.class)))
+          .willReturn(
+              new ReviewDto(
+                  UUID.randomUUID(),
+                  contentId,
+                  new UserSummary(UUID.randomUUID(), null, null),
+                  "리뷰",
+                  3.0));
+
+      // when
+      CursorResponse<ReviewDto> response = reviewService.getReviews(request);
+
+      // then
+      assertThat(response.data()).hasSize(1);
+      assertThat(response.sortBy()).isEqualTo("RATING");
+      then(reviewRepository)
+          .should()
+          .findReviewsByCursor(
+              eq(contentId),
+              eq(ReviewSortBy.RATING),
+              eq(SortDirection.DESCENDING),
+              eq("4.0"),
+              eq(idAfter),
+              eq(11));
+    }
+  }
 
   @Nested
   class CreateReview {
@@ -104,7 +248,10 @@ class ReviewServiceTest {
       then(reviewRepository)
           .should()
           .existsByAuthorIdAndContentIdAndDeletedAtIsNull(eq(authorId), eq(contentId));
-      then(reviewRepository).should().saveAndFlush(reviewCaptor.capture());
+      // 재집계가 저장 이후 최신 값을 보도록 saveAndFlush()가 refreshAggregate()보다 먼저 호출돼야 한다
+      InOrder inOrder = inOrder(reviewRepository, contentRatingService);
+      inOrder.verify(reviewRepository).saveAndFlush(reviewCaptor.capture());
+      inOrder.verify(contentRatingService).refreshAggregate(eq(contentId));
       then(reviewMapper).should().toDto(any(Review.class));
 
       Review captured = reviewCaptor.getValue();
@@ -173,6 +320,10 @@ class ReviewServiceTest {
       assertThat(actual).isEqualTo(expect);
       assertThat(review.getText()).isEqualTo("수정된 내용");
       assertThat(review.getRating()).isEqualTo(2.0);
+      // 재집계가 DB 반영 이후 최신 값을 보도록 flush()가 refreshAggregate()보다 먼저 호출돼야 한다
+      InOrder inOrder = inOrder(reviewRepository, contentRatingService);
+      inOrder.verify(reviewRepository).flush();
+      inOrder.verify(contentRatingService).refreshAggregate(eq(contentId));
       then(reviewMapper).should().toDto(any(Review.class));
     }
 
@@ -244,6 +395,10 @@ class ReviewServiceTest {
 
       // then
       assertThat(review.isDeleted()).isTrue();
+      // 재집계가 DB 반영 이후 최신 값을 보도록 flush()가 refreshAggregate()보다 먼저 호출돼야 한다
+      InOrder inOrder = inOrder(reviewRepository, contentRatingService);
+      inOrder.verify(reviewRepository).flush();
+      inOrder.verify(contentRatingService).refreshAggregate(eq(contentId));
     }
   }
 }
