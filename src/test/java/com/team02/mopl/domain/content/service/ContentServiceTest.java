@@ -13,18 +13,25 @@ import static org.mockito.Mockito.never;
 
 import com.team02.mopl.domain.content.dto.ContentCreateRequest;
 import com.team02.mopl.domain.content.dto.ContentDto;
+import com.team02.mopl.domain.content.dto.ContentSearchCondition;
+import com.team02.mopl.domain.content.dto.ContentSearchRequest;
 import com.team02.mopl.domain.content.dto.ContentUpdateRequest;
 import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.entity.Tag;
 import com.team02.mopl.domain.content.enums.ContentType;
+import com.team02.mopl.domain.content.enums.SortBy;
 import com.team02.mopl.domain.content.mapper.ContentMapper;
 import com.team02.mopl.domain.content.repository.ContentRepository;
 import com.team02.mopl.domain.content.repository.TagRepository;
+import com.team02.mopl.global.dto.CursorResponse;
+import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.global.storage.FileStorage;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +68,8 @@ class ContentServiceTest {
   @Captor ArgumentCaptor<List<Tag>> tagListCaptor;
 
   @Captor ArgumentCaptor<List<Tag>> mapperTagListCaptor;
+
+  @Captor ArgumentCaptor<ContentSearchCondition> conditionCaptor;
 
   // 설정값(app.storage.default-thumbnail-url)이 그대로 쓰이는지 검증하기 위한 상수
   private static final String DEFAULT_THUMBNAIL_URL = "default-thumbnail-sentinel";
@@ -482,7 +491,210 @@ class ContentServiceTest {
 
   @Nested
   @DisplayName("getContents - 콘텐츠 목록 조회")
-  class GetContents {}
+  class GetContents {
+
+    // 이 테스트 그룹에서는 type과 idAfter를 검증 대상으로 삼지 않으므로 null로 고정
+    private ContentSearchRequest request(
+        String keyword,
+        List<String> tags,
+        String cursor,
+        int limit,
+        SortDirection direction,
+        SortBy sortBy) {
+      return new ContentSearchRequest(null, keyword, tags, cursor, null, limit, direction, sortBy);
+    }
+
+    // 테스트용 영속 Content 생성 헬퍼 - id/createdAt/averageRating을 ReflectionTestUtils로 강제 주입
+    private Content content(UUID id, Instant createdAt, double averageRating) {
+      Content content = new Content(ContentType.MOVIE, "제목", "설명", "url");
+      ReflectionTestUtils.setField(content, "id", id);
+      ReflectionTestUtils.setField(content, "createdAt", createdAt);
+      ReflectionTestUtils.setField(content, "averageRating", averageRating);
+      return content;
+    }
+
+    @Test
+    @DisplayName("sortBy/sortDirection 미지정 시 WATCHER_COUNT/DESCENDING으로 조회하고 응답에 그대로 반영한다")
+    void appliesDefaults_whenSortNotGiven() {
+      // given
+      ContentSearchRequest req = request(null, null, null, 20, null, null);
+      given(contentRepository.search(conditionCaptor.capture())).willReturn(List.of());
+      given(contentRepository.countBySearch(any())).willReturn(0L);
+
+      // when
+      CursorResponse<ContentDto> response = contentService.getContents(req);
+
+      // then
+      ContentSearchCondition condition = conditionCaptor.getValue();
+      assertThat(condition.sortBy()).isEqualTo(SortBy.WATCHER_COUNT);
+      assertThat(condition.asc()).isFalse();
+      assertThat(condition.limit()).isEqualTo(21); // fetchLimit = normalizedLimit + 1
+      assertThat(response.sortBy()).isEqualTo("WATCHER_COUNT");
+      assertThat(response.sortDirection()).isEqualTo("DESCENDING");
+    }
+
+    @Test
+    @DisplayName("sortBy/sortDirection 지정 시 그대로 조건과 응답에 반영한다(ASCENDING -> asc=true)")
+    void appliesGivenSort() {
+      // given
+      ContentSearchRequest req =
+          request(null, null, null, 20, SortDirection.ASCENDING, SortBy.CREATED_AT);
+      given(contentRepository.search(conditionCaptor.capture())).willReturn(List.of());
+      given(contentRepository.countBySearch(any())).willReturn(0L);
+
+      // when
+      CursorResponse<ContentDto> response = contentService.getContents(req);
+
+      // then
+      ContentSearchCondition condition = conditionCaptor.getValue();
+      assertThat(condition.sortBy()).isEqualTo(SortBy.CREATED_AT);
+      assertThat(condition.asc()).isTrue();
+      assertThat(response.sortBy()).isEqualTo("CREATED_AT");
+      assertThat(response.sortDirection()).isEqualTo("ASCENDING");
+    }
+
+    @Test
+    @DisplayName("키워드는 앞뒤 공백을 제거하고, null이거나 공백뿐이면 null로 정규화한다")
+    void normalizesKeyword() {
+      // given
+      given(contentRepository.search(conditionCaptor.capture())).willReturn(List.of());
+      given(contentRepository.countBySearch(any())).willReturn(0L);
+
+      // when & then: 앞뒤 공백 제거
+      contentService.getContents(request("  hello  ", null, null, 20, null, null));
+      assertThat(conditionCaptor.getValue().keyword()).isEqualTo("hello");
+
+      // when & then: 공백뿐이면 null
+      contentService.getContents(request("   ", null, null, 20, null, null));
+      assertThat(conditionCaptor.getValue().keyword()).isNull();
+
+      // when & then: null이면 null
+      contentService.getContents(request(null, null, null, 20, null, null));
+      assertThat(conditionCaptor.getValue().keyword()).isNull();
+    }
+
+    @Test
+    @DisplayName("태그는 null/공백 원소 제거 + trim + 중복 제거되며, null 입력은 빈 리스트가 된다")
+    void normalizesTags() {
+      // given
+      given(contentRepository.search(conditionCaptor.capture())).willReturn(List.of());
+      given(contentRepository.countBySearch(any())).willReturn(0L);
+
+      // 입력: ["액션", " 액션 ", "  ", "", null, "드라마"]
+      // when & then: null/공백 원소 제거 + trim + 중복 제거
+      contentService.getContents(
+          request(null, Arrays.asList("액션", " 액션 ", "  ", "", null, "드라마"), null, 20, null, null));
+      assertThat(conditionCaptor.getValue().tags()).containsExactly("액션", "드라마");
+
+      // when & then: null 입력은 빈 리스트
+      contentService.getContents(request(null, null, null, 20, null, null));
+      assertThat(conditionCaptor.getValue().tags()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("repository가 fetchLimit(=size+1)건을 반환하면 hasNext=true이고 여분 1건을 잘라 size개만 매핑한다")
+    void hasNextTrue_whenExtraRowFetched() {
+      // given: limit 2 -> fetchLimit 3, search가 3건 반환
+      UUID id1 = UUID.randomUUID();
+      UUID id2 = UUID.randomUUID();
+      UUID id3 = UUID.randomUUID();
+      Instant now = Instant.parse("2026-06-30T10:00:00Z");
+      given(contentRepository.search(any()))
+          .willReturn(
+              List.of(content(id1, now, 4.0), content(id2, now, 3.0), content(id3, now, 2.0)));
+      given(contentRepository.countBySearch(any())).willReturn(10L);
+      // 이 테스트의 관심사가 아니므로 빈 리스트 반환
+      given(tagRepository.findByContentIdInAndDeletedAtIsNull(any())).willReturn(List.of());
+      given(watcherCountService.countByContentIds(any())).willReturn(Map.of(id1, 9L, id2, 5L));
+      given(contentMapper.toDto(any(Content.class), anyList(), anyLong()))
+          .willReturn(mockDto(id1, List.of(), 0L));
+
+      // when
+      CursorResponse<ContentDto> response =
+          contentService.getContents(request(null, null, null, 2, null, null));
+
+      // then
+      assertThat(response.hasNext()).isTrue(); // 다음 페이지 존재
+      assertThat(response.data()).hasSize(2); //
+      assertThat(response.totalCount()).isEqualTo(10L);
+      // 여분 1건(id3)은 버려지고, 마지막 페이지 행(id2) 기준으로 커서가 생성된다
+      assertThat(response.nextIdAfter()).isEqualTo(id2);
+      assertThat(response.nextCursor()).isEqualTo("5"); // WATCHER_COUNT: watcherCounts.get(id2)
+    }
+
+    @Test
+    @DisplayName("repository가 size 이하로 반환하면 hasNext=false이고 nextCursor/nextIdAfter는 null이다")
+    void hasNextFalse_whenNoExtraRow() {
+      // given: limit 2, search가 2건만 반환
+      UUID id1 = UUID.randomUUID();
+      UUID id2 = UUID.randomUUID();
+      Instant now = Instant.now();
+      given(contentRepository.search(any()))
+          .willReturn(List.of(content(id1, now, 4.0), content(id2, now, 3.0)));
+      given(contentRepository.countBySearch(any())).willReturn(2L);
+      given(tagRepository.findByContentIdInAndDeletedAtIsNull(any())).willReturn(List.of());
+      given(watcherCountService.countByContentIds(any())).willReturn(Map.of());
+      given(contentMapper.toDto(any(Content.class), anyList(), anyLong()))
+          .willReturn(mockDto(id1, List.of(), 0L));
+
+      // when
+      CursorResponse<ContentDto> response =
+          contentService.getContents(request(null, null, null, 2, null, null));
+
+      // then
+      assertThat(response.hasNext()).isFalse(); // 다음 페이지 없음
+      assertThat(response.data()).hasSize(2);
+      assertThat(response.nextCursor()).isNull(); // 마지막 페이지이므로 커서 관련 값은 모두 null
+      assertThat(response.nextIdAfter()).isNull();
+    }
+
+    @Test
+    @DisplayName("결과가 비어 있으면 빈 데이터/0건/커서 null을 반환하고 태그 일괄 조회를 호출하지 않는다")
+    void emptyResult_shortCircuitsTagFetch() {
+      // given
+      given(contentRepository.search(any())).willReturn(List.of());
+      given(contentRepository.countBySearch(any())).willReturn(0L);
+
+      // when
+      CursorResponse<ContentDto> response =
+          contentService.getContents(request(null, null, null, 20, null, null));
+
+      // then
+      assertThat(response.data()).isEmpty();
+      assertThat(response.hasNext()).isFalse();
+      assertThat(response.totalCount()).isZero();
+      assertThat(response.nextCursor()).isNull();
+      assertThat(response.nextIdAfter()).isNull();
+      // 콘텐츠가 0건이면 태그를 조회할 대상도 없으므로 태그 일괄 조회를 하지 않아야 한다
+      then(tagRepository).should(never()).findByContentIdInAndDeletedAtIsNull(any());
+    }
+
+    @Test
+    @DisplayName("CREATED_AT 정렬에서는 마지막 행의 createdAt 문자열이 nextCursor가 된다")
+    void nextCursorUsesCreatedAt_whenSortByCreatedAt() {
+      // given: limit 1 -> fetchLimit 2, search 2건 -> hasNext, last = 첫 번째 행
+      UUID id1 = UUID.randomUUID();
+      UUID id2 = UUID.randomUUID();
+      Instant lastCreatedAt = Instant.parse("2026-06-30T10:00:00Z");
+      given(contentRepository.search(any()))
+          .willReturn(List.of(content(id1, lastCreatedAt, 4.0), content(id2, Instant.now(), 3.0)));
+      given(contentRepository.countBySearch(any())).willReturn(5L);
+      given(tagRepository.findByContentIdInAndDeletedAtIsNull(any())).willReturn(List.of());
+      given(watcherCountService.countByContentIds(any())).willReturn(Map.of());
+      given(contentMapper.toDto(any(Content.class), anyList(), anyLong()))
+          .willReturn(mockDto(id1, List.of(), 0L));
+
+      // when
+      CursorResponse<ContentDto> response =
+          contentService.getContents(request(null, null, null, 1, null, SortBy.CREATED_AT));
+
+      // then
+      assertThat(response.hasNext()).isTrue();
+      // 커서의 보조 키(tie-breaker)인 nextIdAfter는 잘라낸 뒤 마지막 행 id1의 id가 된다
+      assertThat(response.nextIdAfter()).isEqualTo(id1);
+      assertThat(response.nextCursor()).isEqualTo(lastCreatedAt.toString());
+    }
+  }
 
   // ===
 
