@@ -76,6 +76,20 @@ class DirectMessageControllerTest {
   }
 
   @Test
+  @DisplayName("cursor만 전달하고 idAfter를 생략하면 400을 반환한다")
+  void getDirectMessages_cursorWithoutIdAfter_returns400() throws Exception {
+    UUID userId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            get("/api/conversations/{conversationId}/direct-messages", conversationId)
+                .queryParam("cursor", "2026-06-30T10:15:30Z")
+                .with(authentication(new TestingAuthenticationToken(userId, null))))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   @DisplayName("대화방 참여자가 아니면 403을 반환한다")
   void getDirectMessages_notMember_returns403() throws Exception {
     UUID userId = UUID.randomUUID();
