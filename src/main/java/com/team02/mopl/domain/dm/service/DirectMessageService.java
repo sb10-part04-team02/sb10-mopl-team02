@@ -5,11 +5,13 @@ import static com.team02.mopl.global.exception.ErrorCode.USER_NOT_FOUND;
 import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
+import com.team02.mopl.domain.dm.dto.DirectMessageSearchRequest;
 import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
 import com.team02.mopl.domain.dm.dto.DmSentEvent;
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.domain.dm.entity.ConversationMember;
 import com.team02.mopl.domain.dm.entity.DirectMessage;
+import com.team02.mopl.domain.dm.enums.DirectMessageSortBy;
 import com.team02.mopl.domain.dm.exception.ConversationAlreadyExistsException;
 import com.team02.mopl.domain.dm.exception.ConversationForbiddenException;
 import com.team02.mopl.domain.dm.exception.ConversationNotFoundException;
@@ -20,8 +22,12 @@ import com.team02.mopl.domain.dm.repository.DirectMessageRepository;
 import com.team02.mopl.domain.user.dto.UserSummary;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.global.dto.CursorPageRequest;
+import com.team02.mopl.global.dto.CursorResponse;
+import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -145,6 +151,45 @@ public class DirectMessageService {
             .filter(dm -> !dm.getSender().getUser().getId().equals(requesterId))
             .map(dm -> dm.getCreatedAt().isAfter(requesterMember.getLastReadAt()))
             .orElse(false));
+  }
+
+  @Transactional(readOnly = true)
+  public CursorResponse<DirectMessageDto> getDirectMessages(
+      UUID conversationId, UUID requesterId, DirectMessageSearchRequest request) {
+    if (!conversationMemberRepository.existsByConversationIdAndUserId(
+        conversationId, requesterId)) {
+      throw new ConversationForbiddenException();
+    }
+
+    int limit = CursorPageRequest.normalizeLimit(request.limit());
+    SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
+
+    List<DirectMessage> messages =
+        directMessageRepository.findDirectMessagesByCursor(
+            conversationId, direction, request.cursor(), request.idAfter(), limit + 1);
+
+    boolean hasNext = messages.size() > limit;
+    List<DirectMessage> page = hasNext ? messages.subList(0, limit) : messages;
+
+    List<DirectMessageDto> data = page.stream().map(this::toDirectMessageDto).toList();
+    long totalCount = directMessageRepository.countByConversationId(conversationId);
+
+    String nextCursor = null;
+    UUID nextIdAfter = null;
+    if (hasNext) {
+      DirectMessage last = page.get(page.size() - 1);
+      nextCursor = last.getCreatedAt().toString();
+      nextIdAfter = last.getId();
+    }
+
+    return new CursorResponse<>(
+        data,
+        nextCursor,
+        nextIdAfter,
+        hasNext,
+        totalCount,
+        DirectMessageSortBy.CREATED_AT.name(),
+        direction.name());
   }
 
   @Transactional

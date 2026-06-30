@@ -1,6 +1,10 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - dev
+      - main
   pull_request:
     branches:
       - dev
@@ -48,14 +52,17 @@ jobs:
       - name: 커버리지 리포트 (JaCoCo)
         run: ./gradlew jacocoTestReport
 
-      # 테스트가 쌓이면 주석 해제 — 커버리지 미달 시 빌드 실패
-      # - name: ✅ 커버리지 검증
-      #   run: ./gradlew jacocoTestCoverageVerification
+      - name: ✅ 커버리지 검증
+        # 게이트는 PR에서만 실행 — dev/main push(merge)는 뱃지 갱신만 하고 막지 않음
+        if: ${{ github.event_name == 'pull_request' }}
+        run: ./gradlew jacocoTestCoverageVerification
 
       - name: 빌드/패키징 (bootJar)
         run: ./gradlew assemble
 
       - name: Codecov 리포트 업로드
+        # 커버리지 검증 실패와 무관하게 뱃지 갱신을 위해 항상 업로드
+        if: ${{ always() }}
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
