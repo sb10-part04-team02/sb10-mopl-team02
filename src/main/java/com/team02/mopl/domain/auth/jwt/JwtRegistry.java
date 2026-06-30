@@ -1,5 +1,7 @@
 package com.team02.mopl.domain.auth.jwt;
 
+import java.time.Duration;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +17,9 @@ public class JwtRegistry {
 
   @Value("${app.jwt.redis.max-account-count}")
   private long maxAccountCount;
+
+  @Value("${app.jwt.redis.blacklist-prefix}")
+  private String blacklistPrefix;
 
   private final JwtProperties properties;
   private final StringRedisTemplate redisTemplate;
@@ -40,5 +45,28 @@ public class JwtRegistry {
 
   private String userKey(UUID userId) {
     return refreshPrefix + userId.toString();
+  }
+
+  public void deleteRefreshToken(
+      UUID userId, String accessTokenId, Duration remaining, String refreshToken) {
+    String key = userKey(userId);
+    String blackListKey = blacklistKey(accessTokenId);
+
+    // RefreshToken 삭제
+    redisTemplate.opsForZSet().remove(key, refreshToken);
+
+    // AccessToken BlackList 추가
+    if (!remaining.isNegative() && !remaining.isZero()) {
+      redisTemplate.opsForValue().set(blackListKey, "logout", remaining);
+    }
+  }
+
+  public boolean isBlacklisted(String accessTokenId) {
+    String blackListKey = blacklistKey(accessTokenId);
+    return Objects.equals(redisTemplate.hasKey(blackListKey), true);
+  }
+
+  private String blacklistKey(String accessTokenId) {
+    return blacklistPrefix + accessTokenId;
   }
 }
