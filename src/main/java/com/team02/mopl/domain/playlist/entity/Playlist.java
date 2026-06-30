@@ -13,6 +13,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.util.StringUtils;
 
 @Entity
 @Table(name = "playlists")
@@ -42,10 +43,10 @@ public class Playlist extends BaseMutableEntity {
   }
 
   public void update(String title, String description) {
-    if (title != null) {
+    if (StringUtils.hasText(title)) {
       this.title = title;
     }
-    if (description != null) {
+    if (StringUtils.hasText(description)) {
       this.description = description;
     }
   }

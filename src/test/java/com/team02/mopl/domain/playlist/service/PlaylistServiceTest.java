@@ -119,6 +119,40 @@ class PlaylistServiceTest {
     }
 
     @Test
+    @DisplayName("title만 전달하면 description은 기존 값을 유지한다")
+    void success_whenPartialUpdate() {
+      // given
+      Playlist playlist = new Playlist(ownerId, "기존 제목", "기존 설명");
+      PlaylistUpdateRequest request = new PlaylistUpdateRequest("새 제목", null);
+      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistMapper.toDto(playlist, false)).willReturn(null);
+
+      // when
+      playlistService.update(playlistId, ownerId, request);
+
+      // then
+      assertThat(playlist.getTitle()).isEqualTo("새 제목");
+      assertThat(playlist.getDescription()).isEqualTo("기존 설명");
+    }
+
+    @Test
+    @DisplayName("빈 문자열이 전달되면 기존 값을 덮어쓰지 않는다")
+    void success_whenBlankIsIgnored() {
+      // given
+      Playlist playlist = new Playlist(ownerId, "기존 제목", "기존 설명");
+      PlaylistUpdateRequest request = new PlaylistUpdateRequest("", "   ");
+      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistMapper.toDto(playlist, false)).willReturn(null);
+
+      // when
+      playlistService.update(playlistId, ownerId, request);
+
+      // then
+      assertThat(playlist.getTitle()).isEqualTo("기존 제목");
+      assertThat(playlist.getDescription()).isEqualTo("기존 설명");
+    }
+
+    @Test
     @DisplayName("플레이리스트가 없으면 PLAYLIST_NOT_FOUND 예외를 던진다")
     void fail_whenPlaylistNotFound() {
       // given
