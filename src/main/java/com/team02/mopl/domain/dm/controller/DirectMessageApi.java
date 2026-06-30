@@ -2,6 +2,9 @@ package com.team02.mopl.domain.dm.controller;
 
 import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
+import com.team02.mopl.domain.dm.dto.DirectMessageDto;
+import com.team02.mopl.domain.dm.dto.DirectMessageSearchRequest;
+import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -13,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -93,4 +97,31 @@ public interface DirectMessageApi {
   ResponseEntity<ConversationDto> findConversation(
       @Parameter(hidden = true) UUID userId,
       @Parameter(description = "대화방 UUID") UUID conversationId);
+
+  @Operation(
+      summary = "DM 목록 조회",
+      description = "대화방의 DM 목록을 커서 페이지네이션으로 조회합니다. 요청자가 해당 대화방의 참여자여야 합니다.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 커서/페이지네이션 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "대화방 멤버가 아님",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<CursorResponse<DirectMessageDto>> getDirectMessages(
+      @Parameter(hidden = true) UUID userId,
+      @Parameter(description = "대화방 UUID") UUID conversationId,
+      @Valid @ModelAttribute DirectMessageSearchRequest request);
 }
