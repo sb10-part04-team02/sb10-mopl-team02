@@ -38,6 +38,8 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
 
   Optional<ConversationMember> findByConversationIdAndUserId(UUID conversationId, UUID userId);
 
+  boolean existsByConversationIdAndUserId(UUID conversationId, UUID userId);
+
   // 두 유저가 공유하는 대화방에서 상대방 멤버 조회
   @Query(
       """
