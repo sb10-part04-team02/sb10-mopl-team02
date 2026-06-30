@@ -540,6 +540,35 @@ class DirectMessageServiceTest {
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
   }
 
+  @Test
+  @DisplayName("cursor/idAfter와 ASCENDING 정렬 요청을 리포지토리에 그대로 전달한다")
+  void getDirectMessages_withCursorAndAscending_forwardsPaginationArguments() {
+    UUID conversationId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+    UUID idAfter = UUID.randomUUID();
+    String cursor = "2026-06-30T10:15:30Z";
+
+    given(conversationMemberRepository.existsByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(true);
+    given(
+            directMessageRepository.findDirectMessagesByCursor(
+                conversationId, SortDirection.ASCENDING, cursor, idAfter, 6))
+        .willReturn(List.of());
+    given(directMessageRepository.countByConversationId(conversationId)).willReturn(0L);
+
+    CursorResponse<DirectMessageDto> result =
+        directMessageService.getDirectMessages(
+            conversationId,
+            requesterId,
+            new DirectMessageSearchRequest(
+                cursor, idAfter, 5, SortDirection.ASCENDING, DirectMessageSortBy.CREATED_AT));
+
+    verify(directMessageRepository)
+        .findDirectMessagesByCursor(conversationId, SortDirection.ASCENDING, cursor, idAfter, 6);
+    assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING.name());
+    assertThat(result.sortBy()).isEqualTo(DirectMessageSortBy.CREATED_AT.name());
+  }
+
   // ──────────────────────────────────────────────
   // sendDirectMessage
   // ──────────────────────────────────────────────

@@ -11,6 +11,8 @@ import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.support.RepositoryTestSupport;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,61 +48,96 @@ class DirectMessageRepositoryTest extends RepositoryTestSupport {
   @Test
   @DisplayName("커서 없이 조회하면 createdAt 내림차순 첫 페이지를 반환한다")
   void findDirectMessagesByCursor_firstPage_returnsDescOrder() {
-    DirectMessage dm1 = saveDm(member1, member2, "첫 번째");
-    DirectMessage dm2 = saveDm(member1, member2, "두 번째");
+    Instant t1 = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    Instant t2 = t1.plusSeconds(1);
+
+    UUID id1 = saveDmAt(member1, member2, "첫 번째", t1);
+    UUID id2 = saveDmAt(member1, member2, "두 번째", t2);
     em.flush();
 
     List<DirectMessage> result =
         directMessageRepository.findDirectMessagesByCursor(
             conversation.getId(), SortDirection.DESCENDING, null, null, 10);
 
-    assertThat(result).extracting(DirectMessage::getId).containsExactly(dm2.getId(), dm1.getId());
+    assertThat(result).extracting(DirectMessage::getId).containsExactly(id2, id1);
   }
 
   @Test
   @DisplayName("커서 이후 메시지만 조회한다 (내림차순)")
   void findDirectMessagesByCursor_withCursor_returnsMessagesAfterCursor() {
-    DirectMessage dm1 = saveDm(member1, member2, "첫 번째");
-    DirectMessage dm2 = saveDm(member1, member2, "두 번째");
-    DirectMessage dm3 = saveDm(member1, member2, "세 번째");
+    Instant t1 = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    Instant t2 = t1.plusSeconds(1);
+    Instant t3 = t1.plusSeconds(2);
+
+    UUID id1 = saveDmAt(member1, member2, "첫 번째", t1);
+    UUID id2 = saveDmAt(member1, member2, "두 번째", t2);
+    UUID id3 = saveDmAt(member1, member2, "세 번째", t3);
     em.flush();
 
     List<DirectMessage> result =
         directMessageRepository.findDirectMessagesByCursor(
-            conversation.getId(),
-            SortDirection.DESCENDING,
-            dm3.getCreatedAt().toString(),
-            dm3.getId(),
-            10);
+            conversation.getId(), SortDirection.DESCENDING, t3.toString(), id3, 10);
 
-    assertThat(result).extracting(DirectMessage::getId).containsExactly(dm2.getId(), dm1.getId());
+    assertThat(result).extracting(DirectMessage::getId).containsExactly(id2, id1);
   }
 
   @Test
   @DisplayName("커서 이후 메시지만 조회한다 (오름차순)")
   void findDirectMessagesByCursor_withCursorAscending_returnsMessagesAfterCursor() {
-    DirectMessage dm1 = saveDm(member1, member2, "첫 번째");
-    DirectMessage dm2 = saveDm(member1, member2, "두 번째");
-    DirectMessage dm3 = saveDm(member1, member2, "세 번째");
+    Instant t1 = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    Instant t2 = t1.plusSeconds(1);
+    Instant t3 = t1.plusSeconds(2);
+
+    UUID id1 = saveDmAt(member1, member2, "첫 번째", t1);
+    UUID id2 = saveDmAt(member1, member2, "두 번째", t2);
+    UUID id3 = saveDmAt(member1, member2, "세 번째", t3);
     em.flush();
 
     List<DirectMessage> result =
         directMessageRepository.findDirectMessagesByCursor(
+            conversation.getId(), SortDirection.ASCENDING, t1.toString(), id1, 10);
+
+    assertThat(result).extracting(DirectMessage::getId).containsExactly(id2, id3);
+  }
+
+  @Test
+  @DisplayName("같은 createdAt에서 id로 타이브레이킹 한다 (내림차순)")
+  void findDirectMessagesByCursor_sameCreatedAt_tieBreaksByIdDesc() {
+    Instant sameTime = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+
+    // id 비교를 위해 UUID를 직접 제어하여 정렬 순서를 확정
+    UUID id1 = saveDmAt(member1, member2, "메시지A", sameTime);
+    UUID id2 = saveDmAt(member1, member2, "메시지B", sameTime);
+    UUID id3 = saveDmAt(member1, member2, "메시지C", sameTime);
+    em.flush();
+
+    // 첫 페이지 조회로 실제 정렬 순서 확인
+    List<DirectMessage> firstPage =
+        directMessageRepository.findDirectMessagesByCursor(
+            conversation.getId(), SortDirection.DESCENDING, null, null, 10);
+    assertThat(firstPage).hasSize(3);
+
+    // 첫 번째 항목을 커서로 삼아 나머지 2개가 조회되는지 검증
+    DirectMessage cursor = firstPage.get(0);
+    List<DirectMessage> next =
+        directMessageRepository.findDirectMessagesByCursor(
             conversation.getId(),
-            SortDirection.ASCENDING,
-            dm1.getCreatedAt().toString(),
-            dm1.getId(),
+            SortDirection.DESCENDING,
+            cursor.getCreatedAt().toString(),
+            cursor.getId(),
             10);
 
-    assertThat(result).extracting(DirectMessage::getId).containsExactly(dm2.getId(), dm3.getId());
+    assertThat(next).hasSize(2);
+    assertThat(next).doesNotContain(cursor);
   }
 
   @Test
   @DisplayName("limit 개수만큼만 반환한다")
   void findDirectMessagesByCursor_respectsLimit() {
-    saveDm(member1, member2, "첫 번째");
-    saveDm(member1, member2, "두 번째");
-    saveDm(member1, member2, "세 번째");
+    Instant t = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    saveDmAt(member1, member2, "첫 번째", t);
+    saveDmAt(member1, member2, "두 번째", t.plusSeconds(1));
+    saveDmAt(member1, member2, "세 번째", t.plusSeconds(2));
     em.flush();
 
     List<DirectMessage> result =
@@ -113,7 +150,7 @@ class DirectMessageRepositoryTest extends RepositoryTestSupport {
   @Test
   @DisplayName("다른 대화방의 메시지는 조회되지 않는다")
   void findDirectMessagesByCursor_onlyReturnsMessagesForConversation() {
-    saveDm(member1, member2, "이 대화방 메시지");
+    saveDmAt(member1, member2, "이 대화방 메시지", Instant.now().truncatedTo(ChronoUnit.MILLIS));
     em.flush();
 
     List<DirectMessage> result =
@@ -154,8 +191,9 @@ class DirectMessageRepositoryTest extends RepositoryTestSupport {
   @Test
   @DisplayName("countByConversationId는 해당 대화방의 메시지 수를 반환한다")
   void countByConversationId_returnsCorrectCount() {
-    saveDm(member1, member2, "메시지1");
-    saveDm(member2, member1, "메시지2");
+    Instant t = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    saveDmAt(member1, member2, "메시지1", t);
+    saveDmAt(member2, member1, "메시지2", t.plusSeconds(1));
     em.flush();
 
     long count = directMessageRepository.countByConversationId(conversation.getId());
@@ -194,14 +232,19 @@ class DirectMessageRepositoryTest extends RepositoryTestSupport {
         .orElseThrow();
   }
 
-  private DirectMessage saveDm(
-      ConversationMember sender, ConversationMember receiver, String content) {
-    return directMessageRepository.save(
-        DirectMessage.builder()
-            .conversation(conversation)
-            .sender(sender)
-            .receiver(receiver)
-            .content(content)
-            .build());
+  private UUID saveDmAt(
+      ConversationMember sender, ConversationMember receiver, String content, Instant createdAt) {
+    UUID id = UUID.randomUUID();
+    em.createNativeQuery(
+            "INSERT INTO direct_messages (id, created_at, conversation_id, sender_id, receiver_id, content) "
+                + "VALUES (:id, :createdAt, :convId, :senderId, :receiverId, :content)")
+        .setParameter("id", id)
+        .setParameter("createdAt", createdAt)
+        .setParameter("convId", conversation.getId())
+        .setParameter("senderId", sender.getId())
+        .setParameter("receiverId", receiver.getId())
+        .setParameter("content", content)
+        .executeUpdate();
+    return id;
   }
 }

@@ -50,7 +50,7 @@ public class DirectMessageController implements DirectMessageApi {
   public ResponseEntity<CursorResponse<DirectMessageDto>> getDirectMessages(
       @AuthenticationPrincipal UUID userId,
       @PathVariable UUID conversationId,
-      @ModelAttribute DirectMessageSearchRequest request) {
+      @Valid @ModelAttribute DirectMessageSearchRequest request) {
     return ResponseEntity.ok(
         directMessageService.getDirectMessages(conversationId, userId, request));
   }

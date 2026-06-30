@@ -104,6 +104,10 @@ public interface DirectMessageApi {
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "성공"),
     @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 커서/페이지네이션 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
         responseCode = "401",
         description = "인증 오류",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
@@ -119,5 +123,5 @@ public interface DirectMessageApi {
   ResponseEntity<CursorResponse<DirectMessageDto>> getDirectMessages(
       @Parameter(hidden = true) UUID userId,
       @Parameter(description = "대화방 UUID") UUID conversationId,
-      @ModelAttribute DirectMessageSearchRequest request);
+      @Valid @ModelAttribute DirectMessageSearchRequest request);
 }
