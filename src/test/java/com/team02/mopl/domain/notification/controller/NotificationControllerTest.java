@@ -66,7 +66,7 @@ class NotificationControllerTest {
             nextIdAfter,
             true,
             3L,
-            NotificationSortBy.CREATED_AT.name(),
+            NotificationSortBy.createdAt.name(),
             SortDirection.DESCENDING.name());
 
     given(
@@ -106,7 +106,7 @@ class NotificationControllerTest {
             null,
             false,
             0L,
-            NotificationSortBy.CREATED_AT.name(),
+            NotificationSortBy.createdAt.name(),
             SortDirection.DESCENDING.name());
 
     given(
@@ -142,7 +142,7 @@ class NotificationControllerTest {
             null,
             false,
             0L,
-            NotificationSortBy.CREATED_AT.name(),
+            NotificationSortBy.createdAt.name(),
             SortDirection.ASCENDING.name());
 
     given(
@@ -157,11 +157,11 @@ class NotificationControllerTest {
                 .param("idAfter", idAfter.toString())
                 .param("limit", "10")
                 .param("sortDirection", "ASCENDING")
-                .param("sortBy", "CREATED_AT")
+                .param("sortBy", "createdAt")
                 .with(authentication(authenticationWithPrincipal(receiverId))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").isArray())
-        .andExpect(jsonPath("$.sortBy").value("CREATED_AT"))
+        .andExpect(jsonPath("$.sortBy").value("createdAt"))
         .andExpect(jsonPath("$.sortDirection").value("ASCENDING"));
 
     verify(notificationService)

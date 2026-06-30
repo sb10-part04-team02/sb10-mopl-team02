@@ -55,7 +55,7 @@ class NotificationRepositoryTest extends RepositoryTestSupport {
     List<Notification> result =
         notificationRepository.findNotificationsByCursor(
             receiver.getId(),
-            NotificationSortBy.CREATED_AT,
+            NotificationSortBy.createdAt,
             SortDirection.DESCENDING,
             null,
             null,
@@ -81,7 +81,7 @@ class NotificationRepositoryTest extends RepositoryTestSupport {
     List<Notification> result =
         notificationRepository.findNotificationsByCursor(
             receiver.getId(),
-            NotificationSortBy.CREATED_AT,
+            NotificationSortBy.createdAt,
             SortDirection.DESCENDING,
             newest.getCreatedAt().toString(),
             newest.getId(),
@@ -107,7 +107,7 @@ class NotificationRepositoryTest extends RepositoryTestSupport {
     List<Notification> result =
         notificationRepository.findNotificationsByCursor(
             receiver.getId(),
-            NotificationSortBy.CREATED_AT,
+            NotificationSortBy.createdAt,
             SortDirection.ASCENDING,
             null,
             null,
@@ -125,7 +125,7 @@ class NotificationRepositoryTest extends RepositoryTestSupport {
             () ->
                 notificationRepository.findNotificationsByCursor(
                     receiver.getId(),
-                    NotificationSortBy.CREATED_AT,
+                    NotificationSortBy.createdAt,
                     SortDirection.DESCENDING,
                     "2026-06-29T00:00:00Z",
                     null,
@@ -138,7 +138,7 @@ class NotificationRepositoryTest extends RepositoryTestSupport {
             () ->
                 notificationRepository.findNotificationsByCursor(
                     receiver.getId(),
-                    NotificationSortBy.CREATED_AT,
+                    NotificationSortBy.createdAt,
                     SortDirection.DESCENDING,
                     null,
                     UUID.randomUUID(),
@@ -155,7 +155,7 @@ class NotificationRepositoryTest extends RepositoryTestSupport {
             () ->
                 notificationRepository.findNotificationsByCursor(
                     receiver.getId(),
-                    NotificationSortBy.CREATED_AT,
+                    NotificationSortBy.createdAt,
                     SortDirection.DESCENDING,
                     "not-an-instant",
                     UUID.randomUUID(),
@@ -199,7 +199,7 @@ class NotificationRepositoryTest extends RepositoryTestSupport {
 
     em.flush();
 
-    em.createNativeQuery("UPDATE notifications SET created_at = :createdAt WHERE id = :id")
+    em.createQuery("UPDATE Notification n SET n.createdAt = :createdAt WHERE n.id = :id")
         .setParameter("createdAt", createdAt)
         .setParameter("id", notification.getId())
         .executeUpdate();

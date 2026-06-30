@@ -65,7 +65,7 @@ public class NotificationService {
     int limit = CursorPageRequest.normalizeLimit(request.limit());
     SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
     NotificationSortBy sortBy =
-        request.sortBy() != null ? request.sortBy() : NotificationSortBy.CREATED_AT;
+        request.sortBy() != null ? request.sortBy() : NotificationSortBy.createdAt;
 
     List<Notification> notifications =
         notificationRepository.findNotificationsByCursor(

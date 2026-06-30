@@ -170,7 +170,7 @@ class NotificationServiceTest {
     given(
             notificationRepository.findNotificationsByCursor(
                 eq(receiverId),
-                eq(NotificationSortBy.CREATED_AT),
+                eq(NotificationSortBy.createdAt),
                 eq(SortDirection.DESCENDING),
                 eq(null),
                 eq(null),
@@ -189,7 +189,7 @@ class NotificationServiceTest {
     assertThat(result.nextCursor()).isNull();
     assertThat(result.nextIdAfter()).isNull();
     assertThat(result.totalCount()).isEqualTo(2L);
-    assertThat(result.sortBy()).isEqualTo("CREATED_AT");
+    assertThat(result.sortBy()).isEqualTo("createdAt");
     assertThat(result.sortDirection()).isEqualTo("DESCENDING");
   }
 
@@ -211,12 +211,12 @@ class NotificationServiceTest {
 
     NotificationSearchRequest request =
         new NotificationSearchRequest(
-            null, null, 2, SortDirection.DESCENDING, NotificationSortBy.CREATED_AT);
+            null, null, 2, SortDirection.DESCENDING, NotificationSortBy.createdAt);
 
     given(
             notificationRepository.findNotificationsByCursor(
                 eq(receiverId),
-                eq(NotificationSortBy.CREATED_AT),
+                eq(NotificationSortBy.createdAt),
                 eq(SortDirection.DESCENDING),
                 eq(null),
                 eq(null),
