@@ -66,7 +66,7 @@ class JwtLogoutHandlerTest {
     jwtLogoutHandler.logout(request, response, mockAuth);
 
     // then
-    then(jwtTokenProvider).should(never()).verifyAccessToken("token");
+    then(jwtTokenProvider).should(never()).verifyAccessToken(anyString());
   }
 
   @Test
@@ -79,7 +79,7 @@ class JwtLogoutHandlerTest {
     jwtLogoutHandler.logout(request, response, mockAuth);
 
     // then
-    then(jwtTokenProvider).should(never()).verifyAccessToken("token");
+    then(jwtTokenProvider).should(never()).verifyAccessToken(anyString());
   }
 
   @Test
@@ -95,7 +95,7 @@ class JwtLogoutHandlerTest {
     jwtLogoutHandler.logout(request, response, mockAuth);
 
     // then
-    then(jwtTokenProvider).should(never()).verifyAccessToken("token");
+    then(jwtTokenProvider).should(never()).verifyAccessToken(anyString());
   }
 
   @Test
@@ -113,7 +113,7 @@ class JwtLogoutHandlerTest {
     jwtLogoutHandler.logout(request, response, mockAuth);
 
     // then
-    then(jwtTokenProvider).should(never()).verifyAccessToken("token");
+    then(jwtTokenProvider).should(never()).verifyAccessToken(anyString());
   }
 
   @Test

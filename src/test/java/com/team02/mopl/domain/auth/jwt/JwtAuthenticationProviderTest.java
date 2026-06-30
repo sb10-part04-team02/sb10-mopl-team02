@@ -50,7 +50,7 @@ class JwtAuthenticationProviderTest {
 
   @Test
   @DisplayName("토큰ID가 블랙리스트에 올라와 있다면 예외를 던진다")
-  void fail_shouldThrowAuthenticationException_whenGetUserIdFails2() {
+  void fail_shouldThrowCredentialsExpiredException_whenGetUserIdFails2() {
     // given
     Authentication mockAuth = mock(Authentication.class);
     given(mockAuth.getCredentials()).willReturn("ValidToken");
