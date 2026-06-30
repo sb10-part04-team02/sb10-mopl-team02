@@ -8,14 +8,13 @@ import com.team02.mopl.domain.content.dto.ContentUpdateRequest;
 import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.entity.Tag;
 import com.team02.mopl.domain.content.enums.SortBy;
+import com.team02.mopl.domain.content.exception.ContentNotFoundException;
 import com.team02.mopl.domain.content.mapper.ContentMapper;
 import com.team02.mopl.domain.content.repository.ContentRepository;
 import com.team02.mopl.domain.content.repository.TagRepository;
 import com.team02.mopl.domain.content.util.ContentCursorConverter;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.global.storage.FileStorage;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -240,7 +239,7 @@ public class ContentService {
   private Content findActiveOrThrow(UUID contentId) {
     return contentRepository
         .findByIdAndDeletedAtIsNull(contentId)
-        .orElseThrow(() -> new BusinessException(ErrorCode.CONTENT_NOT_FOUND));
+        .orElseThrow(ContentNotFoundException::new);
   }
 
   private List<Tag> replaceTags(Content content, List<String> names) {
