@@ -32,6 +32,45 @@ class JwtUtilsTest {
   @Mock private JwtProperties jwtProperties;
   @InjectMocks private JwtUtils jwtUtils;
 
+  @Nested
+  class ResolveAccessToken {
+    @Test
+    @DisplayName("null이 들어올 경우 null을 반환한다")
+    void fail_shouldReturnNull_whenTokenIsNull() {
+      // when
+      String actual = jwtUtils.resolveAccessToken(null);
+
+      // then
+      assertThat(actual).isNull();
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 값이 들어올 경우 null을 반환한다")
+    void fail_shouldReturnNull_whenAccessTokenIsInvalid() {
+      // given
+      String invalidToken = "invalid Token";
+
+      // when
+      String actual = jwtUtils.resolveAccessToken(invalidToken);
+
+      // then
+      assertThat(actual).isNull();
+    }
+
+    @Test
+    @DisplayName("유효한 토큰 포맷이 들어올 경우 토큰만 반환한다")
+    void success_shouldReturnToken_whenBearerFormatIsValid() {
+      // given
+      String accessToken = "accessToken";
+
+      // when
+      String actual = jwtUtils.resolveAccessToken("Bearer " + accessToken);
+
+      // then
+      assertThat(actual).isEqualTo(accessToken);
+    }
+  }
+
   @Test
   @DisplayName("refresh토큰이 들어오면 쿠키를 반환한다")
   void success_shouldReturnResponseCookie_whenRefreshTokenIsComing() {
@@ -46,6 +85,20 @@ class JwtUtilsTest {
     // then
     assertThat(cookie.getValue()).isEqualTo(refreshToken);
     assertThat(cookie.getMaxAge()).isEqualTo(expiration);
+    assertThat(cookie.isHttpOnly()).isEqualTo(true);
+    assertThat(cookie.isSecure()).isEqualTo(true);
+    assertThat(cookie.getSameSite()).isEqualTo("Lax");
+  }
+
+  @Test
+  @DisplayName("refresh토큰이 만료된 쿠키를 반환한다")
+  void success_shouldReturnExpirationCookie_whenRequestedForLogout() {
+    // when
+    ResponseCookie cookie = jwtUtils.generateLogoutRefreshTokenCookie();
+
+    // then
+    assertThat(cookie.getValue()).isEqualTo("");
+    assertThat(cookie.getMaxAge()).isEqualTo(Duration.ZERO);
     assertThat(cookie.isHttpOnly()).isEqualTo(true);
     assertThat(cookie.isSecure()).isEqualTo(true);
     assertThat(cookie.getSameSite()).isEqualTo("Lax");

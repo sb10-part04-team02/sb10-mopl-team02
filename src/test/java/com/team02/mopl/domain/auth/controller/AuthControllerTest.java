@@ -20,18 +20,26 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team02.mopl.domain.auth.dto.JwtDto;
 import com.team02.mopl.domain.auth.dto.SignInRequest;
 import com.team02.mopl.domain.auth.exception.AuthException;
+import com.team02.mopl.domain.auth.jwt.handler.JwtLogoutHandler;
+import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.global.config.SecurityConfig;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
@@ -43,6 +51,7 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @WebMvcTest(AuthController.class)
 @Import(SecurityConfig.class)
@@ -54,6 +63,8 @@ class AuthControllerTest {
   @MockitoBean private AuthenticationSuccessHandler jwtLoginSuccessHandler;
   @MockitoBean private AuthenticationFailureHandler jwtLoginFailureHandler;
   @MockitoBean private AuthenticationManager authenticationManager;
+  @MockitoBean private JwtLogoutHandler jwtLogoutHandler;
+  @MockitoBean private JwtUtils jwtUtils;
 
   @Autowired private ObjectMapper objectMapper;
   @Autowired private MockMvc mockMvc;
@@ -83,7 +94,7 @@ class AuthControllerTest {
   }
 
   @Nested
-  class signIn {
+  class SignIn {
 
     @Test
     @DisplayName("authController의 signIn함수를 거치면 에러를 반환한다")
@@ -173,6 +184,76 @@ class AuthControllerTest {
           .andExpect(jsonPath("$.userDto.id").value(userId.toString()))
           .andExpect(jsonPath("$.accessToken").value(accessToken));
       then(jwtLoginSuccessHandler).should(times(1)).onAuthenticationSuccess(any(), any(), any());
+    }
+  }
+
+  @Nested
+  class SignOut {
+    @Test
+    @DisplayName("authController의 signOut함수를 거치면 예외를 던진다")
+    void fail_shouldThrowException_whenAuthControllerInvokeFunction() {
+      // given
+      AuthController authController = new AuthController();
+
+      // when & then
+      assertThrows(AuthException.class, authController::signOut);
+    }
+
+    @Test
+    @DisplayName("csrf토큰이 없으면 403을 반환한다")
+    void fail_shouldReturn403Forbidden_whenNoCsrfToken() throws Exception {
+      // when & then
+      mockMvc.perform(post("/api/auth/sign-out")).andExpect(status().isForbidden());
+    }
+
+    private static Stream<Arguments> provideTokens() {
+      return Stream.of(
+          Arguments.of(null, "Refresh", "존재하지 않는 Access"),
+          Arguments.of("Access", null, "존재하지 않는 Refresh"),
+          Arguments.of("Access", "Refresh", "정상"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideTokens")
+    @DisplayName("토큰들이 있어도 없어도 204를 반환한다")
+    void success_shouldReturn204AndExpireCookie_whenTokensAreValidOrMissing(
+        String accessToken, String refreshToken, String description) throws Exception {
+      // given
+      MockHttpServletRequestBuilder builder = post("/api/auth/sign-out").with(csrf());
+
+      if (accessToken != null) {
+        builder.header("Authorization", "Bearer " + accessToken);
+      }
+      if (refreshToken != null) {
+        Cookie refershCookie = new Cookie(JwtUtils.REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+        builder.cookie(refershCookie);
+      }
+
+      willAnswer(
+              invocation -> {
+                HttpServletResponse response = invocation.getArgument(1); // 두 번째 인자인 response 꺼내기
+                response.setStatus(HttpServletResponse.SC_NO_CONTENT);
+                Cookie mockCookie = new Cookie(JwtUtils.REFRESH_TOKEN_COOKIE_NAME, "");
+                mockCookie.setMaxAge(0);
+
+                response.addCookie(mockCookie);
+                return null;
+              })
+          .given(jwtLogoutHandler)
+          .logout(any(), any(), any());
+
+      // when & then
+      mockMvc
+          .perform(builder)
+          .andExpect(status().isNoContent())
+          .andExpect(
+              header()
+                  .string(
+                      HttpHeaders.SET_COOKIE,
+                      containsString(JwtUtils.REFRESH_TOKEN_COOKIE_NAME + "=;")))
+          .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+
+      then(jwtLogoutHandler).should(times(1)).logout(any(), any(), any());
     }
   }
 }
