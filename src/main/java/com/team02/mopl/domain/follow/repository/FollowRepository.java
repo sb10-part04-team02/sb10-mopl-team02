@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.follow.repository;
 
 import com.team02.mopl.domain.follow.entity.Follow;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,4 +20,7 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
 
   // 특정 사용자의 팔로워 수 조회
   long countByFollowee_IdAndDeletedAtIsNull(UUID followeeId);
+
+  // 특정 사용자를 팔로우 중인 활성 팔로우 목록 조회
+  List<Follow> findByFollowee_IdAndDeletedAtIsNull(UUID followeeId);
 }
