@@ -79,11 +79,11 @@ public class GlobalExceptionHandler {
     Map<String, String> details = Map.of("reason", "관리자에게 문의해주세요.");
 
     // 스프링 예외 추가
-    if (e instanceof MissingRequestCookieException) {
+    if (e instanceof MissingRequestCookieException cookieEx) {
       exceptionName = "AuthenticationRequiredException";
       status = HttpStatus.UNAUTHORIZED;
       message = "인증 쿠키가 누락되었습니다.";
-      details = null;
+      details = Map.of(cookieEx.getCookieName(), "필수 인증 쿠키가 누락되었습니다");
     } else {
       log.error("Unexpected server error", e);
     }
