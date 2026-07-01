@@ -2,6 +2,7 @@ package com.team02.mopl.domain.user.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,6 +12,7 @@ import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
+import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.service.UserService;
 import com.team02.mopl.global.exception.GlobalExceptionHandler;
 import com.team02.mopl.support.TestSecurityConfiguration;
@@ -125,6 +127,50 @@ class UserControllerNormalTest {
           .andExpect(jsonPath("$.id").exists())
           .andExpect(jsonPath("$.name").value(name))
           .andExpect(jsonPath("$.email").value(email));
+    }
+  }
+
+  @Nested
+  class GetUser {
+
+    @Test
+    @DisplayName("사용자 상세 조회가 성공하면 200 OK와 UserDto를 반환한다")
+    void success_shouldReturnUserDto_whenUserExists() throws Exception {
+      UUID userId = UUID.randomUUID();
+      UserDto response =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-01T00:00:00Z"),
+              "woody@mopl.io",
+              "우디",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+
+      given(userService.getUser(userId)).willReturn(response);
+
+      mockMvc
+          .perform(get("/api/users/{userId}", userId))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.id").value(userId.toString()))
+          .andExpect(jsonPath("$.email").value("woody@mopl.io"))
+          .andExpect(jsonPath("$.name").value("우디"))
+          .andExpect(jsonPath("$.profileImageUrl").value("https://example.com/profile.png"))
+          .andExpect(jsonPath("$.role").value("USER"))
+          .andExpect(jsonPath("$.locked").value(false));
+    }
+
+    @Test
+    @DisplayName("존재하지 않거나 삭제된 사용자를 조회하면 404 Not Found를 반환한다")
+    void fail_shouldReturnNotFound_whenUserDoesNotExist() throws Exception {
+      UUID userId = UUID.randomUUID();
+
+      given(userService.getUser(userId)).willThrow(new UserNotFoundException());
+
+      mockMvc
+          .perform(get("/api/users/{userId}", userId))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.exceptionName").value("UserNotFoundException"));
     }
   }
 }
