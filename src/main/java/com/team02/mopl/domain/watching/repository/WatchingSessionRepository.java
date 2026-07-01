@@ -16,8 +16,6 @@ public interface WatchingSessionRepository extends JpaRepository<WatchingSession
   long countActiveByContentId(@Param("contentId") UUID contentId);
 
   // 여러 콘텐츠의 활성 시청자 수 일괄 집계 (목록 조회 N+1 방지)
-  // 시청자 0건인 콘텐츠는 결과 행에 없음 -> 호출부에서 0 디폴트 처리
-  // WatcherCountProjection 에 담아서 서비스 계층에 반환
   @Query(
       "select ws.content.id as contentId, count(ws) as count from WatchingSession ws "
           + "where ws.content.id in :contentIds "

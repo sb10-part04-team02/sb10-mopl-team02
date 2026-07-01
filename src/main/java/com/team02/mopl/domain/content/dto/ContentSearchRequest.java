@@ -27,8 +27,7 @@ public record ContentSearchRequest(
     return Math.min(limit, MAX_LIMIT);
   }
 
-  // 다음 페이지 존재 여부(hasNext)를 판정하기 위해 한 건을 더 조회한다.
-  // limit + 1 개가 조회되면 다음 페이지가 있다는 의미이며, 이 여분 1건으로 hasNext를 판정한다.
+  // 다음 페이지 존재 여부(hasNext)를 판정하기 위해 한 건을 더 조회
   public int fetchLimit() {
     return normalizedLimit() + 1;
   }

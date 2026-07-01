@@ -20,25 +20,19 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 
-/*
-- 동적 검색 조건 조합 (타입/키워드/태그)
-- 복합키(sortKey, id) 기반 커서 페이지네이션 (정렬 키가 같을 때 id 로 tie-break)
-- 정렬 키로 RATE / CREATED_AT / WATCHER_COUNT (인기순, 최신순, 평점순) 지원
- */
 @RequiredArgsConstructor
 public class ContentRepositoryImpl implements ContentRepositoryCustom {
 
-  // Q 클래스 - Querydsl이 컴파일 시점에 엔티티 클래스를 기반으로 자동으로 생성해 주는 쿼리 전용 클래스
   private static final QContent content = QContent.content;
   private static final QTag tag = QTag.tag;
   private static final QWatchingSession watchingSession = QWatchingSession.watchingSession;
 
-  private final JPAQueryFactory queryFactory; // Querydsl 라이브러리의 핵심 클래스
+  private final JPAQueryFactory queryFactory;
 
   @Override
   public List<Content> search(ContentSearchCondition condition) {
     return queryFactory
-        .selectFrom(content) // SELECT content.* FROM content
+        .selectFrom(content)
         .where(
             content.deletedAt.isNull(), // 논리 삭제되지 않은 컨텐츠만
             contentTypeEq(condition.type()), // 콘텐츠 타입 일치
@@ -47,22 +41,22 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
             cursorAfter(condition)) // 커서 페이지네이션 경계 조건
         .orderBy(cursorOrder(condition)) // 정렬 키와 id를 같은 방향으로 정렬
         .limit(condition.limit()) // 한 페이지에서 가져올 최대 행 수 (페이지 크기)
-        .fetch(); // 쿼리를 실제로 실행하여 결과를 List<Content>로 반환
+        .fetch();
   }
 
-  // totalCount 산출용 — search()와 동일한 필터 적용하지만, 전체 건수만 집계
+  // totalCount 산출용 - search()와 동일한 필터 적용하지만, 전체 건수만 집계
   @Override
   public long countBySearch(ContentSearchCondition condition) {
     Long count =
         queryFactory
-            .select(content.count()) // SELECT COUNT(content.id)
+            .select(content.count())
             .from(content)
             .where(
                 content.deletedAt.isNull(),
                 contentTypeEq(condition.type()),
                 keywordContains(condition.keyword()),
                 tagsExists(condition.tags()))
-            .fetchOne(); // 단일 값(개수) 조회
+            .fetchOne();
     return count == null ? 0L : count; // NPE 방지
   }
 
@@ -102,43 +96,27 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
 
   // 커서 이후 데이터를 걸러내는 경계 조건
   private BooleanExpression cursorAfter(ContentSearchCondition condition) {
-    Comparable<?> cursor = condition.cursor(); // 직전 페이지 마지막 행의 정렬키 값
-    // 커서의 실제 타입이 정렬 기준(sortBy)에 따라 다르기 때문에 Comparable<?> 사용
+    Comparable<?> cursor = condition.cursor();
     if (cursor == null) {
       return null;
     }
-    boolean asc = condition.asc(); // 정렬 방향
-    UUID idAfter = condition.idAfter(); // 직전 페이지 마지막 행의 id (tie-break 기준)
+    boolean asc = condition.asc();
+    UUID idAfter = condition.idAfter();
     return switch (condition.sortBy()) {
-        // 최신순
       case CREATED_AT -> after(content.createdAt, (Instant) cursor, idAfter, asc);
-        // 평점순
       case RATE ->
           after(Expressions.asComparable(content.averageRating), (Double) cursor, idAfter, asc);
-        // 인기순
       case WATCHER_COUNT ->
           after(Expressions.asComparable(watcherCount()), (Long) cursor, idAfter, asc);
     };
   }
 
-  /*
-  예를 들어 createdAt 내림차순(최신순)으로 페이징할 때:
-
-  1페이지 마지막 행: createdAt = 2024-06-01, id = UUID-A
-  2페이지 조건:
-    (createdAt < 2024-06-01)                  -- keyStep: 정렬키가 더 작은 것
-    OR
-    (createdAt = 2024-06-01 AND id < UUID-A)  -- tieBreak: 같은 날짜면 id로 순서 결정
-  */
   private static <T extends Comparable<T>> BooleanExpression after(
       ComparableExpression<T> sortKey, // DB 컬럼 표현식 최신순, 평점순, 인기순 받음
-      T cursor, // 직전 페이지 마지막 행의 정렬키 값
-      UUID idAfter, // 직전 페이지 마지막 행의 id
-      boolean asc // 정렬 방향
-      ) {
-    // 오름차순 - gt / 내림차순 - lt
+      T cursor,
+      UUID idAfter,
+      boolean asc) {
     BooleanExpression keyStep = asc ? sortKey.gt(cursor) : sortKey.lt(cursor);
-    // tie-break 처리
     BooleanExpression idCondition;
     if (asc) {
       idCondition = content.id.gt(idAfter);
@@ -149,18 +127,16 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
     return keyStep.or(tieBreak);
   }
 
-  // 정렬 키와 id(tie-break)를 같은 방향으로 정렬하는 OrderSpecifier 배열.
+  // 정렬 키와 id(tie-break)를 같은 방향으로 정렬하는 OrderSpecifier 배열
   private OrderSpecifier<?>[] cursorOrder(ContentSearchCondition condition) {
     Order order = condition.asc() ? Order.ASC : Order.DESC;
-    return new OrderSpecifier<?>[] { // OrderSpecifier: 어떤 컬럼을, 어떤 방향으로 정렬할지 담는 객체
+    return new OrderSpecifier<?>[] {
       new OrderSpecifier<>(order, sortKey(condition.sortBy())),
       new OrderSpecifier<>(order, content.id)
     };
   }
 
   // 정렬 키 표현식 (정렬에 사용) - Instant, Double, Long 모두 대응하기 위해서 따로 빼냄
-  // ComparableExpression: QueryDSL에서 gt(), lt(), eq() 같은 비교 연산이 가능한 표현식 타입
-  // Expressions.asComparable(): ComparableExpression으로 래핑하는 메서드 (타입 캐스팅 유팅)
   private ComparableExpression<?> sortKey(SortBy sortBy) {
     return switch (sortBy) {
       case CREATED_AT -> content.createdAt;
@@ -173,7 +149,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
   // TODO: content를 참조하는 상관 서브쿼리라 콘텐츠 N건마다 watching_session 집계가 재실행됨.
   //  특히 sortBy=WATCHER_COUNT면 WHERE(keyStep, tieBreak)와 ORDER BY 세 곳에 서브쿼리가 들어가 비용이 커짐.
   //  추후 반정규화나 Redis ZSet 등으로 watcherCount를 사전 집계/캐싱해, 읽을 때마다 count 하는 구조를 개선.
-  private Expression<Long> watcherCount() { // SQL 표현식을 반환
+  private Expression<Long> watcherCount() {
     return JPAExpressions.select(watchingSession.count())
         .from(watchingSession)
         .where(

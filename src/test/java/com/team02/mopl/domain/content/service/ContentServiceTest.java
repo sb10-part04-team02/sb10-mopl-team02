@@ -504,7 +504,6 @@ class ContentServiceTest {
       return new ContentSearchRequest(null, keyword, tags, cursor, null, limit, direction, sortBy);
     }
 
-    // 테스트용 영속 Content 생성 헬퍼 - id/createdAt/averageRating을 ReflectionTestUtils로 강제 주입
     private Content content(UUID id, Instant createdAt, double averageRating) {
       Content content = new Content(ContentType.MOVIE, "제목", "설명", "url");
       ReflectionTestUtils.setField(content, "id", id);
@@ -615,7 +614,7 @@ class ContentServiceTest {
 
       // then
       assertThat(response.hasNext()).isTrue(); // 다음 페이지 존재
-      assertThat(response.data()).hasSize(2); //
+      assertThat(response.data()).hasSize(2);
       assertThat(response.totalCount()).isEqualTo(10L);
       // 여분 1건(id3)은 버려지고, 마지막 페이지 행(id2) 기준으로 커서가 생성된다
       assertThat(response.nextIdAfter()).isEqualTo(id2);
