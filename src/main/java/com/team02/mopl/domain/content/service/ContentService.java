@@ -2,19 +2,23 @@ package com.team02.mopl.domain.content.service;
 
 import com.team02.mopl.domain.content.dto.ContentCreateRequest;
 import com.team02.mopl.domain.content.dto.ContentDto;
+import com.team02.mopl.domain.content.dto.ContentSearchCondition;
 import com.team02.mopl.domain.content.dto.ContentSearchRequest;
 import com.team02.mopl.domain.content.dto.ContentUpdateRequest;
 import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.entity.Tag;
+import com.team02.mopl.domain.content.enums.SortBy;
+import com.team02.mopl.domain.content.exception.ContentNotFoundException;
 import com.team02.mopl.domain.content.mapper.ContentMapper;
 import com.team02.mopl.domain.content.repository.ContentRepository;
 import com.team02.mopl.domain.content.repository.TagRepository;
+import com.team02.mopl.domain.content.util.ContentCursorConverter;
 import com.team02.mopl.global.dto.CursorResponse;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
+import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.storage.FileStorage;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -72,10 +76,79 @@ public class ContentService {
     return contentMapper.toDto(content, tags, watcherCount);
   }
 
-  // 콘텐츠 목록 조회 (커서 페이지네이션)
+  // 콘텐츠 목록 조회 (QueryDSL 동적 필터 + 동적 정렬 + 복합 커서)
   @Transactional(readOnly = true)
   public CursorResponse<ContentDto> getContents(ContentSearchRequest request) {
-    throw new UnsupportedOperationException("TODO: 콘텐츠 목록 조회 미구현");
+    // 정렬 기준 미지정 시 인기순(WATCHER_COUNT)으로 기본 정렬
+    SortBy sortBy = request.sortBy() != null ? request.sortBy() : SortBy.WATCHER_COUNT;
+    // 정렬 방향 미지정 시 내림차순(최신순) 기본값
+    SortDirection direction =
+        request.sortDirection() != null ? request.sortDirection() : SortDirection.DESCENDING;
+    boolean asc = direction == SortDirection.ASCENDING;
+
+    // 필터 정규화
+    String keyword =
+        (request.keywordLike() != null && !request.keywordLike().isBlank())
+            ? request.keywordLike().trim()
+            : null;
+
+    // QueryDSL 동적 쿼리에 넘길 검색 조건 객체 조립
+    ContentSearchCondition condition =
+        new ContentSearchCondition(
+            request.typeEqual(),
+            keyword,
+            normalizeTags(request.tagsIn()),
+            sortBy,
+            asc,
+            ContentCursorConverter.toSortKey(sortBy, request.cursor()),
+            request.idAfter(),
+            request.fetchLimit());
+
+    // limit + 1 적재분을 잘라 hasNext 판정 (커서 페이지네이션)
+    List<Content> rows = contentRepository.search(condition);
+    int size = request.normalizedLimit();
+    boolean hasNext = rows.size() > size;
+    List<Content> pageContents = hasNext ? rows.subList(0, size) : rows;
+    // 이번 페이지에 있는 contentId를 한 번에 다 뽑는다
+    List<UUID> pageIds = pageContents.stream().map(Content::getId).toList();
+
+    // 태그, watcherCount N+1 방지 일괄 조회 후 콘텐츠별 그룹핑
+    Map<UUID, List<Tag>> tagsByContent =
+        pageIds.isEmpty()
+            ? Map.of()
+            : tagRepository.findByContentIdInAndDeletedAtIsNull(pageIds).stream() // 태그를 전부 가져오고
+                .collect(
+                    Collectors.groupingBy(
+                        tag -> tag.getContent().getId())); // 가져온 태그들을 contentId 기준으로 묶음
+    // contentIds를 통해 모든 시청자 수를 조회한 후 Map으로 반환 (contentId, 시청자 수)
+    Map<UUID, Long> watcherCounts = watcherCountService.countByContentIds(pageIds);
+
+    long totalCount = contentRepository.countBySearch(condition);
+
+    // 페이지에 속한 콘텐츠들을 응답 DTO 리스트로 매핑
+    List<ContentDto> data =
+        pageContents.stream()
+            .map(
+                content ->
+                    contentMapper.toDto(
+                        content,
+                        tagsByContent.getOrDefault(content.getId(), List.of()),
+                        watcherCounts.getOrDefault(content.getId(), 0L)))
+            .toList();
+
+    // 다음 페이지 커서 계산
+    String nextCursor = null;
+    UUID nextIdAfter = null;
+    if (hasNext && !pageContents.isEmpty()) {
+      Content last = pageContents.get(pageContents.size() - 1);
+      nextCursor =
+          ContentCursorConverter.toCursor(
+              sortBy, last, watcherCounts.getOrDefault(last.getId(), 0L));
+      nextIdAfter = last.getId();
+    }
+
+    return new CursorResponse<>(
+        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.name(), direction.name());
   }
 
   // [어드민] 콘텐츠 수정
@@ -117,6 +190,18 @@ public class ContentService {
 
   // ===
 
+  // null/공백 태그 제거 + trim + 중복 제거
+  private static List<String> normalizeTags(List<String> tags) {
+    if (tags == null) { // 태그 목록 자체가 null이면 (태그 필터 미지정) 빈 리스트로 변환
+      return List.of();
+    }
+    return tags.stream()
+        .filter(tag -> tag != null && !tag.isBlank()) // 원소가 null 이거나 공백뿐인 태그는 제거
+        .map(String::trim) // 앞뒤 공백 제거
+        .distinct() // trim 후 동일해진 태그 중복 제거
+        .toList();
+  }
+
   // TODO: 태그로 검색 (장르 검색) 기능 추가할 경우 엔티티 관계 N:M으로 변경 요망
   // 현재는 콘텐츠가 가지고 있는 태그 목록 보여주는 조회만 일어나므로 현재 구조 유지
   private List<Tag> addTags(Content content, List<String> names) {
@@ -148,7 +233,7 @@ public class ContentService {
   private Content findActiveOrThrow(UUID contentId) {
     return contentRepository
         .findByIdAndDeletedAtIsNull(contentId)
-        .orElseThrow(() -> new BusinessException(ErrorCode.CONTENT_NOT_FOUND));
+        .orElseThrow(ContentNotFoundException::new);
   }
 
   private List<Tag> replaceTags(Content content, List<String> names) {
