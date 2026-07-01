@@ -95,7 +95,6 @@ class JwtLogoutHandlerTest {
   @DisplayName("만료된 액세스 토큰이면 블랙리스트 등록을 스킵한다")
   void shouldSkipBlacklist_whenAccessTokenIsExpired() {
     // given
-    JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
     given(jwtUtils.resolveAccessToken(isNull())).willReturn("expired access token");
     given(jwtTokenProvider.verifyAccessToken(anyString()))
         .willThrow(CredentialsExpiredException.class);
@@ -111,7 +110,6 @@ class JwtLogoutHandlerTest {
   @DisplayName("변조된 액세스 토큰이면 블랙리스트 등록을 스킵한다")
   void shouldSkipBlacklist_whenAccessTokenIsManipulated() {
     // given
-    JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
     given(jwtUtils.resolveAccessToken(isNull())).willReturn("manipulated access token");
     given(jwtTokenProvider.verifyAccessToken(anyString())).willThrow(BadCredentialsException.class);
 
@@ -152,7 +150,6 @@ class JwtLogoutHandlerTest {
 
     JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
     given(jwtTokenProvider.parseClaimsWithoutVerification(refreshToken)).willReturn(mockClaimSet);
-    UUID userId = UUID.randomUUID();
     willThrow(BadCredentialsException.class).given(jwtUtils).getUserId(mockClaimSet);
 
     // when

@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.CredentialsExpiredException;
@@ -19,6 +20,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtLogoutHandler implements LogoutHandler {
@@ -97,8 +99,10 @@ public class JwtLogoutHandler implements LogoutHandler {
 
     } catch (CredentialsExpiredException e) {
       // 만료된 토큰은 블랙리스트에 넣을 필요 없음
+      log.debug("만료된 토큰이라 블랙리스트 등록을 생략합니다. message={}", e.getMessage());
     } catch (Exception e) {
       // 변조된 토큰은 블랙리스트에 넣을 필요 없음
+      log.warn("액세스 토큰 무효화중 예외 발생!. message={}", e.getMessage(), e);
     }
   }
 }
