@@ -3,12 +3,15 @@ package com.team02.mopl.domain.auth.jwt.filter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
+import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
@@ -31,6 +34,7 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
 
+  @Mock private JwtUtils jwtUtils;
   @Mock private AuthenticationManager authenticationManager;
   @Mock private AuthenticationEntryPoint authenticationEntryPoint;
 
@@ -50,6 +54,7 @@ class JwtAuthenticationFilterTest {
     MockHttpServletRequest request = new MockHttpServletRequest();
     MockHttpServletResponse response = new MockHttpServletResponse();
     FilterChain filterChain = new MockFilterChain();
+    given(jwtUtils.resolveAccessToken(isNull())).willReturn(null);
 
     // when
     jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
@@ -70,6 +75,7 @@ class JwtAuthenticationFilterTest {
 
     String accessToken = "accessToken";
     request.addHeader("Authorization", "Basic " + accessToken);
+    given(jwtUtils.resolveAccessToken(anyString())).willReturn(null);
 
     // when
     jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
@@ -90,6 +96,7 @@ class JwtAuthenticationFilterTest {
 
     String accessToken = "invalidToken";
     request.addHeader("Authorization", "Bearer " + accessToken);
+    given(jwtUtils.resolveAccessToken(anyString())).willReturn(accessToken);
 
     BadCredentialsException exception = new BadCredentialsException("Invalid token");
     given(authenticationManager.authenticate(any(Authentication.class))).willThrow(exception);
@@ -115,6 +122,7 @@ class JwtAuthenticationFilterTest {
 
     String accessToken = "accessToken";
     request.addHeader("Authorization", "Bearer " + accessToken);
+    given(jwtUtils.resolveAccessToken(anyString())).willReturn(accessToken);
 
     Authentication expectAuthentication = mock(Authentication.class);
     given(authenticationManager.authenticate(any())).willReturn(expectAuthentication);

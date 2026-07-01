@@ -13,6 +13,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.util.StringUtils;
 
 @Entity
 @Table(name = "playlists")
@@ -39,5 +40,14 @@ public class Playlist extends BaseMutableEntity {
     this.ownerId = Objects.requireNonNull(ownerId, "ownerId는 null일 수 없습니다.");
     this.title = Objects.requireNonNull(title, "title은 null일 수 없습니다.");
     this.description = Objects.requireNonNull(description, "description은 null일 수 없습니다.");
+  }
+
+  public void update(String title, String description) {
+    if (StringUtils.hasText(title)) {
+      this.title = title;
+    }
+    if (StringUtils.hasText(description)) {
+      this.description = description;
+    }
   }
 }

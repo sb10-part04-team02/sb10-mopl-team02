@@ -11,6 +11,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
@@ -18,24 +19,13 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class JwtLoginSuccessHandler implements AuthenticationSuccessHandler {
 
   private final ObjectMapper objectMapper;
   private final JwtTokenProvider jwtTokenProvider;
   private final JwtRegistry jwtRegistry;
   private final JwtUtils jwtUtils;
-
-  public JwtLoginSuccessHandler(
-      ObjectMapper objectMapper,
-      JwtTokenProvider jwtTokenProvider,
-      JwtRegistry jwtRegistry,
-      JwtUtils jwtUtils) {
-    this.objectMapper =
-        (objectMapper != null) ? objectMapper.copy() : new ObjectMapper(); // spotbugsMain EL2 해결책
-    this.jwtTokenProvider = jwtTokenProvider;
-    this.jwtRegistry = jwtRegistry;
-    this.jwtUtils = jwtUtils;
-  }
 
   @Override
   public void onAuthenticationSuccess(

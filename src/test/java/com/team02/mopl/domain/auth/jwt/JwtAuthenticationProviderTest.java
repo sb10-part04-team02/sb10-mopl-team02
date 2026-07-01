@@ -21,6 +21,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
@@ -31,6 +32,7 @@ class JwtAuthenticationProviderTest {
 
   @Mock private JwtTokenProvider jwtTokenProvider;
   @Mock private JwtUtils jwtUtils;
+  @Mock private JwtRegistry jwtRegistry;
   @InjectMocks private JwtAuthenticationProvider jwtAuthenticationProvider;
 
   @Test
@@ -47,6 +49,23 @@ class JwtAuthenticationProviderTest {
   }
 
   @Test
+  @DisplayName("토큰ID가 블랙리스트에 올라와 있다면 예외를 던진다")
+  void fail_shouldThrowCredentialsExpiredException_whenGetUserIdFails2() {
+    // given
+    Authentication mockAuth = mock(Authentication.class);
+    given(mockAuth.getCredentials()).willReturn("ValidToken");
+
+    JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
+    given(jwtTokenProvider.verifyAccessToken(anyString())).willReturn(mockClaimSet);
+    given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
+    given(jwtRegistry.isBlacklisted(anyString())).willReturn(true);
+
+    // when & then
+    assertThrows(
+        CredentialsExpiredException.class, () -> jwtAuthenticationProvider.authenticate(mockAuth));
+  }
+
+  @Test
   @DisplayName("userId 값을 얻는데 실패한다면 예외를 던진다")
   void fail_shouldThrowAuthenticationException_whenGetUserIdFails() {
     // given
@@ -55,6 +74,8 @@ class JwtAuthenticationProviderTest {
 
     JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
     given(jwtTokenProvider.verifyAccessToken(anyString())).willReturn(mockClaimSet);
+    given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
+    given(jwtRegistry.isBlacklisted(anyString())).willReturn(false);
     given(jwtUtils.getUserId(mockClaimSet)).willThrow(BadCredentialsException.class);
 
     // when & then
@@ -71,6 +92,8 @@ class JwtAuthenticationProviderTest {
 
     JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
     given(jwtTokenProvider.verifyAccessToken(anyString())).willReturn(mockClaimSet);
+    given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
+    given(jwtRegistry.isBlacklisted(anyString())).willReturn(false);
     given(jwtUtils.getUserId(mockClaimSet)).willReturn(UUID.randomUUID());
     given(jwtUtils.getAuthorities(mockClaimSet)).willThrow(BadCredentialsException.class);
 
@@ -89,6 +112,8 @@ class JwtAuthenticationProviderTest {
 
     Authentication authentication = mock(Authentication.class);
     given(authentication.getCredentials()).willReturn(token);
+    given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
+    given(jwtRegistry.isBlacklisted(anyString())).willReturn(false);
 
     UUID userId = UUID.randomUUID();
     given(jwtUtils.getUserId(any(JWTClaimsSet.class))).willReturn(userId);

@@ -6,19 +6,16 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class JwtLoginFailureHandler implements AuthenticationFailureHandler {
 
   private final ObjectMapper objectMapper;
-
-  public JwtLoginFailureHandler(ObjectMapper objectMapper) {
-    this.objectMapper =
-        (objectMapper != null) ? objectMapper.copy() : new ObjectMapper(); // spotbugsMain EL2 해결책
-  }
 
   @Override
   public void onAuthenticationFailure(

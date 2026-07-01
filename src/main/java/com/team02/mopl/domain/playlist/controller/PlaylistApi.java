@@ -2,6 +2,7 @@ package com.team02.mopl.domain.playlist.controller;
 
 import com.team02.mopl.domain.playlist.dto.PlaylistCreateRequest;
 import com.team02.mopl.domain.playlist.dto.PlaylistDto;
+import com.team02.mopl.domain.playlist.dto.PlaylistUpdateRequest;
 import com.team02.mopl.global.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -36,4 +37,33 @@ public interface PlaylistApi {
   })
   ResponseEntity<PlaylistDto> createPlaylist(
       @Parameter(hidden = true) UUID ownerId, @RequestBody @Valid PlaylistCreateRequest request);
+
+  @Operation(summary = "플레이리스트 수정", description = "플레이리스트 소유자만 수정할 수 있습니다.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "권한 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "플레이리스트를 찾을 수 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<PlaylistDto> updatePlaylist(
+      UUID playlistId,
+      @Parameter(hidden = true) UUID requesterId,
+      @RequestBody @Valid PlaylistUpdateRequest request);
 }

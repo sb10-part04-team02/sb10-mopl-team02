@@ -29,4 +29,11 @@ public class AuthController implements AuthApi {
     // Swagger 노출용입니다
     throw new AuthException(ErrorCode.INTERNAL_SERVER_ERROR);
   }
+
+  @PostMapping("/sign-out")
+  public void signOut() {
+    // SpringSecurity 필터가 요청을 가로채서 로그인 처리를 하므로 실제 실행이 되지 않습니다
+    // Swagger 노출용입니다
+    throw new AuthException(ErrorCode.INTERNAL_SERVER_ERROR);
+  }
 }

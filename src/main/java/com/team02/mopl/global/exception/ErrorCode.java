@@ -21,9 +21,11 @@ public enum ErrorCode {
 
   // Content
   CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CONTENT_404", "콘텐츠를 찾을 수 없습니다."),
+  INVALID_CURSOR(HttpStatus.BAD_REQUEST, "CONTENT_400", "유효하지 않은 커서 값입니다."),
 
   // Playlist
   PLAYLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAYLIST_404", "플레이리스트를 찾을 수 없습니다."),
+  PLAYLIST_FORBIDDEN(HttpStatus.FORBIDDEN, "PLAYLIST_403", "해당 플레이리스트에 접근할 권한이 없습니다."),
   PLAYLIST_CONTENT_ALREADY_EXISTS(
       HttpStatus.BAD_REQUEST, "PLAYLIST_CONTENT_400", "이미 플레이리스트에 추가된 콘텐츠입니다."),
   PLAYLIST_CONTENT_NOT_FOUND(

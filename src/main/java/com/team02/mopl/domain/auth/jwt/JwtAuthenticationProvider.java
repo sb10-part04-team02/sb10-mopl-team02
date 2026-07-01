@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
@@ -18,6 +19,7 @@ public class JwtAuthenticationProvider implements AuthenticationProvider {
 
   private final JwtTokenProvider jwtTokenProvider;
   private final JwtUtils jwtUtils;
+  private final JwtRegistry jwtRegistry;
 
   @Override
   public Authentication authenticate(Authentication authentication) throws AuthenticationException {
@@ -25,6 +27,12 @@ public class JwtAuthenticationProvider implements AuthenticationProvider {
 
     // 값을 반환했다는 것 자체가 검증이 성공됨을 의미
     JWTClaimsSet claimsSet = jwtTokenProvider.verifyAccessToken(token);
+
+    // 블랙리스트 검사
+    if (jwtRegistry.isBlacklisted(claimsSet.getJWTID())) {
+      throw new CredentialsExpiredException("이미 로그아웃된 토큰입니다.");
+    }
+
     UUID userId = jwtUtils.getUserId(claimsSet);
     Collection<? extends GrantedAuthority> authorities = jwtUtils.getAuthorities(claimsSet);
 

@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.auth.jwt.filter;
 
 import com.team02.mopl.domain.auth.jwt.token.JwtAuthenticationToken;
+import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+  private final JwtUtils jwtUtils;
   private final AuthenticationManager authenticationManager;
   private final AuthenticationEntryPoint authenticationEntryPoint;
 
@@ -26,11 +28,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
 
-    String token = resolveToken(request);
-    if (StringUtils.hasText(token)) {
+    String accessToken = jwtUtils.resolveAccessToken(request.getHeader("Authorization"));
+    if (StringUtils.hasText(accessToken)) {
       try {
         // 인증 전 토큰
-        JwtAuthenticationToken authToken = new JwtAuthenticationToken(token);
+        JwtAuthenticationToken authToken = new JwtAuthenticationToken(accessToken);
 
         // 인증된 토큰
         Authentication authentication = authenticationManager.authenticate(authToken);
@@ -44,14 +46,5 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     filterChain.doFilter(request, response);
-  }
-
-  private String resolveToken(HttpServletRequest request) {
-    String bearerToken = request.getHeader("Authorization");
-    if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-      return bearerToken.substring(7);
-    }
-
-    return null;
   }
 }

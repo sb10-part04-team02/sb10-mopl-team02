@@ -2,11 +2,13 @@ package com.team02.mopl.global.config;
 
 import com.team02.mopl.domain.auth.jwt.JwtAuthenticationProvider;
 import com.team02.mopl.domain.auth.jwt.filter.JwtAuthenticationFilter;
+import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import com.team02.mopl.global.config.auth.handler.SpaCsrfTokenRequestHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -20,6 +22,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
+import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
@@ -32,11 +36,13 @@ public class SecurityConfig {
 
   private final AuthenticationSuccessHandler jwtLoginSuccessHandler;
   private final AuthenticationFailureHandler jwtLoginFailureHandler;
+  private final LogoutHandler jwtLogoutHandler;
   private final AuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
   @Bean
   public SecurityFilterChain filterChain(
-      HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
+      HttpSecurity http, AuthenticationManager authenticationManager, JwtUtils jwtUtils)
+      throws Exception {
     RequestMatcher apiMatcher = PathPatternRequestMatcher.withDefaults().matcher("/api/**");
     RequestMatcher nonApiMatcher = new NegatedRequestMatcher(apiMatcher);
 
@@ -44,7 +50,8 @@ public class SecurityConfig {
         // 수동으로 만든걸 추가해야 formLogin에서 Provider가 제대로 인식됨
         .authenticationManager(authenticationManager)
         .addFilterBefore(
-            new JwtAuthenticationFilter(authenticationManager, jwtAuthenticationEntryPoint),
+            new JwtAuthenticationFilter(
+                jwtUtils, authenticationManager, jwtAuthenticationEntryPoint),
             UsernamePasswordAuthenticationFilter.class)
         .csrf(
             csrf ->
@@ -58,6 +65,13 @@ public class SecurityConfig {
                     .loginProcessingUrl("/api/auth/sign-in")
                     .successHandler(jwtLoginSuccessHandler)
                     .failureHandler(jwtLoginFailureHandler))
+        .logout(
+            logout ->
+                logout
+                    .logoutUrl("/api/auth/sign-out")
+                    .addLogoutHandler(jwtLogoutHandler)
+                    .logoutSuccessHandler(
+                        new HttpStatusReturningLogoutSuccessHandler(HttpStatus.NO_CONTENT)))
         .authorizeHttpRequests(
             auth ->
                 auth
@@ -67,6 +81,8 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/users")
                     .permitAll()
                     .requestMatchers("/api/auth/sign-in")
+                    .permitAll()
+                    .requestMatchers("/api/auth/sign-out")
                     .permitAll()
                     .requestMatchers(nonApiMatcher)
                     .permitAll() // swagger, api-docs 대응
