@@ -8,6 +8,9 @@ import com.team02.mopl.domain.playlist.exception.PlaylistForbiddenException;
 import com.team02.mopl.domain.playlist.exception.PlaylistNotFoundException;
 import com.team02.mopl.domain.playlist.mapper.PlaylistMapper;
 import com.team02.mopl.domain.playlist.repository.PlaylistRepository;
+import com.team02.mopl.domain.subscription.entity.Subscription;
+import com.team02.mopl.domain.subscription.repository.SubscriptionRepository;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlaylistService {
 
   private final PlaylistRepository playlistRepository;
+  private final SubscriptionRepository subscriptionRepository;
   private final PlaylistMapper playlistMapper;
 
   @Transactional
@@ -42,7 +46,9 @@ public class PlaylistService {
     log.debug("플레이리스트 수정 시작: playlistId={}, requesterId={}", playlistId, requesterId);
 
     Playlist playlist =
-        playlistRepository.findById(playlistId).orElseThrow(PlaylistNotFoundException::new);
+        playlistRepository
+            .findByIdAndDeletedAtIsNull(playlistId)
+            .orElseThrow(PlaylistNotFoundException::new);
 
     if (!playlist.getOwnerId().equals(requesterId)) {
       throw new PlaylistForbiddenException();
@@ -55,5 +61,33 @@ public class PlaylistService {
 
     log.info("플레이리스트 수정 성공: playlistId={}, requesterId={}", playlistId, requesterId);
     return playlistDto;
+  }
+
+  @Transactional
+  public void delete(UUID playlistId, UUID requesterId) {
+    log.debug("플레이리스트 삭제 시작: playlistId={}, requesterId={}", playlistId, requesterId);
+
+    Playlist playlist =
+        playlistRepository
+            .findByIdAndDeletedAtIsNull(playlistId)
+            .orElseThrow(PlaylistNotFoundException::new);
+
+    if (!playlist.getOwnerId().equals(requesterId)) {
+      throw new PlaylistForbiddenException();
+    }
+
+    playlist.delete();
+
+    List<Subscription> subscriptions =
+        subscriptionRepository.findByPlaylist_IdAndDeletedAtIsNull(playlistId);
+    subscriptions.forEach(Subscription::delete);
+
+    playlistRepository.flush();
+
+    log.info(
+        "플레이리스트 삭제 성공: playlistId={}, requesterId={}, deletedSubscriptionCount={}",
+        playlistId,
+        requesterId,
+        subscriptions.size());
   }
 }
