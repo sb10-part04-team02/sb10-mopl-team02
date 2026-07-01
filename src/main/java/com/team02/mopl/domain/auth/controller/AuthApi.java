@@ -55,4 +55,22 @@ public interface AuthApi {
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   })
   void signIn(@Valid SignInRequest request);
+
+  @Operation(summary = "로그아웃", description = "SecurityFilterChain에서 처리합니다.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  void signOut();
 }

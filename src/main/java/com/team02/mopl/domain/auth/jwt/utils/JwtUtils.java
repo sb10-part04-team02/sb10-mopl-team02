@@ -14,13 +14,22 @@ import org.springframework.security.authentication.InsufficientAuthenticationExc
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 @Component
 @RequiredArgsConstructor
 public class JwtUtils {
 
-  private static final String REFRESH_TOKEN_COOKIE_NAME = "REFRESH_TOKEN";
+  public static final String REFRESH_TOKEN_COOKIE_NAME = "REFRESH_TOKEN";
   private final JwtProperties properties;
+
+  public String resolveAccessToken(String bearerToken) {
+    if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+      return bearerToken.substring(7);
+    }
+
+    return null;
+  }
 
   public ResponseCookie generateRefreshTokenCookie(String refreshToken) {
     return ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, refreshToken)
@@ -29,6 +38,16 @@ public class JwtUtils {
         .secure(true)
         .sameSite("Lax")
         .maxAge(properties.refreshTokenExpiration())
+        .build();
+  }
+
+  public ResponseCookie generateLogoutRefreshTokenCookie() {
+    return ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME)
+        .path("/")
+        .httpOnly(true)
+        .secure(true)
+        .sameSite("Lax")
+        .maxAge(0)
         .build();
   }
 
