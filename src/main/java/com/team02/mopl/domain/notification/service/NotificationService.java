@@ -2,13 +2,18 @@ package com.team02.mopl.domain.notification.service;
 
 import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
 import com.team02.mopl.domain.notification.dto.NotificationDto;
+import com.team02.mopl.domain.notification.dto.NotificationSearchRequest;
 import com.team02.mopl.domain.notification.entity.Notification;
+import com.team02.mopl.domain.notification.enums.NotificationSortBy;
 import com.team02.mopl.domain.notification.exception.NotificationForbiddenException;
 import com.team02.mopl.domain.notification.exception.NotificationNotFoundException;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
 import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.global.dto.CursorPageRequest;
+import com.team02.mopl.global.dto.CursorResponse;
+import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import jakarta.validation.Valid;
@@ -55,13 +60,33 @@ public class NotificationService {
     return notificationDto;
   }
 
-  // TODO: 커서 페이지네이션 구현 후 수정 예정
-  public List<NotificationDto> getNotifications(UUID receiverId) {
-    return notificationRepository
-        .findByReceiver_IdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(receiverId)
-        .stream()
-        .map(NotificationDto::from)
-        .toList();
+  public CursorResponse<NotificationDto> getNotifications(
+      UUID receiverId, NotificationSearchRequest request) {
+    int limit = CursorPageRequest.normalizeLimit(request.limit());
+    SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
+    NotificationSortBy sortBy =
+        request.sortBy() != null ? request.sortBy() : NotificationSortBy.createdAt;
+
+    List<Notification> notifications =
+        notificationRepository.findNotificationsByCursor(
+            receiverId, sortBy, direction, request.cursor(), request.idAfter(), limit + 1);
+
+    boolean hasNext = notifications.size() > limit;
+    List<Notification> page = hasNext ? notifications.subList(0, limit) : notifications;
+
+    List<NotificationDto> data = page.stream().map(NotificationDto::from).toList();
+    long totalCount = notificationRepository.countByReceiver_IdAndDeletedAtIsNull(receiverId);
+
+    String nextCursor = null;
+    UUID nextIdAfter = null;
+    if (hasNext) {
+      Notification last = page.get(page.size() - 1);
+      nextCursor = last.getCreatedAt().toString();
+      nextIdAfter = last.getId();
+    }
+
+    return new CursorResponse<>(
+        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.name(), direction.name());
   }
 
   // 읽음 처리
