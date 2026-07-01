@@ -30,8 +30,10 @@ import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -168,7 +170,7 @@ public class DirectMessageService {
     boolean hasNext = conversations.size() > limit;
     List<Conversation> page = hasNext ? conversations.subList(0, limit) : conversations;
 
-    List<ConversationDto> data = page.stream().map(c -> toConversationDto(c, requesterId)).toList();
+    List<ConversationDto> data = buildConversationDtos(page, requesterId);
     long totalCount = conversationRepository.countByMemberUserId(requesterId);
 
     String nextCursor = null;
@@ -259,31 +261,54 @@ public class DirectMessageService {
     return dto;
   }
 
-  private ConversationDto toConversationDto(Conversation conversation, UUID requesterId) {
-    UUID conversationId = conversation.getId();
+  private List<ConversationDto> buildConversationDtos(List<Conversation> page, UUID requesterId) {
+    if (page.isEmpty()) {
+      return List.of();
+    }
+    List<UUID> conversationIds = page.stream().map(Conversation::getId).toList();
 
-    ConversationMember withUserMember =
+    Map<UUID, ConversationMember> withUserMemberByConvId =
         conversationMemberRepository
-            .findWithUserMember(conversationId, requesterId)
-            .orElseThrow(ConversationForbiddenException::new);
+            .findWithUserMembersForConversations(conversationIds, requesterId)
+            .stream()
+            .collect(Collectors.toMap(cm -> cm.getConversation().getId(), cm -> cm));
 
-    ConversationMember requesterMember =
+    Map<UUID, ConversationMember> requesterMemberByConvId =
         conversationMemberRepository
-            .findByConversationIdAndUserId(conversationId, requesterId)
-            .orElseThrow(ConversationForbiddenException::new);
+            .findByConversationIdsAndUserId(conversationIds, requesterId)
+            .stream()
+            .collect(Collectors.toMap(cm -> cm.getConversation().getId(), cm -> cm));
 
-    User withUser = withUserMember.getUser();
-    Optional<DirectMessage> lastDm =
-        directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversationId);
+    Map<UUID, DirectMessage> lastDmByConvId =
+        directMessageRepository.findLatestByConversationIds(conversationIds).stream()
+            .collect(Collectors.toMap(dm -> dm.getConversation().getId(), dm -> dm));
 
-    return new ConversationDto(
-        conversationId,
-        new UserSummary(withUser.getId(), withUser.getName(), withUser.getProfileImageUrl()),
-        lastDm.map(this::toDirectMessageDto).orElse(null),
-        lastDm
-            .filter(dm -> !dm.getSender().getUser().getId().equals(requesterId))
-            .map(dm -> dm.getCreatedAt().isAfter(requesterMember.getLastReadAt()))
-            .orElse(false));
+    return page.stream()
+        .map(
+            conv -> {
+              UUID convId = conv.getId();
+              ConversationMember withUserMember = withUserMemberByConvId.get(convId);
+              if (withUserMember == null) {
+                throw new ConversationForbiddenException();
+              }
+              ConversationMember requesterMember = requesterMemberByConvId.get(convId);
+              if (requesterMember == null) {
+                throw new ConversationForbiddenException();
+              }
+              User withUser = withUserMember.getUser();
+              DirectMessage lastDm = lastDmByConvId.get(convId);
+              boolean hasUnread =
+                  lastDm != null
+                      && !lastDm.getSender().getUser().getId().equals(requesterId)
+                      && lastDm.getCreatedAt().isAfter(requesterMember.getLastReadAt());
+              return new ConversationDto(
+                  convId,
+                  new UserSummary(
+                      withUser.getId(), withUser.getName(), withUser.getProfileImageUrl()),
+                  lastDm != null ? toDirectMessageDto(lastDm) : null,
+                  hasUnread);
+            })
+        .toList();
   }
 
   private DirectMessageDto toDirectMessageDto(DirectMessage dm) {

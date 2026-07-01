@@ -468,22 +468,26 @@ class DirectMessageServiceTest {
     given(conv.getId()).willReturn(conversationId);
     given(conv.getCreatedAt()).willReturn(Instant.now());
 
-    ConversationMember withUserMember = mockConversationMemberWithUser(withUserId, "상대방", null);
-    ConversationMember requesterMember = mockConversationMember(requesterId, Instant.now());
+    ConversationMember withUserMember =
+        mockConversationMemberWithConvId(conversationId, withUserId, "상대방", null);
+    ConversationMember requesterMember =
+        mockConversationMemberWithConvId(conversationId, requesterId, null, null);
 
     given(
             conversationRepository.findConversationsByCursor(
                 requesterId, SortDirection.DESCENDING, null, null, 21))
         .willReturn(List.of(conv));
     given(conversationRepository.countByMemberUserId(requesterId)).willReturn(1L);
-    given(conversationMemberRepository.findWithUserMember(conversationId, requesterId))
-        .willReturn(Optional.of(withUserMember));
-    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
-        .willReturn(Optional.of(requesterMember));
     given(
-            directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(
-                conversationId))
-        .willReturn(Optional.empty());
+            conversationMemberRepository.findWithUserMembersForConversations(
+                List.of(conversationId), requesterId))
+        .willReturn(List.of(withUserMember));
+    given(
+            conversationMemberRepository.findByConversationIdsAndUserId(
+                List.of(conversationId), requesterId))
+        .willReturn(List.of(requesterMember));
+    given(directMessageRepository.findLatestByConversationIds(List.of(conversationId)))
+        .willReturn(List.of());
 
     CursorResponse<ConversationDto> result =
         directMessageService.getConversations(
@@ -517,23 +521,27 @@ class DirectMessageServiceTest {
     given(conv2.getId()).willReturn(convId2);
     given(conv2.getCreatedAt()).willReturn(t2);
 
-    ConversationMember withMember = mockConversationMemberWithUser(withUserId, "상대방", null);
-    ConversationMember requesterMember = mockConversationMember(requesterId, Instant.now());
+    // limit=1 → page=[conv1], batch queries only for convId1
+    ConversationMember withMember =
+        mockConversationMemberWithConvId(convId1, withUserId, "상대방", null);
+    ConversationMember requesterMember =
+        mockConversationMemberWithConvId(convId1, requesterId, null, null);
 
     given(
             conversationRepository.findConversationsByCursor(
                 requesterId, SortDirection.DESCENDING, null, null, 2))
         .willReturn(List.of(conv1, conv2));
     given(conversationRepository.countByMemberUserId(requesterId)).willReturn(3L);
-
-    for (UUID id : List.of(convId1, convId2)) {
-      given(conversationMemberRepository.findWithUserMember(id, requesterId))
-          .willReturn(Optional.of(withMember));
-      given(conversationMemberRepository.findByConversationIdAndUserId(id, requesterId))
-          .willReturn(Optional.of(requesterMember));
-      given(directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(id))
-          .willReturn(Optional.empty());
-    }
+    given(
+            conversationMemberRepository.findWithUserMembersForConversations(
+                List.of(convId1), requesterId))
+        .willReturn(List.of(withMember));
+    given(
+            conversationMemberRepository.findByConversationIdsAndUserId(
+                List.of(convId1), requesterId))
+        .willReturn(List.of(requesterMember));
+    given(directMessageRepository.findLatestByConversationIds(List.of(convId1)))
+        .willReturn(List.of());
 
     CursorResponse<ConversationDto> result =
         directMessageService.getConversations(
@@ -558,8 +566,11 @@ class DirectMessageServiceTest {
     given(conv.getId()).willReturn(conversationId);
     given(conv.getCreatedAt()).willReturn(Instant.now());
 
-    ConversationMember withUserMember = mockConversationMemberWithUser(withUserId, "상대방", null);
-    ConversationMember requesterMember = mockConversationMember(requesterId, lastReadAt);
+    ConversationMember withUserMember =
+        mockConversationMemberWithConvId(conversationId, withUserId, "상대방", null);
+    ConversationMember requesterMember =
+        mockConversationMemberWithConvId(conversationId, requesterId, null, null);
+    given(requesterMember.getLastReadAt()).willReturn(lastReadAt);
     DirectMessage lastDm = mockDirectMessage(conversationId, withUserId, requesterId, messageAt);
 
     given(
@@ -567,14 +578,16 @@ class DirectMessageServiceTest {
                 requesterId, SortDirection.DESCENDING, null, null, 21))
         .willReturn(List.of(conv));
     given(conversationRepository.countByMemberUserId(requesterId)).willReturn(1L);
-    given(conversationMemberRepository.findWithUserMember(conversationId, requesterId))
-        .willReturn(Optional.of(withUserMember));
-    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
-        .willReturn(Optional.of(requesterMember));
     given(
-            directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(
-                conversationId))
-        .willReturn(Optional.of(lastDm));
+            conversationMemberRepository.findWithUserMembersForConversations(
+                List.of(conversationId), requesterId))
+        .willReturn(List.of(withUserMember));
+    given(
+            conversationMemberRepository.findByConversationIdsAndUserId(
+                List.of(conversationId), requesterId))
+        .willReturn(List.of(requesterMember));
+    given(directMessageRepository.findLatestByConversationIds(List.of(conversationId)))
+        .willReturn(List.of(lastDm));
 
     CursorResponse<ConversationDto> result =
         directMessageService.getConversations(
@@ -583,6 +596,31 @@ class DirectMessageServiceTest {
     assertThat(result.data().get(0).hasUnread()).isTrue();
     assertThat(result.data().get(0).lastMessage()).isNotNull();
     assertThat(result.data().get(0).lastMessage().content()).isEqualTo("안녕하세요");
+  }
+
+  @Test
+  @DisplayName("cursor/idAfter와 ASCENDING 정렬 요청을 리포지토리에 그대로 전달한다")
+  void getConversations_withCursorAndAscending_forwardsPaginationArguments() {
+    UUID requesterId = UUID.randomUUID();
+    UUID idAfter = UUID.randomUUID();
+    String cursor = "2026-06-30T10:15:30Z";
+
+    given(
+            conversationRepository.findConversationsByCursor(
+                requesterId, SortDirection.ASCENDING, cursor, idAfter, 6))
+        .willReturn(List.of());
+    given(conversationRepository.countByMemberUserId(requesterId)).willReturn(0L);
+
+    CursorResponse<ConversationDto> result =
+        directMessageService.getConversations(
+            requesterId,
+            new ConversationSearchRequest(
+                cursor, idAfter, 5, SortDirection.ASCENDING, ConversationSortBy.CREATED_AT));
+
+    verify(conversationRepository)
+        .findConversationsByCursor(requesterId, SortDirection.ASCENDING, cursor, idAfter, 6);
+    assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING.name());
+    assertThat(result.data()).isEmpty();
   }
 
   // ──────────────────────────────────────────────
@@ -823,6 +861,18 @@ class DirectMessageServiceTest {
       UUID userId, String name, String profileImageUrl) {
     User user = mockUser(userId, name, null, profileImageUrl);
     ConversationMember member = mock(ConversationMember.class);
+    given(member.getUser()).willReturn(user);
+    given(member.getLastReadAt()).willReturn(Instant.now());
+    return member;
+  }
+
+  private ConversationMember mockConversationMemberWithConvId(
+      UUID conversationId, UUID userId, String name, String profileImageUrl) {
+    Conversation conversation = mock(Conversation.class);
+    given(conversation.getId()).willReturn(conversationId);
+    User user = name != null ? mockUser(userId, name, null, profileImageUrl) : mock(User.class);
+    ConversationMember member = mock(ConversationMember.class);
+    given(member.getConversation()).willReturn(conversation);
     given(member.getUser()).willReturn(user);
     given(member.getLastReadAt()).willReturn(Instant.now());
     return member;
