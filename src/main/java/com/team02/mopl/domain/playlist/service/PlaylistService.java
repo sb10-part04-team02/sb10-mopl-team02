@@ -42,7 +42,9 @@ public class PlaylistService {
     log.debug("플레이리스트 수정 시작: playlistId={}, requesterId={}", playlistId, requesterId);
 
     Playlist playlist =
-        playlistRepository.findById(playlistId).orElseThrow(PlaylistNotFoundException::new);
+        playlistRepository
+            .findByIdAndDeletedAtIsNull(playlistId)
+            .orElseThrow(PlaylistNotFoundException::new);
 
     if (!playlist.getOwnerId().equals(requesterId)) {
       throw new PlaylistForbiddenException();

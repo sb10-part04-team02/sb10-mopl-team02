@@ -107,7 +107,8 @@ class PlaylistServiceTest {
               0L,
               false,
               List.of());
-      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
       given(playlistMapper.toDto(playlist, false)).willReturn(expect);
 
       // when
@@ -126,7 +127,8 @@ class PlaylistServiceTest {
       // given
       Playlist playlist = new Playlist(ownerId, "기존 제목", "기존 설명");
       PlaylistUpdateRequest request = new PlaylistUpdateRequest("새 제목", "새 설명");
-      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
       given(playlistMapper.toDto(playlist, false)).willReturn(null);
 
       // when
@@ -145,7 +147,8 @@ class PlaylistServiceTest {
       // given
       Playlist playlist = new Playlist(ownerId, "기존 제목", "기존 설명");
       PlaylistUpdateRequest request = new PlaylistUpdateRequest("새 제목", null);
-      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
       given(playlistMapper.toDto(playlist, false)).willReturn(null);
 
       // when
@@ -162,7 +165,8 @@ class PlaylistServiceTest {
       // given
       Playlist playlist = new Playlist(ownerId, "기존 제목", "기존 설명");
       PlaylistUpdateRequest request = new PlaylistUpdateRequest("", "   ");
-      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
       given(playlistMapper.toDto(playlist, false)).willReturn(null);
 
       // when
@@ -178,7 +182,7 @@ class PlaylistServiceTest {
     void fail_whenPlaylistNotFound() {
       // given
       PlaylistUpdateRequest request = new PlaylistUpdateRequest("새 제목", "새 설명");
-      given(playlistRepository.findById(playlistId)).willReturn(Optional.empty());
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId)).willReturn(Optional.empty());
 
       // when & then
       assertThatThrownBy(() -> playlistService.update(playlistId, ownerId, request))
@@ -193,7 +197,8 @@ class PlaylistServiceTest {
       Playlist playlist = new Playlist(ownerId, "기존 제목", "기존 설명");
       UUID otherUserId = UUID.randomUUID();
       PlaylistUpdateRequest request = new PlaylistUpdateRequest("새 제목", "새 설명");
-      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
 
       // when & then
       assertThatThrownBy(() -> playlistService.update(playlistId, otherUserId, request))
