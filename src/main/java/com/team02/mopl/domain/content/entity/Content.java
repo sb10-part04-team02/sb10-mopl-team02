@@ -49,7 +49,7 @@ public class Content extends BaseMutableEntity {
     this.contentType = Objects.requireNonNull(contentType, "contentType은 null일 수 없습니다.");
     this.title = validateNotBlank(title, "title");
     this.description = validateNotBlank(description, "description");
-    this.thumbnailUrl = validateNotBlank(thumbnailUrl, "thumbnailUrl은 null일 수 없습니다.");
+    this.thumbnailUrl = validateNotBlank(thumbnailUrl, "thumbnailUrl");
   }
 
   public void update(String title, String description) {
