@@ -141,6 +141,42 @@ class ReviewServiceTest {
     }
 
     @Test
+    @DisplayName("rating 정렬이고 다음 페이지가 있으면 nextCursor를 마지막 항목의 평점으로 인코딩한다")
+    void nextCursor_encodedAsRating_whenSortByRating() {
+      // given
+      ReviewSearchRequest request =
+          new ReviewSearchRequest(
+              contentId, null, null, 1, SortDirection.DESCENDING, ReviewSortBy.RATING);
+      Review first = review(4.0);
+      given(
+              reviewRepository.findReviewsByCursor(
+                  eq(contentId),
+                  eq(ReviewSortBy.RATING),
+                  eq(SortDirection.DESCENDING),
+                  eq(null),
+                  eq(null),
+                  eq(2)))
+          .willReturn(List.of(first, review(3.0)));
+      given(reviewRepository.countActive(eq(contentId))).willReturn(2L);
+      given(reviewMapper.toDto(any(Review.class)))
+          .willReturn(
+              new ReviewDto(
+                  first.getId(),
+                  contentId,
+                  new UserSummary(UUID.randomUUID(), null, null),
+                  "리뷰",
+                  4.0));
+
+      // when
+      CursorResponse<ReviewDto> response = reviewService.getReviews(request);
+
+      // then
+      assertThat(response.hasNext()).isTrue();
+      assertThat(response.nextCursor()).isEqualTo(Double.toString(first.getRating()));
+      assertThat(response.nextIdAfter()).isEqualTo(first.getId());
+    }
+
+    @Test
     @DisplayName("rating 정렬에서 커서가 있으면 다음 페이지를 평점 기준으로 조회한다")
     void nextPage_byRating() {
       // given

@@ -1,0 +1,17 @@
+# Codecov 설정
+# 머지 차단(게이트)은 build.gradle의 jacocoTestCoverageVerification(전체 80%)이 담당한다.
+# Codecov status check는 수치를 측정·표시만 하고 PR을 막지 않도록 informational로 둔다.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+# JaCoCo 리포트에서 제외하는 자동 생성·측정 불가 코드를 Codecov 분모에서도 제외
+ignore:
+  - "**/entity/Q*"
+  - "**/*MapperImpl*"
+  - "**/MoplApplication*"
