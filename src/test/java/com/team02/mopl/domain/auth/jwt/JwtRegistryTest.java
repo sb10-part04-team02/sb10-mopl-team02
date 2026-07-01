@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
@@ -210,5 +211,55 @@ class JwtRegistryTest {
       // then
       assertThat(actual).isTrue();
     }
+  }
+
+  @Nested
+  class HasRefreshToken {
+
+    private UUID userId;
+    private String refreshToken;
+
+    @BeforeEach
+    void SetUp() {
+      userId = UUID.randomUUID();
+      refreshToken = "refresh token";
+      given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
+    }
+
+    @Test
+    @DisplayName("refresh토큰가 없다면 false를 반환한다")
+    void success_shouldReturnFalse_whenRefreshTokenDoesNotExist() {
+      // given
+      willReturn(null).given(zSetOperations).score(anyString(), anyString());
+
+      // when
+      boolean actual = jwtRegistry.hasRefreshToken(userId, refreshToken);
+
+      // then
+      assertThat(actual).isFalse();
+    }
+
+    @Test
+    @DisplayName("refresh토큰이 있다면 true를 반환한다")
+    void success_shouldReturnTrue_whenRefreshTokenExists() {
+      // given
+      willReturn(3.0).given(zSetOperations).score(anyString(), anyString());
+
+      // when
+      boolean actual = jwtRegistry.hasRefreshToken(userId, refreshToken);
+
+      // then
+      assertThat(actual).isTrue();
+    }
+  }
+
+  @Test
+  @DisplayName("메서드가 실행될때 전체삭제가 진행된다")
+  void success_shouldDeleteAllRefreshTokens_whenUserIdIsGiven() {
+    // when
+    jwtRegistry.deleteAllRefreshTokens(UUID.randomUUID());
+
+    // then
+    then(redisTemplate).should(times(1)).delete(anyString());
   }
 }
