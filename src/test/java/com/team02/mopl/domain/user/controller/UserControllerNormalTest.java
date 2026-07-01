@@ -2,6 +2,7 @@ package com.team02.mopl.domain.user.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -171,6 +172,16 @@ class UserControllerNormalTest {
           .perform(get("/api/users/{userId}", userId))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.exceptionName").value("UserNotFoundException"));
+    }
+
+    @Test
+    @DisplayName("사용자 ID가 UUID 형식이 아니면 400 Bad Request를 반환한다")
+    void fail_shouldReturnBadRequest_whenUserIdIsInvalidUuid() throws Exception {
+      mockMvc
+          .perform(get("/api/users/{userId}", "invalid-user-id"))
+          .andExpect(status().isBadRequest());
+
+      then(userService).shouldHaveNoInteractions();
     }
   }
 }
