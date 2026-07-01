@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
 import com.team02.mopl.domain.playlist.dto.PlaylistCreateRequest;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -116,6 +118,25 @@ class PlaylistServiceTest {
       assertThat(playlist.getTitle()).isEqualTo("새 제목");
       assertThat(playlist.getDescription()).isEqualTo("새 설명");
       then(playlistMapper).should().toDto(playlist, false);
+    }
+
+    @Test
+    @DisplayName("응답 DTO에 갱신된 updatedAt이 담기도록 toDto 매핑 전에 flush를 호출한다")
+    void flushBeforeToDto_whenUpdate() {
+      // given
+      Playlist playlist = new Playlist(ownerId, "기존 제목", "기존 설명");
+      PlaylistUpdateRequest request = new PlaylistUpdateRequest("새 제목", "새 설명");
+      given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+      given(playlistMapper.toDto(playlist, false)).willReturn(null);
+
+      // when
+      playlistService.update(playlistId, ownerId, request);
+
+      // then
+      // flush로 @PreUpdate(updatedAt 갱신)를 유발한 뒤 매핑해야 응답에 최신 값이 담긴다
+      InOrder inOrder = inOrder(playlistRepository, playlistMapper);
+      inOrder.verify(playlistRepository).flush();
+      inOrder.verify(playlistMapper).toDto(playlist, false);
     }
 
     @Test
