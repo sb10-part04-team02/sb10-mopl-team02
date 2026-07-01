@@ -23,8 +23,7 @@ app:
     # 썸네일 미제공 시 내려줄 기본 URL.
     default-thumbnail-url: "" # TODO: S3 전환 후속 이슈에서 실제 기본 이미지의 절대 URL로 교체
   jwt:
-    # 로컬 개발용 기본값(최소 32바이트). 실제 배포/공유 환경에서는 반드시 .env의 JWT_SECRET_KEY로 덮어쓸 것.
-    secret-key: ${JWT_SECRET_KEY:local-dev-insecure-jwt-secret-change-me-in-env}
+    secret-key: ${JWT_SECRET_KEY}
     access-token-expiration: 10m  # 10분
     refresh-token-expiration: 7d  # 일주일
     redis:
