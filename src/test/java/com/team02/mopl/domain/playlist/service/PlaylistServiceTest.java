@@ -181,4 +181,54 @@ class PlaylistServiceTest {
       then(playlistMapper).should(never()).toDto(any(Playlist.class), eq(false));
     }
   }
+
+  @Nested
+  class Delete {
+    private final UUID playlistId = UUID.randomUUID();
+    private final UUID ownerId = UUID.randomUUID();
+
+    @Test
+    @DisplayName("소유자가 요청하면 플레이리스트를 소프트 삭제한다")
+    void success_whenRequesterIsOwner() {
+      // given
+      Playlist playlist = new Playlist(ownerId, "기존 제목", "기존 설명");
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
+
+      // when
+      playlistService.delete(playlistId, ownerId);
+
+      // then
+      assertThat(playlist.isDeleted()).isTrue();
+      then(playlistRepository).should().flush();
+    }
+
+    @Test
+    @DisplayName("플레이리스트가 없으면 PLAYLIST_NOT_FOUND 예외를 던진다")
+    void fail_whenPlaylistNotFound() {
+      // given
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId)).willReturn(Optional.empty());
+
+      // when & then
+      assertThatThrownBy(() -> playlistService.delete(playlistId, ownerId))
+          .isInstanceOf(PlaylistNotFoundException.class);
+      then(playlistRepository).should(never()).flush();
+    }
+
+    @Test
+    @DisplayName("요청자가 소유자가 아니면 FORBIDDEN 예외를 던진다")
+    void fail_whenRequesterIsNotOwner() {
+      // given
+      Playlist playlist = new Playlist(ownerId, "기존 제목", "기존 설명");
+      UUID otherUserId = UUID.randomUUID();
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
+
+      // when & then
+      assertThatThrownBy(() -> playlistService.delete(playlistId, otherUserId))
+          .isInstanceOf(PlaylistForbiddenException.class);
+      assertThat(playlist.isDeleted()).isFalse();
+      then(playlistRepository).should(never()).flush();
+    }
+  }
 }

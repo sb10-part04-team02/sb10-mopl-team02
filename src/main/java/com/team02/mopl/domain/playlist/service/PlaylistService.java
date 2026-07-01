@@ -56,4 +56,23 @@ public class PlaylistService {
     log.info("플레이리스트 수정 성공: playlistId={}, requesterId={}", playlistId, requesterId);
     return playlistDto;
   }
+
+  @Transactional
+  public void delete(UUID playlistId, UUID requesterId) {
+    log.debug("플레이리스트 삭제 시작: playlistId={}, requesterId={}", playlistId, requesterId);
+
+    Playlist playlist =
+        playlistRepository
+            .findByIdAndDeletedAtIsNull(playlistId)
+            .orElseThrow(PlaylistNotFoundException::new);
+
+    if (!playlist.getOwnerId().equals(requesterId)) {
+      throw new PlaylistForbiddenException();
+    }
+
+    playlist.delete();
+    playlistRepository.flush();
+
+    log.info("플레이리스트 삭제 성공: playlistId={}, requesterId={}", playlistId, requesterId);
+  }
 }
