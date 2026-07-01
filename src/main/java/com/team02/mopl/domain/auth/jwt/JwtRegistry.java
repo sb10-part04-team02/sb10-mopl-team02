@@ -47,13 +47,15 @@ public class JwtRegistry {
     return refreshPrefix + userId.toString();
   }
 
-  public void deleteRefreshToken(
-      UUID userId, String accessTokenId, Duration remaining, String refreshToken) {
+  public void deleteRefreshToken(UUID userId, String refreshToken) {
     String key = userKey(userId);
-    String blackListKey = blacklistKey(accessTokenId);
 
     // RefreshToken 삭제
     redisTemplate.opsForZSet().remove(key, refreshToken);
+  }
+
+  public void registerBlacklist(String accessTokenId, Duration remaining) {
+    String blackListKey = blacklistKey(accessTokenId);
 
     // AccessToken BlackList 추가
     if (!remaining.isNegative() && !remaining.isZero()) {

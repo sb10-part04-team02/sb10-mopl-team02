@@ -329,6 +329,33 @@ class JwtTokenProviderTest {
   }
 
   @Nested
+  class ParseClaimsWithoutVerification {
+    @Test
+    @DisplayName("유효하지 않은 토큰이면 예외를 던진다")
+    void fail_shouldThrowBadCredentialsException_whenTokenIsInvalid() {
+      // when & then
+      assertThrows(
+          BadCredentialsException.class,
+          () -> jwtTokenProvider.parseClaimsWithoutVerification("invalid Token"));
+    }
+
+    @Test
+    @DisplayName("유효한 토큰이 들어오면 ClaimSet을 반환한다")
+    void success_shouldReturnClaimSet_whenTokenIsValid() {
+      // given
+      String validFormatToken =
+          "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiI4NGUwM2QxMC0zYmFiLTQzMDUtYmZkZS04MDJkYjU2ZDY0MzAifQ.signature";
+
+      // when
+      JWTClaimsSet actual = jwtTokenProvider.parseClaimsWithoutVerification(validFormatToken);
+
+      // then
+      assertThat(actual).isNotNull();
+      assertDoesNotThrow(() -> actual.getStringClaim("userId"));
+    }
+  }
+
+  @Nested
   class BakeSignerAndVerifier {
 
     @Test

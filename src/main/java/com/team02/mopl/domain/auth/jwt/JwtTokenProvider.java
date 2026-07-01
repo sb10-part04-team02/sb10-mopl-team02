@@ -83,6 +83,14 @@ public class JwtTokenProvider {
     }
   }
 
+  public JWTClaimsSet parseClaimsWithoutVerification(String accessToken) {
+    try {
+      return SignedJWT.parse(accessToken).getJWTClaimsSet();
+    } catch (Exception e) {
+      throw new BadCredentialsException("파싱 불가능한 토큰입니다.", e);
+    }
+  }
+
   public JWTClaimsSet verifyAccessToken(String token) {
     JWTClaimsSet claimsSet = verifyAndGetClaims(token);
 

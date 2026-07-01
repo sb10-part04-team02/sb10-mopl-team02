@@ -14,6 +14,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.stereotype.Component;
@@ -43,21 +44,39 @@ public class JwtLogoutHandler implements LogoutHandler {
 
     JWTClaimsSet claimsSet;
     UUID userId;
+    boolean isExpired = false;
+
     try {
       claimsSet = jwtTokenProvider.verifyAccessToken(accessToken);
       userId = jwtUtils.getUserId(claimsSet);
+    } catch (CredentialsExpiredException e) {
+      isExpired = true;
+
+      try {
+        claimsSet = jwtTokenProvider.parseClaimsWithoutVerification(accessToken);
+        userId = jwtUtils.getUserId(claimsSet);
+      } catch (Exception ex) {
+        // 토큰마저 파싱안되면 종료
+        return;
+      }
+
     } catch (Exception e) {
       // 변조되었으면 Redis건드릴 필요도 없음
       return;
     }
-    String accessTokenId = claimsSet.getJWTID();
 
-    // 남은시간 구하기
-    Instant expirationTime = claimsSet.getExpirationTime().toInstant();
-    Duration remainingDuration = Duration.between(Instant.now(), expirationTime);
+    if (!isExpired) {
+      String accessTokenId = claimsSet.getJWTID();
 
-    // Refresh 삭제, AccessToken 블랙리스트 등록
-    jwtRegistry.deleteRefreshToken(userId, accessTokenId, remainingDuration, refreshToken);
+      // 남은시간 구하기
+      Instant expirationTime = claimsSet.getExpirationTime().toInstant();
+      Duration remainingDuration = Duration.between(Instant.now(), expirationTime);
+
+      // access blacklist 등록
+      jwtRegistry.registerBlacklist(accessTokenId, remainingDuration);
+    }
+
+    jwtRegistry.deleteRefreshToken(userId, refreshToken);
   }
 
   private String resolveRefreshToken(HttpServletRequest request) {

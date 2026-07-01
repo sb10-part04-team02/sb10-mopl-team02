@@ -43,103 +43,103 @@ class JwtRegistryTest {
     ReflectionTestUtils.setField(jwtRegistry, "maxAccountCount", 1L);
   }
 
-  @Test
-  @DisplayName("네트워크 오류로 토큰 개수가 조회되지 않으면 삭제를 건너뛴다")
-  void success_shouldNotRemoveToken_whenCurrentCountIsNull() {
-    // given
-    UUID userId = UUID.randomUUID();
-    String key = "jwt:refresh:" + userId;
-    String refreshToken = "refreshToken";
-    Duration expiration = Duration.ofMinutes(10);
-    given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
+  @Nested
+  class RegisterRefreshToken {
+    @Test
+    @DisplayName("네트워크 오류로 토큰 개수가 조회되지 않으면 삭제를 건너뛴다")
+    void success_shouldNotRemoveToken_whenCurrentCountIsNull() {
+      // given
+      UUID userId = UUID.randomUUID();
+      String key = "jwt:refresh:" + userId;
+      String refreshToken = "refreshToken";
+      Duration expiration = Duration.ofMinutes(10);
+      given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
 
-    given(properties.refreshTokenExpiration()).willReturn(expiration);
-    given(zSetOperations.size(anyString())).willReturn(null);
+      given(properties.refreshTokenExpiration()).willReturn(expiration);
+      given(zSetOperations.size(anyString())).willReturn(null);
 
-    // when
-    jwtRegistry.registerRefreshToken(userId, refreshToken);
+      // when
+      jwtRegistry.registerRefreshToken(userId, refreshToken);
 
-    // then
-    then(zSetOperations).should(never()).removeRange(eq(key), anyLong(), anyLong());
-  }
+      // then
+      then(zSetOperations).should(never()).removeRange(eq(key), anyLong(), anyLong());
+    }
 
-  @Test
-  @DisplayName("현재개수가 maxAccountCount보다 많으면 maxAccountCount 될때까지 삭제한다")
-  void success_shouldRemoveOldestToken_whenExceedMaxAccountCount() {
-    // given
-    UUID userId = UUID.randomUUID();
-    String key = "jwt:refresh:" + userId;
-    String refreshToken = "refreshToken";
-    Duration expiration = Duration.ofMinutes(10);
-    given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
+    @Test
+    @DisplayName("현재개수가 maxAccountCount보다 많으면 maxAccountCount 될때까지 삭제한다")
+    void success_shouldRemoveOldestToken_whenExceedMaxAccountCount() {
+      // given
+      UUID userId = UUID.randomUUID();
+      String key = "jwt:refresh:" + userId;
+      String refreshToken = "refreshToken";
+      Duration expiration = Duration.ofMinutes(10);
+      given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
 
-    given(properties.refreshTokenExpiration()).willReturn(expiration);
-    given(zSetOperations.size(anyString())).willReturn(2L);
+      given(properties.refreshTokenExpiration()).willReturn(expiration);
+      given(zSetOperations.size(anyString())).willReturn(2L);
 
-    // when
-    jwtRegistry.registerRefreshToken(userId, refreshToken);
+      // when
+      jwtRegistry.registerRefreshToken(userId, refreshToken);
 
-    // then
-    then(zSetOperations).should(times(1)).removeRangeByScore(eq(key), eq(0.0), anyDouble());
-    then(zSetOperations).should(times(1)).add(eq(key), eq(refreshToken), anyDouble());
-    then(zSetOperations).should(times(1)).removeRange(eq(key), anyLong(), anyLong());
-    then(redisTemplate).should(times(1)).expire(eq(key), eq(expiration));
-  }
+      // then
+      then(zSetOperations).should(times(1)).removeRangeByScore(eq(key), eq(0.0), anyDouble());
+      then(zSetOperations).should(times(1)).add(eq(key), eq(refreshToken), anyDouble());
+      then(zSetOperations).should(times(1)).removeRange(eq(key), anyLong(), anyLong());
+      then(redisTemplate).should(times(1)).expire(eq(key), eq(expiration));
+    }
 
-  @Test
-  @DisplayName("userId와 refreshToken을 가지고 redis에 저장한다")
-  void success_shouldSaveRefreshToken_whenUserIdAndRefreshTokenHas() {
-    // given
-    UUID userId = UUID.randomUUID();
-    String key = "jwt:refresh:" + userId;
-    String refreshToken = "refreshToken";
-    Duration expiration = Duration.ofMinutes(10);
-    given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
+    @Test
+    @DisplayName("userId와 refreshToken을 가지고 redis에 저장한다")
+    void success_shouldSaveRefreshToken_whenUserIdAndRefreshTokenHas() {
+      // given
+      UUID userId = UUID.randomUUID();
+      String key = "jwt:refresh:" + userId;
+      String refreshToken = "refreshToken";
+      Duration expiration = Duration.ofMinutes(10);
+      given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
 
-    given(properties.refreshTokenExpiration()).willReturn(expiration);
+      given(properties.refreshTokenExpiration()).willReturn(expiration);
 
-    // when
-    jwtRegistry.registerRefreshToken(userId, refreshToken);
+      // when
+      jwtRegistry.registerRefreshToken(userId, refreshToken);
 
-    // then
-    then(zSetOperations).should(times(1)).removeRangeByScore(eq(key), eq(0.0), anyDouble());
-    then(zSetOperations).should(times(1)).add(eq(key), eq(refreshToken), anyDouble());
-    then(zSetOperations).should(times(1)).size(eq(key));
-    then(zSetOperations).should(never()).removeRange(eq(key), anyLong(), anyLong());
-    then(redisTemplate).should(times(1)).expire(eq(key), eq(expiration));
+      // then
+      then(zSetOperations).should(times(1)).removeRangeByScore(eq(key), eq(0.0), anyDouble());
+      then(zSetOperations).should(times(1)).add(eq(key), eq(refreshToken), anyDouble());
+      then(zSetOperations).should(times(1)).size(eq(key));
+      then(zSetOperations).should(never()).removeRange(eq(key), anyLong(), anyLong());
+      then(redisTemplate).should(times(1)).expire(eq(key), eq(expiration));
+    }
   }
 
   @Nested
   class DeleteRefreshToken {
 
-    private UUID userId;
-    private String accessTokenId;
-    private Duration remaining;
-    private String refreshToken;
-
-    @BeforeEach
-    void SetUp() {
-      userId = UUID.randomUUID();
-      accessTokenId = "token id";
-      remaining = Duration.ofMinutes(5);
-      refreshToken = "refresh token";
-
-      given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
-    }
-
     @Test
     @DisplayName("refresh토큰이 잘못된 토큰이어도 삭제요청을 진행한다")
     void success_shouldAttemptToRemove_whenRefreshIsInvalid() {
       // given
-      refreshToken = "invalid token";
-      given(redisTemplate.opsForValue()).willReturn(valueOperations);
+      String refreshToken = "invalid token";
+      given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
 
       // when
-      jwtRegistry.deleteRefreshToken(userId, accessTokenId, remaining, refreshToken);
+      jwtRegistry.deleteRefreshToken(UUID.randomUUID(), refreshToken);
 
       // then
       then(zSetOperations).should(times(1)).remove(anyString(), eq(refreshToken));
-      then(valueOperations).should(times(1)).set(anyString(), eq("logout"), eq(remaining));
+    }
+  }
+
+  @Nested
+  class RegisterBlacklist {
+
+    private String accessTokenId;
+    private Duration remaining;
+
+    @BeforeEach
+    void SetUp() {
+      accessTokenId = "token id";
+      remaining = Duration.ofMinutes(5);
     }
 
     @ParameterizedTest
@@ -150,10 +150,9 @@ class JwtRegistryTest {
       remaining = Duration.ofMinutes(minutes);
 
       // when
-      jwtRegistry.deleteRefreshToken(userId, accessTokenId, remaining, refreshToken);
+      jwtRegistry.registerBlacklist(accessTokenId, remaining);
 
       // then
-      then(zSetOperations).should(times(1)).remove(anyString(), eq(refreshToken));
       then(valueOperations).should(never()).set(anyString(), anyString(), any(Duration.class));
     }
 
@@ -164,7 +163,7 @@ class JwtRegistryTest {
       given(redisTemplate.opsForValue()).willReturn(valueOperations);
 
       // when
-      jwtRegistry.deleteRefreshToken(userId, accessTokenId, remaining, refreshToken);
+      jwtRegistry.registerBlacklist(accessTokenId, remaining);
 
       // then
       then(valueOperations).should(times(1)).set(anyString(), eq("logout"), eq(remaining));
