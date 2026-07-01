@@ -74,6 +74,9 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
   }
 
   // 키워드 부분 매칭 조건 - 제목/설명 대소문자 구분 없이 부분 매칭
+  // TODO: containsIgnoreCase는 LIKE '%kw%' (선행 와일드카드)로 번역돼 B-Tree 인덱스를 못 타고 순차 스캔함.
+  //  데이터가 많아지면 pg_trgm + GIN 표현식 인덱스(LOWER(title)/LOWER(description))로 부분 문자열 검색을
+  //  가속하거나, 검색 요구가 커지면 ElasticSearch 도입을 검토.
   private BooleanExpression keywordContains(String keyword) {
     if (keyword == null || keyword.isBlank()) {
       return null;
@@ -167,6 +170,9 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
   }
 
   // 활성 시청 세션 상관 서브쿼리 집계값
+  // TODO: content를 참조하는 상관 서브쿼리라 콘텐츠 N건마다 watching_session 집계가 재실행됨.
+  //  특히 sortBy=WATCHER_COUNT면 WHERE(keyStep, tieBreak)와 ORDER BY 세 곳에 서브쿼리가 들어가 비용이 커짐.
+  //  추후 반정규화나 Redis ZSet 등으로 watcherCount를 사전 집계/캐싱해, 읽을 때마다 count 하는 구조를 개선.
   private Expression<Long> watcherCount() { // SQL 표현식을 반환
     return JPAExpressions.select(watchingSession.count())
         .from(watchingSession)
