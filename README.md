@@ -15,9 +15,100 @@
 - 프로젝트 기간: 2024.08.13 ~ 2024.09.03
 ---
 ## 기술 스택
-- Backend: Spring Boot, Spring Security, Spring Data JPA
-- Database: MySQL
+- Backend: Spring Boot, Spring Security, Spring Data JPA, QueryDSL
+- Database: PostgreSQL, Redis
 - 공통 Tool: Git & Github, Discord
+---
+
+<details>
+<summary><span style="font-size: 1.5em; font-weight: bold;">로컬 개발 환경</span></summary>
+<div markdown="1">
+
+### 사전 요구사항
+- JDK 17
+- Docker / Docker Compose
+
+### 1. 환경 변수 설정
+(.env 파일을 열어 필수 값 입력)
+```bash
+cp .env.example .env
+```
+
+### 2. 인프라 실행 (PostgreSQL · Redis)
+
+#### 시작 - 빌드 + 백그라운드 실행, 로그를 타임스탬프 파일로 저장
+```bash
+mkdir -p logs/docker && docker compose --env-file .env up -d --build 2>&1 | tee logs/docker/$(date +%Y%m%d_%H%M%S).log
+```
+
+#### 상태 / 로그 확인
+```bash
+docker compose ps                                                                  # 컨테이너 상태
+mkdir -p logs/db logs/redis
+docker compose logs -f db    | tee logs/db/$(date +%Y%m%d_%H%M%S).log               # DB 로그 (실시간 + 저장)
+docker compose logs -f redis | tee logs/redis/$(date +%Y%m%d_%H%M%S).log            # Redis 로그
+```
+
+#### 종료
+```bash
+docker compose down       # 중지 (데이터 보존)
+docker compose down -v    # 중지 + DB 초기화 (볼륨 삭제)
+```
+
+### 3. 애플리케이션 실행
+
+```bash
+mkdir -p logs/app && ./gradlew bootRun 2>&1 | tee logs/app/$(date +%Y%m%d_%H%M%S).log
+```
+
+프로파일을 명시적으로 지정해 실행 (dev가 기본값이라 보통 생략 가능)
+```bash
+./gradlew bootRun --args='--spring.profiles.active=dev'
+```
+
+실행 후 Swagger UI: http://localhost:8080/swagger-ui.html
+
+### 4. 빌드
+
+```bash
+./gradlew build          # 컴파일 + 테스트 + 패키징 (최초 build 시 Git pre-commit 훅 자동 설치)
+./gradlew clean build    # 클린 후 전체 빌드
+```
+
+> `build` 태스크는 `installGitHooks`에 의존해, 최초 빌드 시 `config/git-hooks`의 pre-commit 훅(커밋 시 `spotlessApply` 자동 실행)이 `.git/hooks`로 설치됩니다.
+
+### 5. 테스트 & 커버리지
+
+```bash
+./gradlew test                                                                  # 전체 테스트
+./gradlew test --tests 'com.team02.mopl.SomeTest'                               # 단일 테스트 클래스
+./gradlew test --tests 'com.team02.mopl.SomeTest.method'                        # 단일 테스트 메서드
+```
+
+```bash
+./gradlew jacocoTestReport                  # 커버리지 HTML/XML 리포트 생성
+./gradlew jacocoTestCoverageVerification    # 최소 커버리지(80%) 검증
+```
+
+- 커버리지 리포트: `build/reports/jacoco/test/html/index.html`
+
+> 테스트 프로파일(`test`)은 Testcontainers로 PostgreSQL 컨테이너를 자동으로 띄워 실행합니다. Docker가 실행 중이어야 합니다.
+> `test` 실행 후 `jacocoTestReport`가 자동으로 이어서 실행됩니다. QueryDSL/MapStruct 자동생성 코드는 커버리지 측정에서 제외됩니다.
+
+### 6. 코드 품질 검사
+
+```bash
+./gradlew spotlessApply   # 코드 포맷 자동 적용 (Google Java Format)
+./gradlew spotlessCheck   # 포맷 위반 검사 (수정 없이 확인만)
+./gradlew spotbugsMain    # 정적 분석 (버그 패턴 탐지)
+./gradlew check           # 전체 검증 (test + spotlessCheck + spotbugs 등 통합)
+```
+
+- SpotBugs 리포트: `build/reports/spotbugs/main.html`
+
+</div>
+</details>
+
 ---
 ## 팀원별 구현 기능 상세
 ### 박승민
