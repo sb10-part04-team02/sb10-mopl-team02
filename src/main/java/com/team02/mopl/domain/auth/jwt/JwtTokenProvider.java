@@ -83,9 +83,9 @@ public class JwtTokenProvider {
     }
   }
 
-  public JWTClaimsSet parseClaimsWithoutVerification(String accessToken) {
+  public JWTClaimsSet parseClaimsWithoutVerification(String token) {
     try {
-      return SignedJWT.parse(accessToken).getJWTClaimsSet();
+      return SignedJWT.parse(token).getJWTClaimsSet();
     } catch (Exception e) {
       throw new BadCredentialsException("파싱 불가능한 토큰입니다.", e);
     }
@@ -146,7 +146,8 @@ public class JwtTokenProvider {
       if (tokenExpirationTime == null) {
         throw new InsufficientAuthenticationException("Token 내에 만료시간이 누락되었습니다.");
       }
-      if (tokenExpirationTime.before(new Date())) {
+      // 만료시간이 지났거나 동일한 시간이라면
+      if (!tokenExpirationTime.after(new Date())) {
         throw new CredentialsExpiredException("만료된 토큰입니다.");
       }
 

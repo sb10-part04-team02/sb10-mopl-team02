@@ -37,46 +37,28 @@ public class JwtLogoutHandler implements LogoutHandler {
 
     String refreshToken = resolveRefreshToken(request);
     String accessToken = jwtUtils.resolveAccessToken(request.getHeader("Authorization"));
-    if (refreshToken == null || accessToken == null) {
-      // 토큰이 없으면 이미 로그아웃이나 다름없음
+
+    // 둘 다 없는 경우
+    if (refreshToken == null && accessToken == null) {
       return;
     }
 
-    JWTClaimsSet claimsSet;
-    UUID userId;
-    boolean isExpired = false;
-
-    try {
-      claimsSet = jwtTokenProvider.verifyAccessToken(accessToken);
-      userId = jwtUtils.getUserId(claimsSet);
-    } catch (CredentialsExpiredException e) {
-      isExpired = true;
-
-      try {
-        claimsSet = jwtTokenProvider.parseClaimsWithoutVerification(accessToken);
-        userId = jwtUtils.getUserId(claimsSet);
-      } catch (Exception ex) {
-        // 토큰마저 파싱안되면 종료
-        return;
-      }
-
-    } catch (Exception e) {
-      // 변조되었으면 Redis건드릴 필요도 없음
+    // refreshToken은 오지 않는 경우(쿠키 강제 삭제, 서드파티 쿠키 제한)
+    if (refreshToken == null) {
+      invalidateAccessToken(accessToken);
       return;
     }
 
-    if (!isExpired) {
-      String accessTokenId = claimsSet.getJWTID();
-
-      // 남은시간 구하기
-      Instant expirationTime = claimsSet.getExpirationTime().toInstant();
-      Duration remainingDuration = Duration.between(Instant.now(), expirationTime);
-
-      // access blacklist 등록
-      jwtRegistry.registerBlacklist(accessTokenId, remainingDuration);
+    // accessToken 오지 않는 경우(토큰 만료로 브라우저에서 제거, 클라이언트 버그)
+    UUID userId = extractUserIdWithoutVerification(refreshToken);
+    if (userId != null) {
+      jwtRegistry.deleteRefreshToken(userId, refreshToken);
     }
 
-    jwtRegistry.deleteRefreshToken(userId, refreshToken);
+    // 둘 다 오는 경우
+    if (accessToken != null) {
+      invalidateAccessToken(accessToken);
+    }
   }
 
   private String resolveRefreshToken(HttpServletRequest request) {
@@ -90,5 +72,33 @@ public class JwtLogoutHandler implements LogoutHandler {
         .map(Cookie::getValue)
         .findFirst()
         .orElse(null);
+  }
+
+  private UUID extractUserIdWithoutVerification(String token) {
+    try {
+      JWTClaimsSet claimsSet = jwtTokenProvider.parseClaimsWithoutVerification(token);
+      return jwtUtils.getUserId(claimsSet);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private void invalidateAccessToken(String accessToken) {
+    try {
+      JWTClaimsSet claimsSet = jwtTokenProvider.verifyAccessToken(accessToken);
+      String accessTokenId = claimsSet.getJWTID();
+
+      // 남은시간 구하기
+      Instant expirationTime = claimsSet.getExpirationTime().toInstant();
+      Duration remaining = Duration.between(Instant.now(), expirationTime);
+
+      // 양수시간만 블랙리스트에 등록(음수, zero시간은 verifyAccessToken에서 걸러짐)
+      jwtRegistry.registerBlacklist(accessTokenId, remaining);
+
+    } catch (CredentialsExpiredException e) {
+      // 만료된 토큰은 블랙리스트에 넣을 필요 없음
+    } catch (Exception e) {
+      // 변조된 토큰은 블랙리스트에 넣을 필요 없음
+    }
   }
 }

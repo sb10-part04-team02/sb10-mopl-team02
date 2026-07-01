@@ -8,8 +8,6 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.BDDMockito.willThrow;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -63,8 +61,8 @@ class JwtLogoutHandlerTest {
   }
 
   @Test
-  @DisplayName("쿠키 자체가 없는경우 조기 종료한다")
-  void fail_shouldEarlyReturn_whenCookieIsEmpty() {
+  @DisplayName("쿠키, 액세스 헤더가 없는경우 조기 종료한다")
+  void shouldEarlyReturn_whenRefreshCookieAndAccessHeaderIsEmpty() {
     // when
     jwtLogoutHandler.logout(request, response, mockAuth);
 
@@ -73,155 +71,12 @@ class JwtLogoutHandlerTest {
   }
 
   @Test
-  @DisplayName("refresh 토큰 쿠키가 없는 경우 조기 종료한다")
-  void fail_shouldEarlyReturn_whenRefreshCookieDoesNotExist() {
+  @DisplayName("refresh 토큰 쿠키가 없는 경우 액세스토큰 제거 후 조기 종료한다")
+  void shouldEarlyReturn_whenRefreshCookieDoesNotExist() {
     // given
-    request.setCookies(new Cookie("another_cookie", "value"));
-
-    // when
-    jwtLogoutHandler.logout(request, response, mockAuth);
-
-    // then
-    then(jwtTokenProvider).should(never()).verifyAccessToken(anyString());
-  }
-
-  @Test
-  @DisplayName("Authorization 헤더가 없으면 조기 종료한다")
-  void fail_shouldEarlyReturn_whenAuthorizationHeaderIsAbsent() {
-    // given
-    Cookie refreshTokenCookie = new Cookie(JwtUtils.REFRESH_TOKEN_COOKIE_NAME, "valid Token");
-    request.setCookies(refreshTokenCookie);
-
-    given(jwtUtils.resolveAccessToken(isNull())).willReturn(null);
-
-    // when
-    jwtLogoutHandler.logout(request, response, mockAuth);
-
-    // then
-    then(jwtTokenProvider).should(never()).verifyAccessToken(anyString());
-  }
-
-  @Test
-  @DisplayName("다른 타입의 인증토큰이 있으면 조기 종료한다")
-  void fail_shouldEarlyReturn_whenAuthorizationHeaderIsInvalid() {
-    // given
-    Cookie refreshTokenCookie = new Cookie(JwtUtils.REFRESH_TOKEN_COOKIE_NAME, "valid Token");
-    request.setCookies(refreshTokenCookie);
-
-    String invalidAccessToken = "Invalid Access Token";
-    request.addHeader("Authorization", "Basic " + invalidAccessToken);
-    given(jwtUtils.resolveAccessToken(anyString())).willReturn(null);
-
-    // when
-    jwtLogoutHandler.logout(request, response, mockAuth);
-
-    // then
-    then(jwtTokenProvider).should(never()).verifyAccessToken(anyString());
-  }
-
-  @Test
-  @DisplayName("access 토큰이 변조 되었으면 조기 종료한다")
-  void fail_shouldEarlyReturn_whenAccessTokenIsInvalid() {
-    // given
-    Cookie refreshTokenCookie = new Cookie(JwtUtils.REFRESH_TOKEN_COOKIE_NAME, "valid Token");
-    request.setCookies(refreshTokenCookie);
-
-    String invalidAccessToken = "Invalid Access Token";
-    request.addHeader("Authorization", "Bearer " + invalidAccessToken);
-
-    given(jwtTokenProvider.verifyAccessToken(anyString())).willThrow(BadCredentialsException.class);
-
-    // when
-    jwtLogoutHandler.logout(request, response, mockAuth);
-
-    // then
-    then(jwtUtils).should(never()).getUserId(any());
-  }
-
-  @Test
-  @DisplayName("claimSet 내부에 userId claim이 없으면 조기 종료한다")
-  void fail_shouldEarlyReturn_whenUserIdClaimDoesNotExist() {
-    // given
-    Cookie refreshTokenCookie = new Cookie(JwtUtils.REFRESH_TOKEN_COOKIE_NAME, "valid Token");
-    request.setCookies(refreshTokenCookie);
-
-    String accessTokenWithoutUserId = "Access Token Without UserId";
-    request.addHeader("Authorization", "Bearer " + accessTokenWithoutUserId);
-
     JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
+    given(jwtUtils.resolveAccessToken(isNull())).willReturn("access token");
     given(jwtTokenProvider.verifyAccessToken(anyString())).willReturn(mockClaimSet);
-    doThrow(BadCredentialsException.class).when(jwtUtils).getUserId(mockClaimSet);
-
-    // when
-    jwtLogoutHandler.logout(request, response, mockAuth);
-
-    // then
-    then(jwtRegistry).should(never()).deleteRefreshToken(any(), any());
-  }
-
-  @Test
-  @DisplayName("만료된 토큰이 들어오면 검증없는 파싱으로 진행된다")
-  void fail_shouldProceedToParseWithoutVerification_whenAccessTokenIsExpired() {
-    // given
-    Cookie refreshTokenCookie = new Cookie(JwtUtils.REFRESH_TOKEN_COOKIE_NAME, "valid Token");
-    request.setCookies(refreshTokenCookie);
-
-    String expiredAccessToken = "Expired Access Token";
-    request.addHeader("Authorization", "Bearer " + expiredAccessToken);
-
-    given(jwtTokenProvider.verifyAccessToken(anyString()))
-        .willThrow(CredentialsExpiredException.class);
-
-    JWTClaimsSet claimsSet = mock(JWTClaimsSet.class);
-    given(jwtTokenProvider.parseClaimsWithoutVerification(anyString())).willReturn(claimsSet);
-    willReturn(UUID.randomUUID()).given(jwtUtils).getUserId(claimsSet);
-
-    // when
-    jwtLogoutHandler.logout(request, response, mockAuth);
-
-    // then
-    then(jwtTokenProvider).should(times(1)).parseClaimsWithoutVerification(eq(expiredAccessToken));
-  }
-
-  @Test
-  @DisplayName("만료된 토큰에 userId를 구할 수 없으면 조기종료한다")
-  void fail_shouldEarlyReturn_whenUserIdExtractionFailsAfterExpiration() {
-    // given
-    Cookie refreshTokenCookie = new Cookie(JwtUtils.REFRESH_TOKEN_COOKIE_NAME, "valid Token");
-    request.setCookies(refreshTokenCookie);
-
-    String expiredAccessToken = "Expired Access Token";
-    request.addHeader("Authorization", "Bearer " + expiredAccessToken);
-
-    given(jwtTokenProvider.verifyAccessToken(anyString()))
-        .willThrow(CredentialsExpiredException.class);
-
-    JWTClaimsSet claimsSet = mock(JWTClaimsSet.class);
-    willThrow(BadCredentialsException.class).given(jwtUtils).getUserId(claimsSet);
-
-    // when
-    jwtLogoutHandler.logout(request, response, mockAuth);
-
-    // then
-    then(jwtRegistry).should(never()).deleteRefreshToken(any(), any());
-  }
-
-  @Test
-  @DisplayName("유효한 토큰들이 들어오면 성공적으로 로그아웃처리를 진행한다")
-  void success_shouldCompleteLogoutSuccessfully_whenTokensAreValid() {
-    // given
-    String refreshToken = "Refresh Token";
-    Cookie refreshTokenCookie = new Cookie(JwtUtils.REFRESH_TOKEN_COOKIE_NAME, refreshToken);
-    request.setCookies(refreshTokenCookie);
-
-    String accessToken = "Access Token";
-    request.addHeader("Authorization", "Bearer " + accessToken);
-
-    JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
-    given(jwtTokenProvider.verifyAccessToken(anyString())).willReturn(mockClaimSet);
-
-    UUID userId = UUID.randomUUID();
-    doReturn(userId).when(jwtUtils).getUserId(mockClaimSet);
 
     String accessTokenId = UUID.randomUUID().toString();
     given(mockClaimSet.getJWTID()).willReturn(accessTokenId);
@@ -233,6 +88,109 @@ class JwtLogoutHandlerTest {
     jwtLogoutHandler.logout(request, response, mockAuth);
 
     // then
+    then(jwtRegistry).should(times(1)).registerBlacklist(eq(accessTokenId), any(Duration.class));
+  }
+
+  @Test
+  @DisplayName("만료된 액세스 토큰이면 블랙리스트 등록을 스킵한다")
+  void shouldSkipBlacklist_whenAccessTokenIsExpired() {
+    // given
+    JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
+    given(jwtUtils.resolveAccessToken(isNull())).willReturn("expired access token");
+    given(jwtTokenProvider.verifyAccessToken(anyString()))
+        .willThrow(CredentialsExpiredException.class);
+
+    // when
+    jwtLogoutHandler.logout(request, response, mockAuth);
+
+    // then
+    then(jwtRegistry).should(never()).registerBlacklist(anyString(), any(Duration.class));
+  }
+
+  @Test
+  @DisplayName("변조된 액세스 토큰이면 블랙리스트 등록을 스킵한다")
+  void shouldSkipBlacklist_whenAccessTokenIsManipulated() {
+    // given
+    JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
+    given(jwtUtils.resolveAccessToken(isNull())).willReturn("manipulated access token");
+    given(jwtTokenProvider.verifyAccessToken(anyString())).willThrow(BadCredentialsException.class);
+
+    // when
+    jwtLogoutHandler.logout(request, response, mockAuth);
+
+    // then
+    then(jwtRegistry).should(never()).registerBlacklist(anyString(), any(Duration.class));
+  }
+
+  @Test
+  @DisplayName("refreshToken에서 검증없이 userId를 추출한다")
+  void shouldExtractUserIdWithoutVerification_whenRefreshTokenIsUntrusted() {
+    // given
+    String refreshToken = "untrusted refresh Token";
+    Cookie refreshTokenCookie = new Cookie(JwtUtils.REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+    request.setCookies(refreshTokenCookie);
+
+    JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
+    given(jwtTokenProvider.parseClaimsWithoutVerification(refreshToken)).willReturn(mockClaimSet);
+    UUID userId = UUID.randomUUID();
+    willReturn(userId).given(jwtUtils).getUserId(mockClaimSet);
+
+    // when
+    jwtLogoutHandler.logout(request, response, mockAuth);
+
+    // then
     then(jwtRegistry).should(times(1)).deleteRefreshToken(eq(userId), eq(refreshToken));
+  }
+
+  @Test
+  @DisplayName("유저ID를 추출할 수 없으면 refreshToken을 삭제하지 않는다")
+  void shouldNotDeleteRefreshToken_whenUserIdExtractionFails() {
+    // given
+    String refreshToken = "untrusted refresh Token";
+    Cookie refreshTokenCookie = new Cookie(JwtUtils.REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+    request.setCookies(refreshTokenCookie);
+
+    JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
+    given(jwtTokenProvider.parseClaimsWithoutVerification(refreshToken)).willReturn(mockClaimSet);
+    UUID userId = UUID.randomUUID();
+    willThrow(BadCredentialsException.class).given(jwtUtils).getUserId(mockClaimSet);
+
+    // when
+    jwtLogoutHandler.logout(request, response, mockAuth);
+
+    // then
+    then(jwtRegistry).should(never()).deleteRefreshToken(any(), anyString());
+  }
+
+  @Test
+  @DisplayName("유효한 토큰들이 들어오면 refresh는 삭제하고 access는 블랙리스트에 추가한다")
+  void shouldDeleteRefreshAndRegisterAccess_whenTokensAreValid() {
+    // given
+    String refreshToken = "Refresh Token";
+    Cookie refreshTokenCookie = new Cookie(JwtUtils.REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+    request.setCookies(refreshTokenCookie);
+
+    String accessToken = "Access Token";
+    request.addHeader("Authorization", "Bearer " + accessToken);
+
+    JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
+    given(jwtTokenProvider.parseClaimsWithoutVerification(refreshToken)).willReturn(mockClaimSet);
+
+    UUID userId = UUID.randomUUID();
+    willReturn(userId).given(jwtUtils).getUserId(mockClaimSet);
+
+    String accessTokenId = UUID.randomUUID().toString();
+    given(jwtTokenProvider.verifyAccessToken(eq(accessToken))).willReturn(mockClaimSet);
+    given(mockClaimSet.getJWTID()).willReturn(accessTokenId);
+
+    Instant futureTime = Instant.now().plus(Duration.ofMinutes(10));
+    given(mockClaimSet.getExpirationTime()).willReturn(Date.from(futureTime));
+
+    // when
+    jwtLogoutHandler.logout(request, response, mockAuth);
+
+    // then
+    then(jwtRegistry).should(times(1)).deleteRefreshToken(eq(userId), eq(refreshToken));
+    then(jwtRegistry).should(times(1)).registerBlacklist(eq(accessTokenId), any(Duration.class));
   }
 }
