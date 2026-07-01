@@ -71,4 +71,16 @@ public class JwtRegistry {
   private String blacklistKey(String accessTokenId) {
     return blacklistPrefix + accessTokenId;
   }
+
+  public boolean hasRefreshToken(UUID userId, String refreshToken) {
+    String userKey = userKey(userId);
+    // 값이 있으면 double값, 없으면 null. O(1)
+    return Objects.nonNull(redisTemplate.opsForZSet().score(userKey, refreshToken));
+  }
+
+  public void deleteAllRefreshTokens(UUID userId) {
+    String userKey = userKey(userId);
+    // 키값 전체삭제
+    redisTemplate.delete(userKey);
+  }
 }
