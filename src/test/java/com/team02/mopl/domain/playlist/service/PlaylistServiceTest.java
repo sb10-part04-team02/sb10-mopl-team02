@@ -17,6 +17,8 @@ import com.team02.mopl.domain.playlist.exception.PlaylistForbiddenException;
 import com.team02.mopl.domain.playlist.exception.PlaylistNotFoundException;
 import com.team02.mopl.domain.playlist.mapper.PlaylistMapper;
 import com.team02.mopl.domain.playlist.repository.PlaylistRepository;
+import com.team02.mopl.domain.subscription.entity.Subscription;
+import com.team02.mopl.domain.subscription.repository.SubscriptionRepository;
 import com.team02.mopl.domain.user.dto.UserSummary;
 import java.time.Instant;
 import java.util.List;
@@ -39,6 +41,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class PlaylistServiceTest {
 
   @Mock PlaylistRepository playlistRepository;
+
+  @Mock SubscriptionRepository subscriptionRepository;
 
   @Mock PlaylistMapper playlistMapper;
 
@@ -214,23 +218,29 @@ class PlaylistServiceTest {
     private final UUID ownerId = UUID.randomUUID();
 
     @Test
-    @DisplayName("소유자가 요청하면 플레이리스트를 소프트 삭제한다")
+    @DisplayName("소유자가 요청하면 플레이리스트와 구독을 소프트 삭제한다")
     void success_whenRequesterIsOwner() {
       // given
       Playlist playlist = new Playlist(ownerId, "기존 제목", "기존 설명");
+      Subscription subscription1 = new Subscription(UUID.randomUUID(), playlist);
+      Subscription subscription2 = new Subscription(UUID.randomUUID(), playlist);
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
+      given(subscriptionRepository.findByPlaylist_IdAndDeletedAtIsNull(playlistId))
+          .willReturn(List.of(subscription1, subscription2));
 
       // when
       playlistService.delete(playlistId, ownerId);
 
       // then
       assertThat(playlist.isDeleted()).isTrue();
+      assertThat(subscription1.isDeleted()).isTrue();
+      assertThat(subscription2.isDeleted()).isTrue();
       then(playlistRepository).should().flush();
     }
 
     @Test
-    @DisplayName("플레이리스트가 없으면 PLAYLIST_NOT_FOUND 예외를 던진다")
+    @DisplayName("플레이리스트가 없으면 PLAYLIST_NOT_FOUND 예외를 던지고 구독을 조회하지 않는다")
     void fail_whenPlaylistNotFound() {
       // given
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId)).willReturn(Optional.empty());
@@ -238,11 +248,12 @@ class PlaylistServiceTest {
       // when & then
       assertThatThrownBy(() -> playlistService.delete(playlistId, ownerId))
           .isInstanceOf(PlaylistNotFoundException.class);
+      then(subscriptionRepository).should(never()).findByPlaylist_IdAndDeletedAtIsNull(any());
       then(playlistRepository).should(never()).flush();
     }
 
     @Test
-    @DisplayName("요청자가 소유자가 아니면 FORBIDDEN 예외를 던진다")
+    @DisplayName("요청자가 소유자가 아니면 FORBIDDEN 예외를 던지고 구독을 조회하지 않는다")
     void fail_whenRequesterIsNotOwner() {
       // given
       Playlist playlist = new Playlist(ownerId, "기존 제목", "기존 설명");
@@ -254,6 +265,7 @@ class PlaylistServiceTest {
       assertThatThrownBy(() -> playlistService.delete(playlistId, otherUserId))
           .isInstanceOf(PlaylistForbiddenException.class);
       assertThat(playlist.isDeleted()).isFalse();
+      then(subscriptionRepository).should(never()).findByPlaylist_IdAndDeletedAtIsNull(any());
       then(playlistRepository).should(never()).flush();
     }
   }

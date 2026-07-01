@@ -8,6 +8,9 @@ import com.team02.mopl.domain.playlist.exception.PlaylistForbiddenException;
 import com.team02.mopl.domain.playlist.exception.PlaylistNotFoundException;
 import com.team02.mopl.domain.playlist.mapper.PlaylistMapper;
 import com.team02.mopl.domain.playlist.repository.PlaylistRepository;
+import com.team02.mopl.domain.subscription.entity.Subscription;
+import com.team02.mopl.domain.subscription.repository.SubscriptionRepository;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlaylistService {
 
   private final PlaylistRepository playlistRepository;
+  private final SubscriptionRepository subscriptionRepository;
   private final PlaylistMapper playlistMapper;
 
   @Transactional
@@ -73,8 +77,17 @@ public class PlaylistService {
     }
 
     playlist.delete();
+
+    List<Subscription> subscriptions =
+        subscriptionRepository.findByPlaylist_IdAndDeletedAtIsNull(playlistId);
+    subscriptions.forEach(Subscription::delete);
+
     playlistRepository.flush();
 
-    log.info("플레이리스트 삭제 성공: playlistId={}, requesterId={}", playlistId, requesterId);
+    log.info(
+        "플레이리스트 삭제 성공: playlistId={}, requesterId={}, deletedSubscriptionCount={}",
+        playlistId,
+        requesterId,
+        subscriptions.size());
   }
 }
