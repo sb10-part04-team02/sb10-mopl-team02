@@ -2,6 +2,7 @@ package com.team02.mopl.domain.auth.controller;
 
 import com.team02.mopl.domain.auth.dto.JwtDto;
 import com.team02.mopl.domain.auth.dto.SignInRequest;
+import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import com.team02.mopl.global.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -10,10 +11,12 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.web.bind.annotation.CookieValue;
 
 @Tag(name = "인증 관리")
 public interface AuthApi {
@@ -73,4 +76,29 @@ public interface AuthApi {
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   })
   void signOut();
+
+  @Operation(
+      summary = "토큰 재발급",
+      description = "쿠키(REFRESH_TOKEN)에 저장된 리프레시 토큰으로 리프레시 토큰과 엑세스 토큰을 재발급합니다.")
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "성공",
+        content = @Content(schema = @Schema(implementation = JwtDto.class))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<JwtDto> refresh(
+      @CookieValue(name = JwtUtils.REFRESH_TOKEN_COOKIE_NAME) String refreshToken,
+      HttpServletResponse response);
 }

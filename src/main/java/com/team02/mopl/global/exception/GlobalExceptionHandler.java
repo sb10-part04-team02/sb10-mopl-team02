@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestCookieException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -71,12 +72,23 @@ public class GlobalExceptionHandler {
   // 스택 트레이스는 서버 로그에만 기록
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ErrorResponse> handleException(Exception e) {
-    log.error("Unexpected server error", e);
 
-    ErrorResponse response =
-        new ErrorResponse(
-            "InternalServerException", "서버 내부 오류가 발생했습니다.", Map.of("reason", "관리자에게 문의해주세요."));
+    String exceptionName = "InternalServerException";
+    HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+    String message = "서버 내부 오류가 발생했습니다.";
+    Map<String, String> details = Map.of("reason", "관리자에게 문의해주세요.");
 
-    return ResponseEntity.internalServerError().body(response);
+    // 스프링 예외 추가
+    if (e instanceof MissingRequestCookieException) {
+      exceptionName = "AuthenticationRequiredException";
+      status = HttpStatus.UNAUTHORIZED;
+      message = "인증 쿠키가 누락되었습니다.";
+      details = null;
+    } else {
+      log.error("Unexpected server error", e);
+    }
+
+    ErrorResponse response = new ErrorResponse(exceptionName, message, details);
+    return ResponseEntity.status(status).body(response);
   }
 }
