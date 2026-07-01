@@ -49,7 +49,7 @@ public class PlaylistService {
     }
 
     playlist.update(request.title(), request.description());
-
+    playlistRepository.flush();
     // 소유자 본인의 플레이리스트이므로 subscribedByMe는 false
     PlaylistDto playlistDto = playlistMapper.toDto(playlist, false);
 
