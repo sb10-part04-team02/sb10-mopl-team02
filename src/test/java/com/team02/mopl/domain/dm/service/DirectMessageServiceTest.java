@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 
 import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
+import com.team02.mopl.domain.dm.dto.ConversationSearchRequest;
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageSearchRequest;
 import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
@@ -17,6 +18,7 @@ import com.team02.mopl.domain.dm.dto.DmSentEvent;
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.domain.dm.entity.ConversationMember;
 import com.team02.mopl.domain.dm.entity.DirectMessage;
+import com.team02.mopl.domain.dm.enums.ConversationSortBy;
 import com.team02.mopl.domain.dm.enums.DirectMessageSortBy;
 import com.team02.mopl.domain.dm.repository.ConversationMemberRepository;
 import com.team02.mopl.domain.dm.repository.ConversationRepository;
@@ -449,6 +451,138 @@ class DirectMessageServiceTest {
 
     assertThat(result.lastMessage()).isNull();
     assertThat(result.hasUnread()).isFalse();
+  }
+
+  // ──────────────────────────────────────────────
+  // getConversations
+  // ──────────────────────────────────────────────
+
+  @Test
+  @DisplayName("대화 목록을 조회하면 CursorResponse를 반환한다")
+  void getConversations_success_returnsCursorResponse() {
+    UUID requesterId = UUID.randomUUID();
+    UUID withUserId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+
+    Conversation conv = mock(Conversation.class);
+    given(conv.getId()).willReturn(conversationId);
+    given(conv.getCreatedAt()).willReturn(Instant.now());
+
+    ConversationMember withUserMember = mockConversationMemberWithUser(withUserId, "상대방", null);
+    ConversationMember requesterMember = mockConversationMember(requesterId, Instant.now());
+
+    given(
+            conversationRepository.findConversationsByCursor(
+                requesterId, SortDirection.DESCENDING, null, null, 21))
+        .willReturn(List.of(conv));
+    given(conversationRepository.countByMemberUserId(requesterId)).willReturn(1L);
+    given(conversationMemberRepository.findWithUserMember(conversationId, requesterId))
+        .willReturn(Optional.of(withUserMember));
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(Optional.of(requesterMember));
+    given(
+            directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(
+                conversationId))
+        .willReturn(Optional.empty());
+
+    CursorResponse<ConversationDto> result =
+        directMessageService.getConversations(
+            requesterId, new ConversationSearchRequest(null, null, null, null, null));
+
+    assertThat(result.data()).hasSize(1);
+    assertThat(result.data().get(0).id()).isEqualTo(conversationId);
+    assertThat(result.data().get(0).with().userId()).isEqualTo(withUserId);
+    assertThat(result.hasNext()).isFalse();
+    assertThat(result.totalCount()).isEqualTo(1L);
+    assertThat(result.sortBy()).isEqualTo(ConversationSortBy.CREATED_AT.name());
+    assertThat(result.sortDirection()).isEqualTo(SortDirection.DESCENDING.name());
+  }
+
+  @Test
+  @DisplayName("대화 목록이 limit보다 하나 많으면 hasNext=true이고 nextCursor가 설정된다")
+  void getConversations_hasNext_whenResultsExceedLimit() {
+    UUID requesterId = UUID.randomUUID();
+    UUID withUserId = UUID.randomUUID();
+
+    UUID convId1 = UUID.randomUUID();
+    UUID convId2 = UUID.randomUUID();
+    Instant t1 = Instant.parse("2026-06-29T02:00:00Z");
+    Instant t2 = Instant.parse("2026-06-29T01:00:00Z");
+
+    Conversation conv1 = mock(Conversation.class);
+    given(conv1.getId()).willReturn(convId1);
+    given(conv1.getCreatedAt()).willReturn(t1);
+
+    Conversation conv2 = mock(Conversation.class);
+    given(conv2.getId()).willReturn(convId2);
+    given(conv2.getCreatedAt()).willReturn(t2);
+
+    ConversationMember withMember = mockConversationMemberWithUser(withUserId, "상대방", null);
+    ConversationMember requesterMember = mockConversationMember(requesterId, Instant.now());
+
+    given(
+            conversationRepository.findConversationsByCursor(
+                requesterId, SortDirection.DESCENDING, null, null, 2))
+        .willReturn(List.of(conv1, conv2));
+    given(conversationRepository.countByMemberUserId(requesterId)).willReturn(3L);
+
+    for (UUID id : List.of(convId1, convId2)) {
+      given(conversationMemberRepository.findWithUserMember(id, requesterId))
+          .willReturn(Optional.of(withMember));
+      given(conversationMemberRepository.findByConversationIdAndUserId(id, requesterId))
+          .willReturn(Optional.of(requesterMember));
+      given(directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(id))
+          .willReturn(Optional.empty());
+    }
+
+    CursorResponse<ConversationDto> result =
+        directMessageService.getConversations(
+            requesterId, new ConversationSearchRequest(null, null, 1, null, null));
+
+    assertThat(result.data()).hasSize(1);
+    assertThat(result.hasNext()).isTrue();
+    assertThat(result.nextCursor()).isEqualTo(t1.toString());
+    assertThat(result.nextIdAfter()).isEqualTo(convId1);
+  }
+
+  @Test
+  @DisplayName("대화 목록의 마지막 메시지와 읽지 않음 여부가 올바르게 설정된다")
+  void getConversations_withLastMessage_setsHasUnreadCorrectly() {
+    UUID requesterId = UUID.randomUUID();
+    UUID withUserId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+    Instant lastReadAt = Instant.parse("2026-06-29T01:00:00Z");
+    Instant messageAt = Instant.parse("2026-06-29T02:00:00Z");
+
+    Conversation conv = mock(Conversation.class);
+    given(conv.getId()).willReturn(conversationId);
+    given(conv.getCreatedAt()).willReturn(Instant.now());
+
+    ConversationMember withUserMember = mockConversationMemberWithUser(withUserId, "상대방", null);
+    ConversationMember requesterMember = mockConversationMember(requesterId, lastReadAt);
+    DirectMessage lastDm = mockDirectMessage(conversationId, withUserId, requesterId, messageAt);
+
+    given(
+            conversationRepository.findConversationsByCursor(
+                requesterId, SortDirection.DESCENDING, null, null, 21))
+        .willReturn(List.of(conv));
+    given(conversationRepository.countByMemberUserId(requesterId)).willReturn(1L);
+    given(conversationMemberRepository.findWithUserMember(conversationId, requesterId))
+        .willReturn(Optional.of(withUserMember));
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(Optional.of(requesterMember));
+    given(
+            directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(
+                conversationId))
+        .willReturn(Optional.of(lastDm));
+
+    CursorResponse<ConversationDto> result =
+        directMessageService.getConversations(
+            requesterId, new ConversationSearchRequest(null, null, null, null, null));
+
+    assertThat(result.data().get(0).hasUnread()).isTrue();
+    assertThat(result.data().get(0).lastMessage()).isNotNull();
+    assertThat(result.data().get(0).lastMessage().content()).isEqualTo("안녕하세요");
   }
 
   // ──────────────────────────────────────────────

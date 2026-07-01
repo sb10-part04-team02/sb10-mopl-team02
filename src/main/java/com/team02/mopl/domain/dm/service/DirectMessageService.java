@@ -4,6 +4,7 @@ import static com.team02.mopl.global.exception.ErrorCode.USER_NOT_FOUND;
 
 import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
+import com.team02.mopl.domain.dm.dto.ConversationSearchRequest;
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageSearchRequest;
 import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
@@ -11,6 +12,7 @@ import com.team02.mopl.domain.dm.dto.DmSentEvent;
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.domain.dm.entity.ConversationMember;
 import com.team02.mopl.domain.dm.entity.DirectMessage;
+import com.team02.mopl.domain.dm.enums.ConversationSortBy;
 import com.team02.mopl.domain.dm.enums.DirectMessageSortBy;
 import com.team02.mopl.domain.dm.exception.ConversationAlreadyExistsException;
 import com.team02.mopl.domain.dm.exception.ConversationForbiddenException;
@@ -154,6 +156,40 @@ public class DirectMessageService {
   }
 
   @Transactional(readOnly = true)
+  public CursorResponse<ConversationDto> getConversations(
+      UUID requesterId, ConversationSearchRequest request) {
+    int limit = CursorPageRequest.normalizeLimit(request.limit());
+    SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
+
+    List<Conversation> conversations =
+        conversationRepository.findConversationsByCursor(
+            requesterId, direction, request.cursor(), request.idAfter(), limit + 1);
+
+    boolean hasNext = conversations.size() > limit;
+    List<Conversation> page = hasNext ? conversations.subList(0, limit) : conversations;
+
+    List<ConversationDto> data = page.stream().map(c -> toConversationDto(c, requesterId)).toList();
+    long totalCount = conversationRepository.countByMemberUserId(requesterId);
+
+    String nextCursor = null;
+    UUID nextIdAfter = null;
+    if (hasNext) {
+      Conversation last = page.get(page.size() - 1);
+      nextCursor = last.getCreatedAt().toString();
+      nextIdAfter = last.getId();
+    }
+
+    return new CursorResponse<>(
+        data,
+        nextCursor,
+        nextIdAfter,
+        hasNext,
+        totalCount,
+        ConversationSortBy.CREATED_AT.name(),
+        direction.name());
+  }
+
+  @Transactional(readOnly = true)
   public CursorResponse<DirectMessageDto> getDirectMessages(
       UUID conversationId, UUID requesterId, DirectMessageSearchRequest request) {
     if (!conversationMemberRepository.existsByConversationIdAndUserId(
@@ -221,6 +257,33 @@ public class DirectMessageService {
     eventPublisher.publishEvent(new DmSentEvent(receiverUserId, saved.getId().toString(), dto));
 
     return dto;
+  }
+
+  private ConversationDto toConversationDto(Conversation conversation, UUID requesterId) {
+    UUID conversationId = conversation.getId();
+
+    ConversationMember withUserMember =
+        conversationMemberRepository
+            .findWithUserMember(conversationId, requesterId)
+            .orElseThrow(ConversationForbiddenException::new);
+
+    ConversationMember requesterMember =
+        conversationMemberRepository
+            .findByConversationIdAndUserId(conversationId, requesterId)
+            .orElseThrow(ConversationForbiddenException::new);
+
+    User withUser = withUserMember.getUser();
+    Optional<DirectMessage> lastDm =
+        directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversationId);
+
+    return new ConversationDto(
+        conversationId,
+        new UserSummary(withUser.getId(), withUser.getName(), withUser.getProfileImageUrl()),
+        lastDm.map(this::toDirectMessageDto).orElse(null),
+        lastDm
+            .filter(dm -> !dm.getSender().getUser().getId().equals(requesterId))
+            .map(dm -> dm.getCreatedAt().isAfter(requesterMember.getLastReadAt()))
+            .orElse(false));
   }
 
   private DirectMessageDto toDirectMessageDto(DirectMessage dm) {
