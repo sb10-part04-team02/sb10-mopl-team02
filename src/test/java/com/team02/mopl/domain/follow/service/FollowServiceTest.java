@@ -89,6 +89,8 @@ class FollowServiceTest {
     assertThat(notificationCommand.receiverId()).isEqualTo(followeeId);
     assertThat(notificationCommand.level()).isEqualTo(NotificationLevel.INFO);
     assertThat(notificationCommand.notificationType()).isEqualTo(NotificationType.USER_FOLLOWED);
+    assertThat(notificationCommand.title()).isEqualTo("새 팔로워 알림");
+    assertThat(notificationCommand.content()).isEqualTo("팔로워님이 팔로우했습니다.");
   }
 
   @Test
