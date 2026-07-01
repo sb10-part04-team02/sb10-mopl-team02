@@ -11,9 +11,11 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.util.StringUtils;
 
 @Entity
 @Table(name = "contents")
@@ -44,24 +46,32 @@ public class Content extends BaseMutableEntity {
   private List<Tag> tags = new ArrayList<>();
 
   public Content(ContentType contentType, String title, String description, String thumbnailUrl) {
-    this.contentType = contentType;
-    this.title = title;
-    this.description = description;
-    this.thumbnailUrl = thumbnailUrl;
+    this.contentType = Objects.requireNonNull(contentType, "contentType은 null일 수 없습니다.");
+    this.title = validateNotBlank(title, "title");
+    this.description = validateNotBlank(description, "description");
+    this.thumbnailUrl = validateNotBlank(thumbnailUrl, "thumbnailUrl은 null일 수 없습니다.");
   }
 
   public void update(String title, String description) {
-    if (title != null) {
+    if (StringUtils.hasText(title)) {
       this.title = title;
     }
-    if (description != null) {
+    if (StringUtils.hasText(description)) {
       this.description = description;
     }
   }
 
   public void changeThumbnailUrl(String thumbnailUrl) {
-    if (thumbnailUrl != null) {
+    if (StringUtils.hasText(thumbnailUrl)) {
       this.thumbnailUrl = thumbnailUrl;
     }
+  }
+
+  private static String validateNotBlank(String value, String field) {
+    Objects.requireNonNull(value, field + "은(는) null일 수 없습니다.");
+    if (value.isBlank()) {
+      throw new IllegalArgumentException(field + "은(는) 공백일 수 없습니다.");
+    }
+    return value;
   }
 }
