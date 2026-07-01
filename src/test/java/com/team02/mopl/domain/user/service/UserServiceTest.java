@@ -12,9 +12,11 @@ import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
+import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -119,6 +121,46 @@ class UserServiceTest {
       // then
       assertThat(actual).isEqualTo(expect);
       assertThat(actual.email()).isEqualTo(shortEmail);
+    }
+  }
+
+  @Nested
+  class GetUser {
+
+    @Test
+    @DisplayName("존재하는 사용자를 조회하면 UserDto를 반환한다")
+    void success_shouldReturnUserDto_whenUserExists() {
+      UUID userId = UUID.randomUUID();
+      User user = new User("우디", "woody@mopl.io", "password", null, Role.USER, false);
+      UserDto expect =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-01T00:00:00Z"),
+              "woody@mopl.io",
+              "우디",
+              null,
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(userMapper.toDto(user)).willReturn(expect);
+
+      UserDto actual = userService.getUser(userId);
+
+      assertThat(actual).isEqualTo(expect);
+      then(userRepository).should().findByIdAndDeletedAtIsNull(userId);
+      then(userMapper).should().toDto(user);
+    }
+
+    @Test
+    @DisplayName("존재하지 않거나 삭제된 사용자를 조회하면 UserNotFoundException이 발생한다")
+    void fail_shouldThrowUserNotFoundException_whenUserDoesNotExist() {
+      UUID userId = UUID.randomUUID();
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.empty());
+
+      assertThrows(UserNotFoundException.class, () -> userService.getUser(userId));
+
+      then(userRepository).should().findByIdAndDeletedAtIsNull(userId);
     }
   }
 }
