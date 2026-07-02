@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class PlaylistRepositoryTest extends RepositoryTestSupport {
 
@@ -155,6 +156,77 @@ class PlaylistRepositoryTest extends RepositoryTestSupport {
             10);
 
     assertThat(result).extracting(Playlist::getId).containsExactly(first.getId());
+  }
+
+  @Test
+  @DisplayName("subscriberCount 내림차순으로 정렬해 반환한다")
+  void findPlaylistsByCursor_sortsBySubscriberCountDesc() {
+    savePlaylistWithSubscriberCount("적음", 1L);
+    savePlaylistWithSubscriberCount("많음", 5L);
+    savePlaylistWithSubscriberCount("중간", 3L);
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null, PlaylistSortBy.SUBSCRIBE_COUNT, SortDirection.DESCENDING, null, null, 10);
+
+    assertThat(result).extracting(Playlist::getSubscriberCount).containsExactly(5L, 3L, 1L);
+  }
+
+  @Test
+  @DisplayName("subscriberCount 커서 이후 항목만 반환한다 (DESC, 복합키 경계)")
+  void findPlaylistsByCursor_bySubscriberCount_returnsItemsAfterCursor() {
+    Playlist high = savePlaylistWithSubscriberCount("높음", 5L);
+    Playlist mid = savePlaylistWithSubscriberCount("중간", 3L);
+    Playlist low = savePlaylistWithSubscriberCount("낮음", 1L);
+    em.flush();
+
+    // 중간(3)을 커서로 넘기면 그 이후(더 작은 subscriberCount)인 낮음(1)만 남는다
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.SUBSCRIBE_COUNT,
+            SortDirection.DESCENDING,
+            Long.toString(mid.getSubscriberCount()),
+            mid.getId(),
+            10);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(low.getId());
+    assertThat(result).doesNotContain(high);
+  }
+
+  @Test
+  @DisplayName("subscriberCount 동률이면 id 타이브레이커로 커서 이후 항목만 반환한다")
+  void findPlaylistsByCursor_bySubscriberCount_breaksTiesById() {
+    savePlaylistWithSubscriberCount("동률 A", 2L);
+    savePlaylistWithSubscriberCount("동률 B", 2L);
+    em.flush();
+
+    // DB 정렬 순서(UUID 비교는 Java와 다를 수 있으므로 실제 조회 결과로 확인)에서
+    // 첫 항목을 커서로 넘기면 그 이후인 두 번째 항목만 남는다
+    List<Playlist> all =
+        playlistRepository.findPlaylistsByCursor(
+            null, PlaylistSortBy.SUBSCRIBE_COUNT, SortDirection.DESCENDING, null, null, 10);
+    assertThat(all).hasSize(2);
+    Playlist cursor = all.get(0);
+    Playlist remaining = all.get(1);
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.SUBSCRIBE_COUNT,
+            SortDirection.DESCENDING,
+            Long.toString(cursor.getSubscriberCount()),
+            cursor.getId(),
+            10);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(remaining.getId());
+  }
+
+  private Playlist savePlaylistWithSubscriberCount(String title, long subscriberCount) {
+    Playlist playlist = new Playlist(ownerId, title, "설명");
+    ReflectionTestUtils.setField(playlist, "subscriberCount", subscriberCount);
+    return playlistRepository.save(playlist);
   }
 
   private long countActiveWithKeyword(String keyword) {
