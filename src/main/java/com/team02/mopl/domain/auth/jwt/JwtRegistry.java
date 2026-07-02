@@ -24,6 +24,7 @@ public class JwtRegistry {
   private final JwtProperties properties;
   private final StringRedisTemplate redisTemplate;
 
+  // TODO: 기본구현 후 LuaScript를 통한 원자적 처리 구현
   public void registerRefreshToken(UUID userId, String refreshToken) {
     String key = userKey(userId);
     long now = System.currentTimeMillis();
@@ -72,6 +73,7 @@ public class JwtRegistry {
     return blacklistPrefix + accessTokenId;
   }
 
+  // TODO: 기본구현 후 LuaScript를 통한 원자적 처리 구현
   public RotationResult rotateRefreshToken(
       UUID userId, String refreshToken, String newRefreshToken) {
     String key = userKey(userId);
