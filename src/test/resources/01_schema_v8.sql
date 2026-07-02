@@ -251,3 +251,12 @@ CREATE INDEX ix_reviews_content_created_id
 
 CREATE INDEX ix_reviews_content_rating_id
     ON reviews (content_id, rating, id) WHERE deleted_at IS NULL;
+
+--==================================================================================================
+-- 대화방별 마지막 DM 조회용 복합 인덱스
+-- (conversation_id, created_at DESC, id DESC) 순으로 정렬되어 있어야
+-- 대화방당 NOT EXISTS 서브쿼리 풀스캔 없이 DISTINCT ON으로 최신 메시지 1건을 인덱스만으로 찾을 수 있음
+--==================================================================================================
+
+CREATE INDEX ix_direct_messages_conversation_created_id
+    ON direct_messages (conversation_id, created_at DESC, id DESC);
