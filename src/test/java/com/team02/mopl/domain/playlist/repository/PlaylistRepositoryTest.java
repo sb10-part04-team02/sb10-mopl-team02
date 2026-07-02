@@ -7,6 +7,8 @@ import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.entity.PlaylistContent;
+import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
+import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.support.RepositoryTestSupport;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -97,6 +99,66 @@ class PlaylistRepositoryTest extends RepositoryTestSupport {
     assertThat(
             playlistContentRepository.existsByPlaylistIdAndContentId(playlist.getId(), contentId))
         .isFalse();
+  }
+
+  @Test
+  @DisplayName("커서 조회는 논리 삭제 플레이리스트를 제외하고 updatedAt 내림차순으로 반환한다")
+  void findPlaylistsByCursor_excludesSoftDeleted_andSortsByUpdatedAtDesc() {
+    Playlist first = playlistRepository.save(new Playlist(ownerId, "첫 번째", "설명"));
+    em.flush();
+    Playlist second = playlistRepository.save(new Playlist(ownerId, "두 번째", "설명"));
+    em.flush();
+    Playlist deleted = playlistRepository.save(new Playlist(ownerId, "삭제됨", "설명"));
+    deleted.delete();
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null, PlaylistSortBy.UPDATED_AT, SortDirection.DESCENDING, null, null, 10);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(second.getId(), first.getId());
+  }
+
+  @Test
+  @DisplayName("keyword가 있으면 제목·설명을 대소문자 구분 없이 부분일치로 필터링한다")
+  void findPlaylistsByCursor_filtersByKeyword() {
+    playlistRepository.save(new Playlist(ownerId, "액션 영화 모음", "설명"));
+    playlistRepository.save(new Playlist(ownerId, "다른 리스트", "액션 태그 포함"));
+    playlistRepository.save(new Playlist(ownerId, "코미디", "웃긴 것"));
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            "액션", PlaylistSortBy.UPDATED_AT, SortDirection.DESCENDING, null, null, 10);
+
+    assertThat(result).hasSize(2);
+    assertThat(countActiveWithKeyword("액션")).isEqualTo(2L);
+    assertThat(countActiveWithKeyword("코미디")).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("커서 이후 항목만 반환한다 (updatedAt DESC, 복합키 경계)")
+  void findPlaylistsByCursor_returnsItemsAfterCursor() {
+    Playlist first = playlistRepository.save(new Playlist(ownerId, "첫 번째", "설명"));
+    em.flush();
+    Playlist second = playlistRepository.save(new Playlist(ownerId, "두 번째", "설명"));
+    em.flush();
+
+    // second를 커서로 넘기면 그 이후(더 과거)인 first만 남는다
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.UPDATED_AT,
+            SortDirection.DESCENDING,
+            second.getUpdatedAt().toString(),
+            second.getId(),
+            10);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(first.getId());
+  }
+
+  private long countActiveWithKeyword(String keyword) {
+    return playlistRepository.countActive(keyword);
   }
 
   private UUID insertUser() {

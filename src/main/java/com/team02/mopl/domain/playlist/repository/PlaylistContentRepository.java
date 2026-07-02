@@ -9,6 +9,9 @@ public interface PlaylistContentRepository extends JpaRepository<PlaylistContent
 
   List<PlaylistContent> findByPlaylistId(UUID playlistId);
 
+  // 여러 플레이리스트의 콘텐츠 매핑 일괄 조회
+  List<PlaylistContent> findByPlaylistIdIn(List<UUID> playlistIds);
+
   boolean existsByPlaylistIdAndContentId(UUID playlistId, UUID contentId);
 
   void deleteByPlaylistIdAndContentId(UUID playlistId, UUID contentId);
