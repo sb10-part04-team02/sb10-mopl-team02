@@ -286,17 +286,15 @@ public class DirectMessageService {
             .collect(Collectors.toMap(dm -> dm.getConversation().getId(), dm -> dm));
 
     return page.stream()
+        .filter(
+            conv ->
+                withUserMemberByConvId.containsKey(conv.getId())
+                    && requesterMemberByConvId.containsKey(conv.getId()))
         .map(
             conv -> {
               UUID convId = conv.getId();
               ConversationMember withUserMember = withUserMemberByConvId.get(convId);
-              if (withUserMember == null) {
-                throw new ConversationForbiddenException();
-              }
               ConversationMember requesterMember = requesterMemberByConvId.get(convId);
-              if (requesterMember == null) {
-                throw new ConversationForbiddenException();
-              }
               User withUser = withUserMember.getUser();
               DirectMessage lastDm = lastDmByConvId.get(convId);
               boolean hasUnread =
