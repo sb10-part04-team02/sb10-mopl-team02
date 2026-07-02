@@ -72,15 +72,31 @@ public class JwtRegistry {
     return blacklistPrefix + accessTokenId;
   }
 
-  public boolean hasRefreshToken(UUID userId, String refreshToken) {
-    String userKey = userKey(userId);
+  public RotationResult rotateRefreshToken(
+      UUID userId, String refreshToken, String newRefreshToken) {
+    String key = userKey(userId);
+
     // 값이 있으면 double값, 없으면 null. O(1)
-    return Objects.nonNull(redisTemplate.opsForZSet().score(userKey, refreshToken));
+    if (redisTemplate.opsForZSet().score(key, refreshToken) == null) {
+      // 키값 전체삭제
+      redisTemplate.delete(key);
+      return RotationResult.COMPROMISED;
+    }
+
+    long tokenExpirationTime =
+        System.currentTimeMillis() + properties.refreshTokenExpiration().toMillis();
+
+    redisTemplate.opsForZSet().remove(key, refreshToken);
+    // 순서있는 Set(만료시간을 기준으로 정렬됨)
+    redisTemplate.opsForZSet().add(key, newRefreshToken, tokenExpirationTime);
+    // 토큰키 값 TTL 최신화
+    redisTemplate.expire(key, properties.refreshTokenExpiration());
+
+    return RotationResult.OK;
   }
 
-  public void deleteAllRefreshTokens(UUID userId) {
-    String userKey = userKey(userId);
-    // 키값 전체삭제
-    redisTemplate.delete(userKey);
+  public enum RotationResult {
+    OK,
+    COMPROMISED
   }
 }

@@ -8,10 +8,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
-import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
+import com.team02.mopl.domain.auth.jwt.JwtRegistry.RotationResult;
 import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -214,52 +214,49 @@ class JwtRegistryTest {
   }
 
   @Nested
-  class HasRefreshToken {
+  class RotateRefreshToken {
 
     private UUID userId;
     private String refreshToken;
+    private String newRefreshToken;
 
     @BeforeEach
     void SetUp() {
       userId = UUID.randomUUID();
       refreshToken = "refresh token";
+      newRefreshToken = "new refresh token";
       given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
     }
 
     @Test
-    @DisplayName("refresh토큰가 없다면 false를 반환한다")
-    void success_shouldReturnFalse_whenRefreshTokenDoesNotExist() {
+    @DisplayName("refresh토큰이 없다면 키를 전체삭제하고 COMPROMISED 결과값을 반환한다")
+    void fail_shouldDeleteAllAndReturnCompromisedResult_whenRefreshTokenDoesNotExist() {
       // given
-      willReturn(null).given(zSetOperations).score(anyString(), anyString());
+      given(zSetOperations.score(anyString(), anyString())).willReturn(null);
 
       // when
-      boolean actual = jwtRegistry.hasRefreshToken(userId, refreshToken);
+      RotationResult actual = jwtRegistry.rotateRefreshToken(userId, refreshToken, newRefreshToken);
 
       // then
-      assertThat(actual).isFalse();
+      then(redisTemplate).should(times(1)).delete(anyString());
+      assertThat(actual).isEqualTo(RotationResult.COMPROMISED);
     }
 
     @Test
-    @DisplayName("refresh토큰이 있다면 true를 반환한다")
-    void success_shouldReturnTrue_whenRefreshTokenExists() {
+    @DisplayName("refresh토큰이 있다면 rotate과정을 진행한다")
+    void success_shouldProcessRotate_whenRefreshTokenExists() {
       // given
-      willReturn(3.0).given(zSetOperations).score(anyString(), anyString());
+      given(zSetOperations.score(anyString(), eq(refreshToken))).willReturn(3.0);
+      given(properties.refreshTokenExpiration()).willReturn(Duration.ofMinutes(10));
 
       // when
-      boolean actual = jwtRegistry.hasRefreshToken(userId, refreshToken);
+      RotationResult actual = jwtRegistry.rotateRefreshToken(userId, refreshToken, newRefreshToken);
 
       // then
-      assertThat(actual).isTrue();
+      then(zSetOperations).should(times(1)).remove(anyString(), eq(refreshToken));
+      then(zSetOperations).should(times(1)).add(anyString(), eq(newRefreshToken), anyDouble());
+      then(redisTemplate).should(times(1)).expire(anyString(), any(Duration.class));
+      assertThat(actual).isEqualTo(RotationResult.OK);
     }
-  }
-
-  @Test
-  @DisplayName("메서드가 실행될때 전체삭제가 진행된다")
-  void success_shouldDeleteAllRefreshTokens_whenUserIdIsGiven() {
-    // when
-    jwtRegistry.deleteAllRefreshTokens(UUID.randomUUID());
-
-    // then
-    then(redisTemplate).should(times(1)).delete(anyString());
   }
 }

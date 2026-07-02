@@ -17,6 +17,7 @@ import com.team02.mopl.domain.auth.entity.MoplUserDetails;
 import com.team02.mopl.domain.auth.exception.CompromisedTokenException;
 import com.team02.mopl.domain.auth.exception.InvalidTokenException;
 import com.team02.mopl.domain.auth.jwt.JwtRegistry;
+import com.team02.mopl.domain.auth.jwt.JwtRegistry.RotationResult;
 import com.team02.mopl.domain.auth.jwt.JwtTokenProvider;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import com.team02.mopl.domain.auth.service.AuthService.TokenResult;
@@ -64,24 +65,23 @@ class AuthServiceTest {
       MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
       given(userDetailsService.loadUserByUsername(anyString())).willReturn(mockUserDetails);
 
-      given(jwtRegistry.hasRefreshToken(any(UUID.class), anyString())).willReturn(true);
-
+      String refresh = "refresh";
       String newAccess = "new Access";
       String newRefresh = "new Refresh";
       given(jwtTokenProvider.generateAccessToken(mockUserDetails)).willReturn(newAccess);
       given(jwtTokenProvider.generateRefreshToken(mockUserDetails)).willReturn(newRefresh);
+      given(jwtRegistry.rotateRefreshToken(userId, refresh, newRefresh))
+          .willReturn(RotationResult.OK);
+
       UserDto userDto = new UserDto(userId, Instant.now(), email, "이름", null, Role.USER, false);
       given(mockUserDetails.getUserDto()).willReturn(userDto);
       JwtDto jwtDto = new JwtDto(userDto, newAccess);
       TokenResult expect = new TokenResult(jwtDto, newRefresh);
 
       // when
-      String refresh = "refresh";
       TokenResult actual = authService.update(refresh);
 
       // then
-      then(jwtRegistry).should(times(1)).deleteRefreshToken(eq(userId), eq(refresh));
-      then(jwtRegistry).should(times(1)).registerRefreshToken(eq(userId), eq(newRefresh));
       assertThat(actual.jwtDto().accessToken()).isEqualTo(expect.jwtDto().accessToken());
       assertThat(actual.refreshToken()).isEqualTo(expect.refreshToken());
     }
@@ -143,8 +143,8 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("토큰이 탈취가 됐으면 refresh토큰을 전체 삭제를 하고 예외를 던진다")
-    void fail_shouldDeleteAllRefreshTokensAndThrowException_whenTokenIsCompromised() {
+    @DisplayName("토큰이 탈취가 됐으면 예외를 던진다")
+    void fail_shouldThrowCompromisedTokenException_whenTokenIsCompromised() {
       // given
       JWTClaimsSet mockClaims = mock(JWTClaimsSet.class);
       given(jwtTokenProvider.verifyRefreshToken(anyString())).willReturn(mockClaims);
@@ -154,14 +154,20 @@ class AuthServiceTest {
 
       String email = "example@gmail.com";
       given(mockClaims.getSubject()).willReturn(email);
-      given(userDetailsService.loadUserByUsername(email)).willReturn(mock(MoplUserDetails.class));
+
+      MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
+      given(userDetailsService.loadUserByUsername(email)).willReturn(mockUserDetails);
 
       String refresh = "refresh";
-      given(jwtRegistry.hasRefreshToken(userId, refresh)).willReturn(false);
+      String newAccess = "newAccess";
+      String newRefresh = "newRefresh";
+      given(jwtTokenProvider.generateAccessToken(mockUserDetails)).willReturn(newAccess);
+      given(jwtTokenProvider.generateRefreshToken(mockUserDetails)).willReturn(newRefresh);
+      given(jwtRegistry.rotateRefreshToken(userId, refresh, newRefresh))
+          .willReturn(RotationResult.COMPROMISED);
 
       // when & then
       assertThrows(CompromisedTokenException.class, () -> authService.update(refresh));
-      then(jwtRegistry).should(times(1)).deleteAllRefreshTokens(eq(userId));
     }
   }
 }
