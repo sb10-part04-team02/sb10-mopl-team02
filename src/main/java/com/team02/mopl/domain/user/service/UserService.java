@@ -10,6 +10,7 @@ import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.global.storage.FileStorage;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ public class UserService {
   private final UserRepository userRepository;
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
+  private final FileStorage fileStorage;
 
   @Transactional
   public UserDto createUser(UserCreateRequest request) {
@@ -68,9 +70,12 @@ public class UserService {
     User user =
         userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
 
-    // TODO: 이미지 저장소 연동 후 image가 있으면 저장된 URL로 교체
-    // 현재는 이름만 수정하고 기존 프로필 이미지 URL을 유지
-    user.updateProfile(request.name(), user.getProfileImageUrl());
+    String profileImageUrl = user.getProfileImageUrl();
+    if (image != null && !image.isEmpty()) {
+      profileImageUrl = fileStorage.store(image);
+    }
+
+    user.updateProfile(request.name(), profileImageUrl);
 
     return userMapper.toDto(user);
   }
