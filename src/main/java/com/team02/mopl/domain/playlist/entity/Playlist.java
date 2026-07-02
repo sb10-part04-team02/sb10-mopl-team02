@@ -50,4 +50,14 @@ public class Playlist extends BaseMutableEntity {
       this.description = description;
     }
   }
+
+  public void increaseSubscriberCount() {
+    this.subscriberCount++;
+  }
+
+  public void decreaseSubscriberCount() {
+    if (this.subscriberCount > 0) {
+      this.subscriberCount--;
+    }
+  }
 }
