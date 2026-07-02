@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.content.repository;
 
 import com.team02.mopl.domain.content.entity.Content;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,6 +14,10 @@ public interface ContentRepository extends JpaRepository<Content, UUID>, Content
   // 활성(논리 삭제되지 않은) 콘텐츠 단건 조회
   // SELECT c.* FROM contents c WHERE c.id = ? AND c.deleted_at IS NULL;
   Optional<Content> findByIdAndDeletedAtIsNull(UUID id);
+
+  // 여러 활성 콘텐츠 일괄 조회 (플레이리스트 포함 콘텐츠 N+1 방지)
+  // SELECT c.* FROM contents c WHERE c.id IN (?, ?, ...) AND c.deleted_at IS NULL;
+  List<Content> findByIdInAndDeletedAtIsNull(List<UUID> ids);
 
   // 콘텐츠의 활성 리뷰를 전량 재집계해 평균 평점·리뷰 수를 단일 UPDATE로 갱신
   // 행 잠금 하에 즉시 재집계하므로 read-modify-write 사이의 동시성 틈이 없고, DB 왕복도 1회로 줄인다
