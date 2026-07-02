@@ -12,6 +12,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -22,6 +23,8 @@ import com.team02.mopl.domain.auth.dto.SignInRequest;
 import com.team02.mopl.domain.auth.exception.AuthException;
 import com.team02.mopl.domain.auth.jwt.handler.JwtLogoutHandler;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
+import com.team02.mopl.domain.auth.service.AuthService;
+import com.team02.mopl.domain.auth.service.AuthService.TokenResult;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.global.config.SecurityConfig;
@@ -40,6 +43,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
@@ -64,8 +68,10 @@ class AuthControllerTest {
   @MockitoBean private AuthenticationFailureHandler jwtLoginFailureHandler;
   @MockitoBean private AuthenticationManager authenticationManager;
   @MockitoBean private JwtLogoutHandler jwtLogoutHandler;
+  @MockitoBean private AuthService authService;
   @MockitoBean private JwtUtils jwtUtils;
 
+  @Autowired private AuthController authController;
   @Autowired private ObjectMapper objectMapper;
   @Autowired private MockMvc mockMvc;
 
@@ -100,7 +106,6 @@ class AuthControllerTest {
     @DisplayName("authController의 signIn함수를 거치면 에러를 반환한다")
     void fail_shouldThrowException_whenAuthControllerInvokeFunction() {
       // given
-      AuthController authController = new AuthController();
       SignInRequest request = new SignInRequest("example@gmail.com", "password");
 
       // when & then
@@ -192,9 +197,6 @@ class AuthControllerTest {
     @Test
     @DisplayName("authController의 signOut함수를 거치면 예외를 던진다")
     void fail_shouldThrowException_whenAuthControllerInvokeFunction() {
-      // given
-      AuthController authController = new AuthController();
-
       // when & then
       assertThrows(AuthException.class, authController::signOut);
     }
@@ -254,6 +256,57 @@ class AuthControllerTest {
           .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
 
       then(jwtLogoutHandler).should(times(1)).logout(any(), any(), any());
+    }
+  }
+
+  @Nested
+  class Refresh {
+
+    @Test
+    @DisplayName("refresh 토큰이 없으면 401 에러를 반환한다")
+    void fail_shouldReturn401Unauthorized_whenRefreshTokenIsNull() throws Exception {
+      // when & then
+      mockMvc
+          .perform(post("/api/auth/refresh").with(csrf()))
+          .andExpect(status().isUnauthorized())
+          .andExpect(jsonPath("$.exceptionName").value("AuthenticationRequiredException"))
+          .andExpect(jsonPath("$.message").value("인증 쿠키가 누락되었습니다."));
+    }
+
+    @Test
+    @DisplayName("정상적인 refresh 토큰이 들어오는 경우 200 JwtDto를 반환한다")
+    void success_shouldReturn200OkAndJwtDto_whenRefreshTokenIsValid() throws Exception {
+      // given
+      UUID userId = UUID.randomUUID();
+      String email = "example@gmail.com";
+      UserDto userDto = new UserDto(userId, Instant.now(), email, "이름", null, Role.USER, false);
+      String accessToken = "accessToken";
+      JwtDto jwtDto = new JwtDto(userDto, accessToken);
+      String comingRefreshToken = "coming refreshToken";
+      String newRefreshToken = "newRefreshToken";
+
+      TokenResult mockTokenResult = mock(TokenResult.class);
+      given(authService.update(comingRefreshToken)).willReturn(mockTokenResult);
+      given(mockTokenResult.refreshToken()).willReturn(newRefreshToken);
+      given(mockTokenResult.jwtDto()).willReturn(jwtDto);
+
+      String refreshTokenName = JwtUtils.REFRESH_TOKEN_COOKIE_NAME;
+      ResponseCookie responseCookie =
+          ResponseCookie.from(refreshTokenName, newRefreshToken).build();
+      given(jwtUtils.generateRefreshTokenCookie(newRefreshToken)).willReturn(responseCookie);
+
+      // when & then
+      mockMvc
+          .perform(
+              post("/api/auth/refresh")
+                  .with(csrf())
+                  .cookie(new Cookie(refreshTokenName, comingRefreshToken)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.userDto.id").value(userId.toString()))
+          .andExpect(jsonPath("$.accessToken").value(accessToken))
+          .andExpect(cookie().value(refreshTokenName, newRefreshToken));
+
+      then(authService).should(times(1)).update(comingRefreshToken);
     }
   }
 }

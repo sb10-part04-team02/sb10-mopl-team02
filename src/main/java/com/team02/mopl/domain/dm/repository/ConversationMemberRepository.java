@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.dm.repository;
 
 import com.team02.mopl.domain.dm.entity.ConversationMember;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -39,6 +40,25 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
   Optional<ConversationMember> findByConversationIdAndUserId(UUID conversationId, UUID userId);
 
   boolean existsByConversationIdAndUserId(UUID conversationId, UUID userId);
+
+  @Query(
+      """
+      SELECT cm FROM ConversationMember cm
+      JOIN FETCH cm.user
+      WHERE cm.conversation.id IN :conversationIds
+      AND cm.user.id != :requesterId
+      """)
+  List<ConversationMember> findWithUserMembersForConversations(
+      @Param("conversationIds") List<UUID> conversationIds, @Param("requesterId") UUID requesterId);
+
+  @Query(
+      """
+      SELECT cm FROM ConversationMember cm
+      WHERE cm.conversation.id IN :conversationIds
+      AND cm.user.id = :requesterId
+      """)
+  List<ConversationMember> findByConversationIdsAndUserId(
+      @Param("conversationIds") List<UUID> conversationIds, @Param("requesterId") UUID requesterId);
 
   // 두 유저가 공유하는 대화방에서 상대방 멤버 조회
   @Query(

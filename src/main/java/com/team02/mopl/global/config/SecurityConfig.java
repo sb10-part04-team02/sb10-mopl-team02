@@ -80,9 +80,11 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/users")
                     .permitAll()
-                    .requestMatchers("/api/auth/sign-in")
+                    .requestMatchers(HttpMethod.POST, "/api/auth/sign-in")
                     .permitAll()
-                    .requestMatchers("/api/auth/sign-out")
+                    .requestMatchers(HttpMethod.POST, "/api/auth/sign-out")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/auth/refresh")
                     .permitAll()
                     .requestMatchers(nonApiMatcher)
                     .permitAll() // swagger, api-docs 대응
