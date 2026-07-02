@@ -9,9 +9,11 @@ import static org.mockito.BDDMockito.then;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
+import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -159,6 +161,74 @@ class UserServiceTest {
       given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.empty());
 
       assertThrows(UserNotFoundException.class, () -> userService.getUser(userId));
+
+      then(userRepository).should().findByIdAndDeletedAtIsNull(userId);
+    }
+  }
+
+  @Nested
+  class UpdateProfile {
+
+    @Test
+    @DisplayName("본인이 프로필을 수정하면 이름을 변경하고 UserDto를 반환한다")
+    void success_shouldUpdateNameAndReturnUserDto_whenRequesterIsOwner() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+      UserDto expect =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-02T00:00:00Z"),
+              "woody@mopl.io",
+              "새이름",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(userMapper.toDto(user)).willReturn(expect);
+
+      UserDto actual = userService.updateProfile(userId, userId, request, null);
+
+      assertThat(actual).isEqualTo(expect);
+      assertThat(user.getName()).isEqualTo("새이름");
+      assertThat(user.getProfileImageUrl()).isEqualTo("https://example.com/profile.png");
+      then(userRepository).should().findByIdAndDeletedAtIsNull(userId);
+      then(userMapper).should().toDto(user);
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 프로필을 수정하면 UserForbiddenException이 발생한다")
+    void fail_shouldThrowUserForbiddenException_whenRequesterIsNotOwner() {
+      UUID requesterId = UUID.randomUUID();
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+
+      assertThrows(
+          UserForbiddenException.class,
+          () -> userService.updateProfile(requesterId, userId, request, null));
+
+      then(userRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("존재하지 않거나 삭제된 사용자의 프로필을 수정하면 UserNotFoundException이 발생한다")
+    void fail_shouldThrowUserNotFoundException_whenUserDoesNotExist() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.empty());
+
+      assertThrows(
+          UserNotFoundException.class,
+          () -> userService.updateProfile(userId, userId, request, null));
 
       then(userRepository).should().findByIdAndDeletedAtIsNull(userId);
     }

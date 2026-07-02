@@ -2,9 +2,11 @@ package com.team02.mopl.domain.user.service;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
+import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -15,6 +17,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Service
@@ -55,6 +58,27 @@ public class UserService {
         userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
 
     return userMapper.toDto(user);
+  }
+
+  @Transactional
+  public UserDto updateProfile(
+      UUID requesterId, UUID userId, UserUpdateRequest request, MultipartFile image) {
+    validateOwner(requesterId, userId);
+
+    User user =
+        userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
+
+    // TODO: 이미지 저장소 연동 후 image가 있으면 저장된 URL로 교체
+    // 현재는 이름만 수정하고 기존 프로필 이미지 URL을 유지
+    user.updateProfile(request.name(), user.getProfileImageUrl());
+
+    return userMapper.toDto(user);
+  }
+
+  private void validateOwner(UUID requesterId, UUID userId) {
+    if (!userId.equals(requesterId)) {
+      throw new UserForbiddenException();
+    }
   }
 
   private String maskValidEmail(String validEmail) {
