@@ -79,7 +79,8 @@ public class JwtTokenProvider {
       signedJWT.sign(signer);
       return signedJWT.serialize();
     } catch (JOSEException e) {
-      throw new TokenGenerationException(e);
+      log.error("토큰 서명에 실패했습니다.", e);
+      throw new TokenGenerationException();
     }
   }
 
