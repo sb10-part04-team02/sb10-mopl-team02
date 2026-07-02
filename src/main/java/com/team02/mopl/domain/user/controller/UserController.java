@@ -2,16 +2,21 @@ package com.team02.mopl.domain.user.controller;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.service.UserService;
+import com.team02.mopl.global.dto.CursorResponse;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,6 +43,14 @@ public class UserController implements UserApi {
   @GetMapping("/{userId}")
   public ResponseEntity<UserDto> getUser(@PathVariable UUID userId) {
     return ResponseEntity.ok(userService.getUser(userId));
+  }
+
+  @PreAuthorize("hasRole('ADMIN')")
+  @Override
+  @GetMapping
+  public ResponseEntity<CursorResponse<UserDto>> getUserList(
+      @ParameterObject @ModelAttribute @Valid UserSearchRequest request) {
+    return ResponseEntity.ok(userService.getUsers(request));
   }
 
   @Override

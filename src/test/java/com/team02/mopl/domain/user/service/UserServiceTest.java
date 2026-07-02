@@ -6,17 +6,22 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
+import com.team02.mopl.domain.user.enums.UserSortBy;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.global.dto.CursorResponse;
+import com.team02.mopl.global.enums.SortDirection;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -163,6 +168,31 @@ class UserServiceTest {
       assertThrows(UserNotFoundException.class, () -> userService.getUser(userId));
 
       then(userRepository).should().findByIdAndDeletedAtIsNull(userId);
+    }
+  }
+
+  @Nested
+  class GetUsers {
+    @Test
+    @DisplayName("올바른 검색 요청이 오면 유저목록 조회 후 CursorResponse를 반환한다")
+    void success_shouldReturnCursorResponse_whenValidSearchRequestProvided() {
+      // given
+      UserSearchRequest request = mock(UserSearchRequest.class);
+
+      // when
+      CursorResponse<UserDto> actual = userService.getUsers(request);
+
+      // then
+      assertThat(actual)
+          .isNotNull()
+          .satisfies(
+              act -> {
+                assertThat(act.data()).hasSize(1);
+                assertThat(act.hasNext()).isFalse();
+                assertThat(act.totalCount()).isEqualTo(1);
+                assertThat(act.sortBy()).isEqualTo(UserSortBy.NAME.getValue());
+                assertThat(act.sortDirection()).isEqualTo(SortDirection.ASCENDING.name());
+              });
     }
   }
 
