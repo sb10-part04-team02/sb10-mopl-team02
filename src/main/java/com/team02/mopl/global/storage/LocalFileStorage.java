@@ -44,6 +44,9 @@ public class LocalFileStorage implements FileStorage {
     try {
       Files.createDirectories(basePath); // 저장 루트 디렉터리가 없으면 생성
       Path target = basePath.resolve(storedName).normalize(); // 최종 저장 경로 생성
+      if (!target.startsWith(basePath)) {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      }
       file.transferTo(target); // 업로드된 파일의 내용을 실제 저장 경로로 옮김
       log.debug("파일 저장 완료: {}", target);
       // publicBaseUrl이 있으면 절대 URL(dev), 없으면 상대 경로(prod, 같은 origin)
@@ -71,8 +74,14 @@ public class LocalFileStorage implements FileStorage {
     // baseUrl 접두사 제거하여 실제 저장 파일명만 추출
     String storedName = path.substring((baseUrl + "/").length());
     try {
+      Path resolved = basePath.resolve(storedName).normalize();
+      // basePath 밖을 가리키는 경로 탈출 시도 차단
+      if (!resolved.startsWith(basePath)) {
+        log.warn("경로 탈출 시도 감지, 삭제 건너뜀: {}", url);
+        return;
+      }
       // 해당 파일이 존재하면 삭제 (없으면 예외 없이 false 반환)
-      Files.deleteIfExists(basePath.resolve(storedName).normalize());
+      Files.deleteIfExists(resolved);
     } catch (IOException e) {
       log.warn("파일 삭제 실패: {}", url, e); // 삭제 실패는 로그만 남김
     }
