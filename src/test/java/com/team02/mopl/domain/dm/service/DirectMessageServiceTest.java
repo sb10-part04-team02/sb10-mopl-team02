@@ -486,8 +486,9 @@ class DirectMessageServiceTest {
             conversationMemberRepository.findByConversationIdsAndUserId(
                 List.of(conversationId), requesterId))
         .willReturn(List.of(requesterMember));
-    given(directMessageRepository.findLatestByConversationIds(List.of(conversationId)))
+    given(directMessageRepository.findLatestMessageIdsByConversationIds(List.of(conversationId)))
         .willReturn(List.of());
+    given(directMessageRepository.findByIdIn(List.of())).willReturn(List.of());
 
     CursorResponse<ConversationDto> result =
         directMessageService.getConversations(
@@ -540,8 +541,9 @@ class DirectMessageServiceTest {
             conversationMemberRepository.findByConversationIdsAndUserId(
                 List.of(convId1), requesterId))
         .willReturn(List.of(requesterMember));
-    given(directMessageRepository.findLatestByConversationIds(List.of(convId1)))
+    given(directMessageRepository.findLatestMessageIdsByConversationIds(List.of(convId1)))
         .willReturn(List.of());
+    given(directMessageRepository.findByIdIn(List.of())).willReturn(List.of());
 
     CursorResponse<ConversationDto> result =
         directMessageService.getConversations(
@@ -572,6 +574,7 @@ class DirectMessageServiceTest {
         mockConversationMemberWithConvId(conversationId, requesterId, null, null);
     given(requesterMember.getLastReadAt()).willReturn(lastReadAt);
     DirectMessage lastDm = mockDirectMessage(conversationId, withUserId, requesterId, messageAt);
+    UUID lastDmId = lastDm.getId();
 
     given(
             conversationRepository.findConversationsByCursor(
@@ -586,8 +589,9 @@ class DirectMessageServiceTest {
             conversationMemberRepository.findByConversationIdsAndUserId(
                 List.of(conversationId), requesterId))
         .willReturn(List.of(requesterMember));
-    given(directMessageRepository.findLatestByConversationIds(List.of(conversationId)))
-        .willReturn(List.of(lastDm));
+    given(directMessageRepository.findLatestMessageIdsByConversationIds(List.of(conversationId)))
+        .willReturn(List.of(lastDmId));
+    given(directMessageRepository.findByIdIn(List.of(lastDmId))).willReturn(List.of(lastDm));
 
     CursorResponse<ConversationDto> result =
         directMessageService.getConversations(

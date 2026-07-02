@@ -17,18 +17,18 @@ public interface DirectMessageRepository
 
   long countByConversationId(UUID conversationId);
 
-  @EntityGraph(attributePaths = {"sender.user", "receiver.user", "conversation"})
   @Query(
-      """
-      SELECT dm FROM DirectMessage dm
-      WHERE dm.conversation.id IN :conversationIds
-      AND NOT EXISTS (
-          SELECT 1 FROM DirectMessage dm2
-          WHERE dm2.conversation = dm.conversation
-          AND (dm2.createdAt > dm.createdAt
-               OR (dm2.createdAt = dm.createdAt AND dm2.id > dm.id))
-      )
-      """)
-  List<DirectMessage> findLatestByConversationIds(
+      value =
+          """
+          SELECT DISTINCT ON (conversation_id) id
+          FROM direct_messages
+          WHERE conversation_id IN :conversationIds
+          ORDER BY conversation_id, created_at DESC, id DESC
+          """,
+      nativeQuery = true)
+  List<UUID> findLatestMessageIdsByConversationIds(
       @Param("conversationIds") List<UUID> conversationIds);
+
+  @EntityGraph(attributePaths = {"sender.user", "receiver.user", "conversation"})
+  List<DirectMessage> findByIdIn(List<UUID> ids);
 }

@@ -279,8 +279,10 @@ public class DirectMessageService {
             .stream()
             .collect(Collectors.toMap(cm -> cm.getConversation().getId(), cm -> cm));
 
+    List<UUID> lastMessageIds =
+        directMessageRepository.findLatestMessageIdsByConversationIds(conversationIds);
     Map<UUID, DirectMessage> lastDmByConvId =
-        directMessageRepository.findLatestByConversationIds(conversationIds).stream()
+        directMessageRepository.findByIdIn(lastMessageIds).stream()
             .collect(Collectors.toMap(dm -> dm.getConversation().getId(), dm -> dm));
 
     return page.stream()
