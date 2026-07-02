@@ -188,7 +188,7 @@ public class PlaylistService {
   // 단건용: 한 플레이리스트의 포함 콘텐츠를 ContentSummary로 조립 (추가된 순서 보존)
   private List<ContentSummary> toContentSummaries(UUID playlistId) {
     List<UUID> contentIds =
-        playlistContentRepository.findByPlaylistIdOrderByCreatedAtAsc(playlistId).stream()
+        playlistContentRepository.findByPlaylistIdOrderByCreatedAtAscIdAsc(playlistId).stream()
             .map(PlaylistContent::getContentId)
             .toList();
     if (contentIds.isEmpty()) {
@@ -216,7 +216,7 @@ public class PlaylistService {
     // 플레이리스트별 콘텐츠 매핑 일괄 조회(추가된 순서) 후 콘텐츠 요약 조립.
     // 아래 groupingBy는 스트림 순서를 보존하므로 플레이리스트별 콘텐츠 노출 순서가 고정된다.
     List<PlaylistContent> playlistContents =
-        playlistContentRepository.findByPlaylistIdInOrderByCreatedAtAsc(playlistIds);
+        playlistContentRepository.findByPlaylistIdInOrderByCreatedAtAscIdAsc(playlistIds);
     List<UUID> allContentIds =
         playlistContents.stream().map(PlaylistContent::getContentId).distinct().toList();
     Map<UUID, ContentSummary> summaryByContent = findContentSummaries(allContentIds);

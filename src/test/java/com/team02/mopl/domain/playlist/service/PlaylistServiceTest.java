@@ -261,7 +261,7 @@ class PlaylistServiceTest {
           .willReturn(Optional.of(playlist));
       given(userRepository.findByIdAndDeletedAtIsNull(ownerId)).willReturn(Optional.of(owner));
       given(playlistMapper.toUserSummary(owner)).willReturn(ownerSummary);
-      given(playlistContentRepository.findByPlaylistIdOrderByCreatedAtAsc(playlistId))
+      given(playlistContentRepository.findByPlaylistIdOrderByCreatedAtAscIdAsc(playlistId))
           .willReturn(List.of(new PlaylistContent(playlist, contentId)));
       given(tagRepository.findByContentIdInAndDeletedAtIsNull(List.of(contentId)))
           .willReturn(List.of(tag));
@@ -325,7 +325,9 @@ class PlaylistServiceTest {
           .willReturn(List.of(first, second));
       given(playlistRepository.countActive(null)).willReturn(2L);
       given(userRepository.findAllById(List.of(ownerId))).willReturn(List.of());
-      given(playlistContentRepository.findByPlaylistIdInOrderByCreatedAtAsc(List.of(first.getId())))
+      given(
+              playlistContentRepository.findByPlaylistIdInOrderByCreatedAtAscIdAsc(
+                  List.of(first.getId())))
           .willReturn(List.of());
       given(subscriptionRepository.findSubscribedPlaylistIds(requesterId, List.of(first.getId())))
           .willReturn(List.of());
@@ -385,7 +387,9 @@ class PlaylistServiceTest {
           .willReturn(List.of(first, second));
       given(playlistRepository.countActive(null)).willReturn(2L);
       given(userRepository.findAllById(List.of(ownerId))).willReturn(List.of());
-      given(playlistContentRepository.findByPlaylistIdInOrderByCreatedAtAsc(List.of(first.getId())))
+      given(
+              playlistContentRepository.findByPlaylistIdInOrderByCreatedAtAscIdAsc(
+                  List.of(first.getId())))
           .willReturn(List.of());
       given(subscriptionRepository.findSubscribedPlaylistIds(requesterId, List.of(first.getId())))
           .willReturn(List.of());
