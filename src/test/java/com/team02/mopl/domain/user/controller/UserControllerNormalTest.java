@@ -1,9 +1,14 @@
 package com.team02.mopl.domain.user.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,8 +16,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
+import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.service.UserService;
 import com.team02.mopl.global.exception.GlobalExceptionHandler;
@@ -34,6 +41,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -183,5 +192,157 @@ class UserControllerNormalTest {
 
       then(userService).shouldHaveNoInteractions();
     }
+  }
+
+  @Nested
+  class UpdateProfile {
+
+    @Test
+    @DisplayName("프로필 수정이 성공하면 200 OK와 UserDto를 반환한다")
+    void success_shouldReturnUserDto_whenRequestIsValid() throws Exception {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest updateRequest = new UserUpdateRequest("새이름");
+      UserDto response =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-02T00:00:00Z"),
+              "woody@mopl.io",
+              "새이름",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+
+      MockMultipartFile requestPart =
+          new MockMultipartFile(
+              "request",
+              "",
+              MediaType.APPLICATION_JSON_VALUE,
+              objectMapper.writeValueAsBytes(updateRequest));
+
+      given(
+              userService.updateProfile(
+                  eq(userId), eq(userId), any(UserUpdateRequest.class), isNull()))
+          .willReturn(response);
+
+      mockMvc
+          .perform(
+              multipart("/api/users/{userId}", userId)
+                  .file(requestPart)
+                  .with(
+                      servletRequest -> {
+                        servletRequest.setMethod("PATCH");
+                        return servletRequest;
+                      })
+                  .with(authentication(authenticationWithPrincipal(userId)))
+                  .with(csrf()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.id").value(userId.toString()))
+          .andExpect(jsonPath("$.name").value("새이름"))
+          .andExpect(jsonPath("$.profileImageUrl").value("https://example.com/profile.png"));
+
+      then(userService)
+          .should()
+          .updateProfile(eq(userId), eq(userId), any(UserUpdateRequest.class), isNull());
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 프로필을 수정하면 403 Forbidden을 반환한다")
+    void fail_shouldReturnForbidden_whenRequesterIsNotOwner() throws Exception {
+      UUID requesterId = UUID.randomUUID();
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest updateRequest = new UserUpdateRequest("새이름");
+
+      MockMultipartFile requestPart =
+          new MockMultipartFile(
+              "request",
+              "",
+              MediaType.APPLICATION_JSON_VALUE,
+              objectMapper.writeValueAsBytes(updateRequest));
+
+      given(
+              userService.updateProfile(
+                  eq(requesterId), eq(userId), any(UserUpdateRequest.class), isNull()))
+          .willThrow(new UserForbiddenException());
+
+      mockMvc
+          .perform(
+              multipart("/api/users/{userId}", userId)
+                  .file(requestPart)
+                  .with(
+                      servletRequest -> {
+                        servletRequest.setMethod("PATCH");
+                        return servletRequest;
+                      })
+                  .with(authentication(authenticationWithPrincipal(requesterId)))
+                  .with(csrf()))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.exceptionName").value("UserForbiddenException"));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자의 프로필을 수정하면 404 Not Found를 반환한다")
+    void fail_shouldReturnNotFound_whenUserDoesNotExist() throws Exception {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest updateRequest = new UserUpdateRequest("새이름");
+
+      MockMultipartFile requestPart =
+          new MockMultipartFile(
+              "request",
+              "",
+              MediaType.APPLICATION_JSON_VALUE,
+              objectMapper.writeValueAsBytes(updateRequest));
+
+      given(
+              userService.updateProfile(
+                  eq(userId), eq(userId), any(UserUpdateRequest.class), isNull()))
+          .willThrow(new UserNotFoundException());
+
+      mockMvc
+          .perform(
+              multipart("/api/users/{userId}", userId)
+                  .file(requestPart)
+                  .with(
+                      servletRequest -> {
+                        servletRequest.setMethod("PATCH");
+                        return servletRequest;
+                      })
+                  .with(authentication(authenticationWithPrincipal(userId)))
+                  .with(csrf()))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.exceptionName").value("UserNotFoundException"));
+    }
+
+    @Test
+    @DisplayName("프로필 수정 요청의 이름이 비어 있으면 400 Bad Request를 반환한다")
+    void fail_shouldReturnBadRequest_whenNameIsBlank() throws Exception {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest updateRequest = new UserUpdateRequest("");
+
+      MockMultipartFile requestPart =
+          new MockMultipartFile(
+              "request",
+              "",
+              MediaType.APPLICATION_JSON_VALUE,
+              objectMapper.writeValueAsBytes(updateRequest));
+
+      mockMvc
+          .perform(
+              multipart("/api/users/{userId}", userId)
+                  .file(requestPart)
+                  .with(
+                      servletRequest -> {
+                        servletRequest.setMethod("PATCH");
+                        return servletRequest;
+                      })
+                  .with(authentication(authenticationWithPrincipal(userId)))
+                  .with(csrf()))
+          .andExpect(status().isBadRequest());
+
+      then(userService).shouldHaveNoInteractions();
+    }
+  }
+
+  private TestingAuthenticationToken authenticationWithPrincipal(UUID principal) {
+    return new TestingAuthenticationToken(principal, null);
   }
 }
