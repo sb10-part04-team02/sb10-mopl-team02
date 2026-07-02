@@ -69,7 +69,8 @@ class PlaylistRepositoryTest extends RepositoryTestSupport {
     playlistContentRepository.save(new PlaylistContent(playlist, contentId));
     em.flush();
 
-    List<PlaylistContent> result = playlistContentRepository.findByPlaylistId(playlist.getId());
+    List<PlaylistContent> result =
+        playlistContentRepository.findByPlaylistIdOrderByCreatedAtAsc(playlist.getId());
 
     assertThat(result).hasSize(1);
     assertThat(result.get(0).getContentId()).isEqualTo(contentId);

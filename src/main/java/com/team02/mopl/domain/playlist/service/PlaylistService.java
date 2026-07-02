@@ -27,6 +27,7 @@ import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -184,20 +185,18 @@ public class PlaylistService {
         .orElseGet(() -> new UserSummary(ownerId, null, null));
   }
 
-  // 단건용: 한 플레이리스트의 포함 콘텐츠를 ContentSummary로 조립
+  // 단건용: 한 플레이리스트의 포함 콘텐츠를 ContentSummary로 조립 (추가된 순서 보존)
   private List<ContentSummary> toContentSummaries(UUID playlistId) {
     List<UUID> contentIds =
-        playlistContentRepository.findByPlaylistId(playlistId).stream()
+        playlistContentRepository.findByPlaylistIdOrderByCreatedAtAsc(playlistId).stream()
             .map(PlaylistContent::getContentId)
             .toList();
     if (contentIds.isEmpty()) {
       return List.of();
     }
-    Map<UUID, List<Tag>> tagsByContent = findTagsByContent(contentIds);
-    return contentRepository.findByIdInAndDeletedAtIsNull(contentIds).stream()
-        .map(
-            content -> playlistMapper.toContentSummary(content, tagsByContent.get(content.getId())))
-        .toList();
+    Map<UUID, ContentSummary> summaryByContent = findContentSummaries(contentIds);
+    // 논리 삭제된 콘텐츠는 Map에 없으므로 제외하고, contentIds 순서대로 매핑
+    return contentIds.stream().map(summaryByContent::get).filter(Objects::nonNull).toList();
   }
 
   // 목록용: 페이지에 속한 플레이리스트들을 owner/contents/subscribedByMe까지 일괄 조립 (N+1 방지)
@@ -214,9 +213,10 @@ public class PlaylistService {
             .filter(user -> !user.isDeleted())
             .collect(Collectors.toMap(User::getId, playlistMapper::toUserSummary));
 
-    // 플레이리스트별 콘텐츠 매핑 일괄 조회 후 콘텐츠 요약 조립
+    // 플레이리스트별 콘텐츠 매핑 일괄 조회(추가된 순서) 후 콘텐츠 요약 조립.
+    // 아래 groupingBy는 스트림 순서를 보존하므로 플레이리스트별 콘텐츠 노출 순서가 고정된다.
     List<PlaylistContent> playlistContents =
-        playlistContentRepository.findByPlaylistIdIn(playlistIds);
+        playlistContentRepository.findByPlaylistIdInOrderByCreatedAtAsc(playlistIds);
     List<UUID> allContentIds =
         playlistContents.stream().map(PlaylistContent::getContentId).distinct().toList();
     Map<UUID, ContentSummary> summaryByContent = findContentSummaries(allContentIds);

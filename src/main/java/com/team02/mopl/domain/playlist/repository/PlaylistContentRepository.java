@@ -7,10 +7,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PlaylistContentRepository extends JpaRepository<PlaylistContent, UUID> {
 
-  List<PlaylistContent> findByPlaylistId(UUID playlistId);
+  // 플레이리스트에 추가된 순서(createdAt)대로 반환해 콘텐츠 노출 순서를 고정
+  List<PlaylistContent> findByPlaylistIdOrderByCreatedAtAsc(UUID playlistId);
 
-  // 여러 플레이리스트의 콘텐츠 매핑 일괄 조회
-  List<PlaylistContent> findByPlaylistIdIn(List<UUID> playlistIds);
+  // 여러 플레이리스트의 콘텐츠 매핑 일괄 조회 (추가된 순서 고정)
+  List<PlaylistContent> findByPlaylistIdInOrderByCreatedAtAsc(List<UUID> playlistIds);
 
   boolean existsByPlaylistIdAndContentId(UUID playlistId, UUID contentId);
 

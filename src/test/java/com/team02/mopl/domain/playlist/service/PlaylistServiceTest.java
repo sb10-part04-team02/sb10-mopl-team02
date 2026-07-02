@@ -9,6 +9,7 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
+import com.team02.mopl.domain.content.dto.ContentSummary;
 import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.entity.Tag;
 import com.team02.mopl.domain.content.enums.ContentType;
@@ -260,7 +261,7 @@ class PlaylistServiceTest {
           .willReturn(Optional.of(playlist));
       given(userRepository.findByIdAndDeletedAtIsNull(ownerId)).willReturn(Optional.of(owner));
       given(playlistMapper.toUserSummary(owner)).willReturn(ownerSummary);
-      given(playlistContentRepository.findByPlaylistId(playlistId))
+      given(playlistContentRepository.findByPlaylistIdOrderByCreatedAtAsc(playlistId))
           .willReturn(List.of(new PlaylistContent(playlist, contentId)));
       given(tagRepository.findByContentIdInAndDeletedAtIsNull(List.of(contentId)))
           .willReturn(List.of(tag));
@@ -270,7 +271,10 @@ class PlaylistServiceTest {
               subscriptionRepository.existsByUserIdAndPlaylist_IdAndDeletedAtIsNull(
                   requesterId, playlistId))
           .willReturn(true);
-      given(playlistMapper.toContentSummary(eq(content), any())).willReturn(null);
+      ContentSummary contentSummary =
+          new ContentSummary(
+              contentId, ContentType.MOVIE, "영화", "설명", "http://img", List.of("액션"), 0.0, 0);
+      given(playlistMapper.toContentSummary(eq(content), any())).willReturn(contentSummary);
       given(playlistMapper.toDto(eq(playlist), eq(ownerSummary), any(), eq(true)))
           .willReturn(expect);
 
@@ -280,6 +284,10 @@ class PlaylistServiceTest {
       // then
       assertThat(actual).isEqualTo(expect);
       then(playlistMapper).should().toContentSummary(eq(content), any());
+      // 조립된 콘텐츠 요약이 순서대로 toDto로 전달되는지 확인
+      then(playlistMapper)
+          .should()
+          .toDto(eq(playlist), eq(ownerSummary), eq(List.of(contentSummary)), eq(true));
     }
 
     @Test
@@ -317,7 +325,7 @@ class PlaylistServiceTest {
           .willReturn(List.of(first, second));
       given(playlistRepository.countActive(null)).willReturn(2L);
       given(userRepository.findAllById(List.of(ownerId))).willReturn(List.of());
-      given(playlistContentRepository.findByPlaylistIdIn(List.of(first.getId())))
+      given(playlistContentRepository.findByPlaylistIdInOrderByCreatedAtAsc(List.of(first.getId())))
           .willReturn(List.of());
       given(subscriptionRepository.findSubscribedPlaylistIds(requesterId, List.of(first.getId())))
           .willReturn(List.of());
@@ -353,6 +361,44 @@ class PlaylistServiceTest {
       assertThat(response.data()).isEmpty();
       assertThat(response.nextCursor()).isNull();
       assertThat(response.nextIdAfter()).isNull();
+    }
+
+    @Test
+    @DisplayName("SUBSCRIBE_COUNT 정렬 시 cursor·idAfter를 그대로 전달하고 다음 커서를 구독자 수로 인코딩한다")
+    void success_encodesSubscriberCountCursorAndPassesRequest() {
+      // given: subscriberCount 정렬 + 커서("5"/cursorId)가 리포지토리로 그대로 전달되는지 검증
+      Playlist first = new Playlist(ownerId, "인기", "설명");
+      ReflectionTestUtils.setField(first, "id", UUID.randomUUID());
+      ReflectionTestUtils.setField(first, "subscriberCount", 42L);
+      Playlist second = new Playlist(ownerId, "덜 인기", "설명");
+      ReflectionTestUtils.setField(second, "id", UUID.randomUUID());
+      ReflectionTestUtils.setField(second, "subscriberCount", 10L);
+
+      UUID cursorId = UUID.randomUUID();
+      PlaylistSearchRequest request =
+          new PlaylistSearchRequest(
+              null, "5", cursorId, 1, SortDirection.DESCENDING, PlaylistSortBy.SUBSCRIBE_COUNT);
+
+      given(
+              playlistRepository.findPlaylistsByCursor(
+                  null, PlaylistSortBy.SUBSCRIBE_COUNT, SortDirection.DESCENDING, "5", cursorId, 2))
+          .willReturn(List.of(first, second));
+      given(playlistRepository.countActive(null)).willReturn(2L);
+      given(userRepository.findAllById(List.of(ownerId))).willReturn(List.of());
+      given(playlistContentRepository.findByPlaylistIdInOrderByCreatedAtAsc(List.of(first.getId())))
+          .willReturn(List.of());
+      given(subscriptionRepository.findSubscribedPlaylistIds(requesterId, List.of(first.getId())))
+          .willReturn(List.of());
+      given(playlistMapper.toDto(eq(first), any(), any(), eq(false))).willReturn(null);
+
+      // when
+      CursorResponse<PlaylistDto> response = playlistService.getPlaylists(request, requesterId);
+
+      // then: 다음 커서는 마지막 응답 항목(first)의 subscriberCount 문자열이어야 한다
+      assertThat(response.hasNext()).isTrue();
+      assertThat(response.nextCursor()).isEqualTo("42");
+      assertThat(response.nextIdAfter()).isEqualTo(first.getId());
+      assertThat(response.sortBy()).isEqualTo(PlaylistSortBy.SUBSCRIBE_COUNT.name());
     }
   }
 
