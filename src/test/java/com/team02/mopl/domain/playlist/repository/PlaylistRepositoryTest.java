@@ -224,6 +224,80 @@ class PlaylistRepositoryTest extends RepositoryTestSupport {
     assertThat(result).extracting(Playlist::getId).containsExactly(remaining.getId());
   }
 
+  @Test
+  @DisplayName("updatedAt 오름차순이면 오래된 플레이리스트부터 반환한다")
+  void findPlaylistsByCursor_sortsByUpdatedAtAsc() {
+    Playlist first = playlistRepository.save(new Playlist(ownerId, "첫 번째", "설명"));
+    em.flush();
+    Playlist second = playlistRepository.save(new Playlist(ownerId, "두 번째", "설명"));
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null, PlaylistSortBy.UPDATED_AT, SortDirection.ASCENDING, null, null, 10);
+
+    // ASC: 오래된 first가 먼저, 최신 second가 나중
+    assertThat(result).extracting(Playlist::getId).containsExactly(first.getId(), second.getId());
+  }
+
+  @Test
+  @DisplayName("커서 이후 항목만 반환한다 (updatedAt ASC, 복합키 경계)")
+  void findPlaylistsByCursor_byUpdatedAt_asc_returnsItemsAfterCursor() {
+    Playlist first = playlistRepository.save(new Playlist(ownerId, "첫 번째", "설명"));
+    em.flush();
+    Playlist second = playlistRepository.save(new Playlist(ownerId, "두 번째", "설명"));
+    em.flush();
+
+    // ASC에서 first(더 과거)를 커서로 넘기면 그 이후(더 미래)인 second만 남는다
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.UPDATED_AT,
+            SortDirection.ASCENDING,
+            first.getUpdatedAt().toString(),
+            first.getId(),
+            10);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(second.getId());
+  }
+
+  @Test
+  @DisplayName("subscriberCount 오름차순으로 정렬해 반환한다")
+  void findPlaylistsByCursor_sortsBySubscriberCountAsc() {
+    savePlaylistWithSubscriberCount("적음", 1L);
+    savePlaylistWithSubscriberCount("많음", 5L);
+    savePlaylistWithSubscriberCount("중간", 3L);
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null, PlaylistSortBy.SUBSCRIBE_COUNT, SortDirection.ASCENDING, null, null, 10);
+
+    assertThat(result).extracting(Playlist::getSubscriberCount).containsExactly(1L, 3L, 5L);
+  }
+
+  @Test
+  @DisplayName("subscriberCount 커서 이후 항목만 반환한다 (ASC, 복합키 경계)")
+  void findPlaylistsByCursor_bySubscriberCount_asc_returnsItemsAfterCursor() {
+    Playlist low = savePlaylistWithSubscriberCount("낮음", 1L);
+    Playlist mid = savePlaylistWithSubscriberCount("중간", 3L);
+    Playlist high = savePlaylistWithSubscriberCount("높음", 5L);
+    em.flush();
+
+    // ASC에서 중간(3)을 커서로 넘기면 그 이후(더 큰 subscriberCount)인 높음(5)만 남는다
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.SUBSCRIBE_COUNT,
+            SortDirection.ASCENDING,
+            Long.toString(mid.getSubscriberCount()),
+            mid.getId(),
+            10);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(high.getId());
+    assertThat(result).doesNotContain(low);
+  }
+
   private Playlist savePlaylistWithSubscriberCount(String title, long subscriberCount) {
     Playlist playlist = new Playlist(ownerId, title, "설명");
     ReflectionTestUtils.setField(playlist, "subscriberCount", subscriberCount);
