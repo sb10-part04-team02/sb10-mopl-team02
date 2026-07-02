@@ -15,6 +15,10 @@ public enum ErrorCode {
   CONFLICT(HttpStatus.BAD_REQUEST, "COMMON_400", "이미 존재하거나 충돌이 발생한 리소스입니다."),
   INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500", "서버 내부 오류가 발생했습니다."),
 
+  // Auth
+  INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401", "만료되었거나 유효하지 않은 토큰입니다."),
+  COMPROMISED_TOKEN(HttpStatus.FORBIDDEN, "AUTH_403", "보안 위협이 감지되어 접속이 차단되었습니다."),
+
   // User
   USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_404", "사용자를 찾을 수 없습니다."),
   EMAIL_DUPLICATED(HttpStatus.CONFLICT, "USER_409", "이미 존재하는 이메일입니다."),

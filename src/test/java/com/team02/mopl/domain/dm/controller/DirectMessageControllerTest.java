@@ -3,11 +3,14 @@ package com.team02.mopl.domain.dm.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.team02.mopl.domain.dm.dto.ConversationDto;
+import com.team02.mopl.domain.dm.dto.ConversationSearchRequest;
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageSearchRequest;
 import com.team02.mopl.domain.dm.exception.ConversationForbiddenException;
@@ -35,6 +38,82 @@ class DirectMessageControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private DirectMessageService directMessageService;
+
+  @Test
+  @DisplayName("대화 목록 조회 성공 시 200과 CursorResponse를 반환한다")
+  void getConversations_success_returns200() throws Exception {
+    UUID userId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+    UUID withUserId = UUID.randomUUID();
+    UUID nextIdAfter = UUID.randomUUID();
+
+    ConversationDto conversationDto =
+        new ConversationDto(conversationId, new UserSummary(withUserId, "상대방", null), null, false);
+
+    CursorResponse<ConversationDto> response =
+        new CursorResponse<>(
+            List.of(conversationDto),
+            "2026-06-29T00:00:00Z",
+            nextIdAfter,
+            true,
+            5L,
+            "CREATED_AT",
+            "DESCENDING");
+
+    given(directMessageService.getConversations(eq(userId), any(ConversationSearchRequest.class)))
+        .willReturn(response);
+
+    mockMvc
+        .perform(
+            get("/api/conversations")
+                .with(authentication(new TestingAuthenticationToken(userId, null))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].id").value(conversationId.toString()))
+        .andExpect(jsonPath("$.data[0].with.userId").value(withUserId.toString()))
+        .andExpect(jsonPath("$.hasNext").value(true))
+        .andExpect(jsonPath("$.nextCursor").value("2026-06-29T00:00:00Z"))
+        .andExpect(jsonPath("$.nextIdAfter").value(nextIdAfter.toString()))
+        .andExpect(jsonPath("$.totalCount").value(5))
+        .andExpect(jsonPath("$.sortBy").value("CREATED_AT"))
+        .andExpect(jsonPath("$.sortDirection").value("DESCENDING"));
+
+    verify(directMessageService).getConversations(eq(userId), any(ConversationSearchRequest.class));
+  }
+
+  @Test
+  @DisplayName("대화 목록 조회 시 cursor만 전달하고 idAfter를 생략하면 400을 반환한다")
+  void getConversations_cursorWithoutIdAfter_returns400() throws Exception {
+    UUID userId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            get("/api/conversations")
+                .queryParam("cursor", "2026-06-30T10:15:30Z")
+                .with(authentication(new TestingAuthenticationToken(userId, null))))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("대화 목록이 비어 있으면 200과 빈 data를 반환한다")
+  void getConversations_empty_returns200() throws Exception {
+    UUID userId = UUID.randomUUID();
+
+    CursorResponse<ConversationDto> response =
+        new CursorResponse<>(List.of(), null, null, false, 0L, "CREATED_AT", "DESCENDING");
+
+    given(directMessageService.getConversations(eq(userId), any(ConversationSearchRequest.class)))
+        .willReturn(response);
+
+    mockMvc
+        .perform(
+            get("/api/conversations")
+                .with(authentication(new TestingAuthenticationToken(userId, null))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").isArray())
+        .andExpect(jsonPath("$.data").isEmpty())
+        .andExpect(jsonPath("$.hasNext").value(false))
+        .andExpect(jsonPath("$.totalCount").value(0));
+  }
 
   @Test
   @DisplayName("DM 목록 조회 성공 시 200과 CursorResponse를 반환한다")
