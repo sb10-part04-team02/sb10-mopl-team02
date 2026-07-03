@@ -90,7 +90,7 @@ public class UserService {
 
     deleteOldProfileImageIfReplaced(oldProfileImageUrl, profileImageUrl);
 
-    return userMapper.toDto(user);
+    return userDto;
   }
 
   private void validateOwner(UUID requesterId, UUID userId) {
