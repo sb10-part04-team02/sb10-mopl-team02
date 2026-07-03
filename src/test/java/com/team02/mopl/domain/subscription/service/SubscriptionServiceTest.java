@@ -171,7 +171,7 @@ class SubscriptionServiceTest {
                 requesterId, playlistId))
         .willReturn(false);
     given(subscriptionRepository.saveAndFlush(any(Subscription.class)))
-        .willThrow(DataIntegrityViolationException.class);
+        .willThrow(new DataIntegrityViolationException("중복 구독"));
 
     assertThatThrownBy(() -> subscriptionService.subscribe(playlistId, requesterId))
         .isInstanceOfSatisfying(

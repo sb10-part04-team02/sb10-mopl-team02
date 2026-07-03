@@ -8,4 +8,8 @@ public class SubscriptionException extends BusinessException {
   public SubscriptionException(ErrorCode errorCode) {
     super(errorCode);
   }
+
+  public SubscriptionException(ErrorCode errorCode, Throwable cause) {
+    super(errorCode, cause);
+  }
 }

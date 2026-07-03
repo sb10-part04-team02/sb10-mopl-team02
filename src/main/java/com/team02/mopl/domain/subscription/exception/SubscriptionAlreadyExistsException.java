@@ -7,4 +7,8 @@ public class SubscriptionAlreadyExistsException extends SubscriptionException {
   public SubscriptionAlreadyExistsException() {
     super(ErrorCode.SUBSCRIPTION_ALREADY_EXISTS);
   }
+
+  public SubscriptionAlreadyExistsException(Throwable cause) {
+    super(ErrorCode.SUBSCRIPTION_ALREADY_EXISTS, cause);
+  }
 }

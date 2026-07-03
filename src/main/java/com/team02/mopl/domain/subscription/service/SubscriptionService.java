@@ -57,7 +57,7 @@ public class SubscriptionService {
     try {
       subscriptionRepository.saveAndFlush(new Subscription(requesterId, playlist));
     } catch (DataIntegrityViolationException e) {
-      throw new SubscriptionAlreadyExistsException();
+      throw new SubscriptionAlreadyExistsException(e);
     }
 
     playlistRepository.increaseSubscriberCount(playlistId);
