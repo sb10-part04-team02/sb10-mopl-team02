@@ -71,8 +71,8 @@ public class StompChannelInterceptor implements ChannelInterceptor {
     try {
       authentication = jwtAuthenticationProvider.authenticate(new JwtAuthenticationToken(token));
     } catch (AuthenticationException e) {
-      log.warn("WebSocket CONNECT 인증 실패: {}", e.getMessage());
-      throw new MessageDeliveryException(message, "유효하지 않은 토큰입니다.");
+      log.warn("WebSocket CONNECT 인증 실패: {}", e.getMessage(), e);
+      throw new MessageDeliveryException(message, "유효하지 않은 토큰입니다.", e);
     }
 
     // 이후 SUBSCRIBE/SEND 프레임과 @MessageMapping 핸들러에서 Principal로 사용된다.
