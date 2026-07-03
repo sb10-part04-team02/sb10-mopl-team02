@@ -890,6 +890,28 @@ class DirectMessageServiceTest {
   }
 
   @Test
+  @DisplayName("lastReadAt과 DM createdAt이 동일하면 lastReadAt을 갱신하지 않는다")
+  void markAsRead_sameTimestamp_doesNotUpdate() {
+    UUID conversationId = UUID.randomUUID();
+    UUID directMessageId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+
+    Instant dmCreatedAt = Instant.parse("2026-07-02T00:00:00Z");
+    ConversationMember requesterMember = mockConversationMember(requesterId, dmCreatedAt);
+    DirectMessage dm =
+        mockDirectMessage(conversationId, UUID.randomUUID(), requesterId, dmCreatedAt);
+
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(Optional.of(requesterMember));
+    given(directMessageRepository.findByIdAndConversationId(directMessageId, conversationId))
+        .willReturn(Optional.of(dm));
+
+    directMessageService.markAsRead(conversationId, directMessageId, requesterId);
+
+    verify(requesterMember, never()).updateLastReadAt(any());
+  }
+
+  @Test
   @DisplayName("DM 읽음 처리 시 요청자가 대화방 멤버가 아니면 FORBIDDEN 예외가 발생한다")
   void markAsRead_notMember_throwsForbidden() {
     UUID conversationId = UUID.randomUUID();

@@ -70,6 +70,6 @@ public class DirectMessageController implements DirectMessageApi {
       @PathVariable UUID conversationId,
       @PathVariable UUID directMessageId) {
     directMessageService.markAsRead(conversationId, directMessageId, userId);
-    return ResponseEntity.ok().build();
+    return ResponseEntity.noContent().build();
   }
 }

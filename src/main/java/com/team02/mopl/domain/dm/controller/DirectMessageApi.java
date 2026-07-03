@@ -149,7 +149,7 @@ public interface DirectMessageApi {
 
   @Operation(summary = "DM 읽음 처리", description = "대화방의 특정 DM까지 읽음 처리합니다. 요청자가 해당 대화방의 참여자여야 합니다.")
   @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "성공"),
+    @ApiResponse(responseCode = "204", description = "성공"),
     @ApiResponse(
         responseCode = "401",
         description = "인증 오류",

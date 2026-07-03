@@ -191,8 +191,8 @@ class DirectMessageControllerTest {
   }
 
   @Test
-  @DisplayName("DM 읽음 처리 성공 시 200을 반환한다")
-  void markDirectMessageAsRead_success_returns200() throws Exception {
+  @DisplayName("DM 읽음 처리 성공 시 204를 반환한다")
+  void markDirectMessageAsRead_success_returns204() throws Exception {
     UUID userId = UUID.randomUUID();
     UUID conversationId = UUID.randomUUID();
     UUID directMessageId = UUID.randomUUID();
@@ -204,7 +204,7 @@ class DirectMessageControllerTest {
                     conversationId,
                     directMessageId)
                 .with(authentication(new TestingAuthenticationToken(userId, null))))
-        .andExpect(status().isOk());
+        .andExpect(status().isNoContent());
 
     verify(directMessageService).markAsRead(conversationId, directMessageId, userId);
   }
