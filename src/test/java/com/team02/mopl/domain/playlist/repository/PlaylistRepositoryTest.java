@@ -304,7 +304,10 @@ class PlaylistRepositoryTest extends RepositoryTestSupport {
   void increaseSubscriberCount_incrementsCount_withoutTouchingUpdatedAt() {
     Playlist playlist = playlistRepository.save(new Playlist(ownerId, "리스트", "설명"));
     em.flush();
-    Instant updatedAtBefore = playlist.getUpdatedAt();
+    em.clear();
+    // DB에 저장된 값 기준으로 updatedAt을 확보 (인메모리 Instant와 DB 정밀도 차이 방지)
+    Instant updatedAtBefore =
+        playlistRepository.findById(playlist.getId()).orElseThrow().getUpdatedAt();
 
     playlistRepository.increaseSubscriberCount(playlist.getId());
     em.flush();
@@ -320,7 +323,10 @@ class PlaylistRepositoryTest extends RepositoryTestSupport {
   void decreaseSubscriberCount_decrementsCount_withoutTouchingUpdatedAt() {
     Playlist playlist = savePlaylistWithSubscriberCount("리스트", 2L);
     em.flush();
-    Instant updatedAtBefore = playlist.getUpdatedAt();
+    em.clear();
+    // DB에 저장된 값 기준으로 updatedAt을 확보 (인메모리 Instant와 DB 정밀도 차이 방지)
+    Instant updatedAtBefore =
+        playlistRepository.findById(playlist.getId()).orElseThrow().getUpdatedAt();
 
     playlistRepository.decreaseSubscriberCount(playlist.getId());
     em.flush();
