@@ -10,6 +10,7 @@ import com.team02.mopl.domain.review.enums.ReviewSortBy;
 import com.team02.mopl.domain.review.exception.ReviewAlreadyExistsException;
 import com.team02.mopl.domain.review.mapper.ReviewMapper;
 import com.team02.mopl.domain.review.repository.ReviewRepository;
+import com.team02.mopl.domain.review.util.ReviewCursorConverter;
 import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
@@ -42,10 +43,19 @@ public class ReviewService {
     SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
     ReviewSortBy sortBy = request.sortBy() != null ? request.sortBy() : ReviewSortBy.CREATED_AT;
 
+    // cursor·idAfter는 항상 함께 와야 한다. 둘 다 없으면 첫 페이지, 하나만 있으면 잘못된 요청
+    boolean hasCursor = request.cursor() != null && !request.cursor().isBlank();
+    boolean hasIdAfter = request.idAfter() != null;
+    if (hasCursor != hasIdAfter) {
+      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+    }
+
+    Comparable<?> cursor = ReviewCursorConverter.toSortKey(sortBy, request.cursor());
+
     // hasNext 판정을 위해 limit + 1건을 조회
     List<Review> reviews =
         reviewRepository.findReviewsByCursor(
-            request.contentId(), sortBy, direction, request.cursor(), request.idAfter(), limit + 1);
+            request.contentId(), sortBy, direction, cursor, request.idAfter(), limit + 1);
 
     boolean hasNext = reviews.size() > limit;
     List<Review> page = hasNext ? reviews.subList(0, limit) : reviews;
@@ -57,19 +67,12 @@ public class ReviewService {
     UUID nextIdAfter = null;
     if (hasNext) {
       Review last = page.get(page.size() - 1);
-      nextCursor = encodeCursor(sortBy, last);
+      nextCursor = ReviewCursorConverter.toCursor(sortBy, last);
       nextIdAfter = last.getId();
     }
 
     return new CursorResponse<>(
         data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.name(), direction.name());
-  }
-
-  // 정렬값을 원문 문자열로 인코딩 (createdAt: ISO-8601, rating: 숫자)
-  private String encodeCursor(ReviewSortBy sortBy, Review review) {
-    return sortBy == ReviewSortBy.RATING
-        ? Double.toString(review.getRating())
-        : review.getCreatedAt().toString();
   }
 
   @Transactional

@@ -8,11 +8,8 @@ import com.team02.mopl.domain.review.entity.QReview;
 import com.team02.mopl.domain.review.entity.Review;
 import com.team02.mopl.domain.review.enums.ReviewSortBy;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.UUID;
 import org.hibernate.jpa.HibernateHints;
@@ -32,15 +29,12 @@ public class ReviewRepositoryImpl implements ReviewRepositoryCustom {
       UUID contentId,
       ReviewSortBy sortBy,
       SortDirection direction,
-      String cursor,
+      Comparable<?> cursor,
       UUID idAfter,
       int limit) {
     boolean ascending = direction == SortDirection.ASCENDING;
-    // cursor·idAfter는 항상 함께 와야 한다. 둘 다 없으면 첫 페이지, 하나만 있으면 잘못된 요청
+    // cursor·idAfter는 항상 함께 와야 한다. 둘 다 없으면 첫 페이지로 동작한다
     boolean firstPage = cursor == null && idAfter == null;
-    if (!firstPage && (cursor == null || idAfter == null)) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
 
     return queryFactory
         .selectFrom(review)
@@ -61,13 +55,11 @@ public class ReviewRepositoryImpl implements ReviewRepositoryCustom {
 
   // 복합키 (정렬값, id) 비교를 row-value 표현식으로 구성한다 (동률 다수 대응)
   private BooleanExpression cursorPredicate(
-      ReviewSortBy sortBy, boolean ascending, String cursor, UUID idAfter) {
+      ReviewSortBy sortBy, boolean ascending, Comparable<?> cursor, UUID idAfter) {
     if (sortBy == ReviewSortBy.RATING) {
-      double rating = parseDoubleCursor(cursor);
-      return rowComparison(review.rating, ascending, rating, idAfter);
+      return rowComparison(review.rating, ascending, (Double) cursor, idAfter);
     }
-    Instant createdAt = parseInstantCursor(cursor);
-    return rowComparison(review.createdAt, ascending, createdAt, idAfter);
+    return rowComparison(review.createdAt, ascending, (Instant) cursor, idAfter);
   }
 
   // (정렬키, id) row-value 비교: ASC면 >, DESC면 < 로 커서 이후 항목만 조회
@@ -94,26 +86,5 @@ public class ReviewRepositoryImpl implements ReviewRepositoryCustom {
     return ascending
         ? new OrderSpecifier<?>[] {review.createdAt.asc(), review.id.asc()}
         : new OrderSpecifier<?>[] {review.createdAt.desc(), review.id.desc()};
-  }
-
-  private Instant parseInstantCursor(String cursor) {
-    try {
-      return Instant.parse(cursor);
-    } catch (DateTimeParseException e) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
-  }
-
-  private double parseDoubleCursor(String cursor) {
-    try {
-      double value = Double.parseDouble(cursor);
-      // NaN·Infinity는 (rating, id) 비교에서 무의미하므로 차단한다
-      if (!Double.isFinite(value)) {
-        throw new BusinessException(ErrorCode.INVALID_REQUEST);
-      }
-      return value;
-    } catch (NumberFormatException e) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
   }
 }
