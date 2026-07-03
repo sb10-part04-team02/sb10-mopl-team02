@@ -16,6 +16,7 @@ import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.exception.UserForbiddenException;
+import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -266,6 +267,8 @@ class UserServiceTest {
 
       given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
       given(image.isEmpty()).willReturn(false);
+      given(image.getSize()).willReturn(1024L);
+      given(image.getContentType()).willReturn("image/png");
       given(fileStorage.store(image)).willReturn("https://example.com/new-profile.png");
       given(userMapper.toDto(user)).willReturn(expect);
 
@@ -313,6 +316,59 @@ class UserServiceTest {
       assertThat(user.getProfileImageUrl()).isEqualTo("https://example.com/profile.png");
       then(fileStorage).should(never()).store(any());
       then(userMapper).should().toDto(user);
+    }
+
+    @Test
+    @DisplayName("프로필 이미지 Content-Type이 허용되지 않으면 UserInvalidProfileImageException이 발생한다")
+    void fail_shouldThrowUserInvalidProfileImageException_whenContentTypeIsNotAllowed() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      MultipartFile image = mock(MultipartFile.class);
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(image.isEmpty()).willReturn(false);
+      given(image.getSize()).willReturn(1024L);
+      given(image.getContentType()).willReturn("application/pdf");
+
+      assertThrows(
+          UserInvalidProfileImageException.class,
+          () -> userService.updateProfile(userId, userId, request, image));
+
+      then(fileStorage).should(never()).store(any());
+    }
+
+    @Test
+    @DisplayName("프로필 이미지 크기가 제한을 초과하면 UserInvalidProfileImageException이 발생한다")
+    void fail_shouldThrowUserInvalidProfileImageException_whenImageSizeExceeded() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      MultipartFile image = mock(MultipartFile.class);
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(image.isEmpty()).willReturn(false);
+      given(image.getSize()).willReturn(5 * 1024 * 1024 + 1L);
+
+      assertThrows(
+          UserInvalidProfileImageException.class,
+          () -> userService.updateProfile(userId, userId, request, image));
+
+      then(fileStorage).should(never()).store(any());
     }
   }
 }
