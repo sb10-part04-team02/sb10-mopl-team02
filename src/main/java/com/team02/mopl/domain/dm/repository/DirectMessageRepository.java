@@ -17,6 +17,8 @@ public interface DirectMessageRepository
 
   long countByConversationId(UUID conversationId);
 
+  Optional<DirectMessage> findByIdAndConversationId(UUID id, UUID conversationId);
+
   @Query(
       value =
           """
