@@ -20,7 +20,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   @Override
   public void registerStompEndpoints(StompEndpointRegistry registry) {
     // 클라이언트가 연결할 WebSocket 엔드포인트 정의
-    // FIXME: 추후 JWT 사용한 인증을 요구하도록 수정 필요
+    // JWT 인증은 StompChannelInterceptor의 CONNECT 처리에서 수행한다.
     registry
         .addEndpoint("/ws")
         .setAllowedOriginPatterns("*") // CORS 허용
