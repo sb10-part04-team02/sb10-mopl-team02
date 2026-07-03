@@ -83,8 +83,6 @@ class PlaylistServiceTest {
 
   @Mock NotificationService notificationService;
 
-  @Mock UserRepository userRepository;
-
   @InjectMocks PlaylistService playlistService;
 
   @Captor ArgumentCaptor<Playlist> playlistCaptor;
