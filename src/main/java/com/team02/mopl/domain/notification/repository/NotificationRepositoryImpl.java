@@ -7,11 +7,8 @@ import com.team02.mopl.domain.notification.entity.Notification;
 import com.team02.mopl.domain.notification.entity.QNotification;
 import com.team02.mopl.domain.notification.enums.NotificationSortBy;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.UUID;
 import org.hibernate.jpa.HibernateHints;
@@ -31,17 +28,13 @@ public class NotificationRepositoryImpl implements NotificationRepositoryCustom 
       UUID receiverId,
       NotificationSortBy sortBy,
       SortDirection direction,
-      String cursor,
+      Instant cursor,
       UUID idAfter,
       int limit) {
     // ascending이면 true
     boolean ascending = direction == SortDirection.ASCENDING;
     // 첫 페이지 기준 둘다 null
     boolean firstPage = cursor == null && idAfter == null;
-
-    if (!firstPage && (cursor == null || idAfter == null)) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
 
     return queryFactory
         .selectFrom(notification)
@@ -60,23 +53,14 @@ public class NotificationRepositoryImpl implements NotificationRepositoryCustom 
         .fetch();
   }
 
-  private BooleanExpression cursorCondition(String cursor, UUID idAfter, boolean ascending) {
-    Instant createdAt = parseInstantCursor(cursor);
+  private BooleanExpression cursorCondition(Instant cursor, UUID idAfter, boolean ascending) {
     String operator = ascending ? ">" : "<";
 
     return Expressions.booleanTemplate(
         "({0}, {1}) " + operator + " ({2}, {3})",
         notification.createdAt,
         notification.id,
-        Expressions.constant(createdAt),
+        Expressions.constant(cursor),
         Expressions.constant(idAfter));
-  }
-
-  private Instant parseInstantCursor(String cursor) {
-    try {
-      return Instant.parse(cursor);
-    } catch (DateTimeParseException e) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
   }
 }

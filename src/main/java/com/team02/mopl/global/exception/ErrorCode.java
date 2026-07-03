@@ -13,6 +13,7 @@ public enum ErrorCode {
   NOT_FOUND(HttpStatus.NOT_FOUND, "COMMON_404", "요청한 리소스를 찾을 수 없습니다."),
   METHOD_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "COMMON_400", "지원하지 않는 HTTP 메서드입니다."),
   CONFLICT(HttpStatus.BAD_REQUEST, "COMMON_400", "이미 존재하거나 충돌이 발생한 리소스입니다."),
+  INVALID_CURSOR(HttpStatus.BAD_REQUEST, "COMMON_400", "유효하지 않은 커서 값입니다."),
   INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500", "서버 내부 오류가 발생했습니다."),
 
   // Auth
@@ -25,7 +26,6 @@ public enum ErrorCode {
 
   // Content
   CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CONTENT_404", "콘텐츠를 찾을 수 없습니다."),
-  INVALID_CURSOR(HttpStatus.BAD_REQUEST, "CONTENT_400", "유효하지 않은 커서 값입니다."),
 
   // Playlist
   PLAYLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAYLIST_404", "플레이리스트를 찾을 수 없습니다."),

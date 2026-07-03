@@ -22,6 +22,8 @@ import com.team02.mopl.domain.dm.exception.SelfConversationException;
 import com.team02.mopl.domain.dm.repository.ConversationMemberRepository;
 import com.team02.mopl.domain.dm.repository.ConversationRepository;
 import com.team02.mopl.domain.dm.repository.DirectMessageRepository;
+import com.team02.mopl.domain.dm.util.ConversationCursorConverter;
+import com.team02.mopl.domain.dm.util.DirectMessageCursorConverter;
 import com.team02.mopl.domain.user.dto.UserSummary;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -29,6 +31,7 @@ import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
+import com.team02.mopl.global.exception.ErrorCode;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -164,9 +167,16 @@ public class DirectMessageService {
     int limit = CursorPageRequest.normalizeLimit(request.limit());
     SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
 
+    if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
+      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+    }
+
+    Instant cursor =
+        ConversationCursorConverter.toSortKey(ConversationSortBy.CREATED_AT, request.cursor());
+
     List<Conversation> conversations =
         conversationRepository.findConversationsByCursor(
-            requesterId, direction, request.cursor(), request.idAfter(), limit + 1);
+            requesterId, direction, cursor, request.idAfter(), limit + 1);
 
     boolean hasNext = conversations.size() > limit;
     List<Conversation> page = hasNext ? conversations.subList(0, limit) : conversations;
@@ -203,9 +213,16 @@ public class DirectMessageService {
     int limit = CursorPageRequest.normalizeLimit(request.limit());
     SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
 
+    if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
+      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+    }
+
+    Instant cursor =
+        DirectMessageCursorConverter.toSortKey(DirectMessageSortBy.CREATED_AT, request.cursor());
+
     List<DirectMessage> messages =
         directMessageRepository.findDirectMessagesByCursor(
-            conversationId, direction, request.cursor(), request.idAfter(), limit + 1);
+            conversationId, direction, cursor, request.idAfter(), limit + 1);
 
     boolean hasNext = messages.size() > limit;
     List<DirectMessage> page = hasNext ? messages.subList(0, limit) : messages;

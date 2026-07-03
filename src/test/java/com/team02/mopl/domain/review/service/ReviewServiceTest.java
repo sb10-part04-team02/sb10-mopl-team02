@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.review.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -31,6 +32,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InOrder;
@@ -189,7 +192,7 @@ class ReviewServiceTest {
                   eq(contentId),
                   eq(ReviewSortBy.RATING),
                   eq(SortDirection.DESCENDING),
-                  eq("4.0"),
+                  eq(4.0),
                   eq(idAfter),
                   eq(11)))
           .willReturn(List.of(review(3.0)));
@@ -215,9 +218,65 @@ class ReviewServiceTest {
               eq(contentId),
               eq(ReviewSortBy.RATING),
               eq(SortDirection.DESCENDING),
-              eq("4.0"),
+              eq(4.0),
               eq(idAfter),
               eq(11));
+    }
+
+    @Test
+    @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_REQUEST 예외가 발생한다")
+    void partialCursor_throwsInvalidRequest() {
+      ReviewSearchRequest cursorOnly =
+          new ReviewSearchRequest(contentId, "4.0", null, 10, null, ReviewSortBy.RATING);
+      assertThatThrownBy(() -> reviewService.getReviews(cursorOnly))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+
+      ReviewSearchRequest idAfterOnly =
+          new ReviewSearchRequest(
+              contentId, null, UUID.randomUUID(), 10, null, ReviewSortBy.RATING);
+      assertThatThrownBy(() -> reviewService.getReviews(idAfterOnly))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"not-a-number", "NaN", "Infinity", "-Infinity"})
+    @DisplayName("rating 정렬에서 cursor가 유효한 유한 숫자가 아니면 INVALID_CURSOR 예외가 발생한다")
+    void invalidRatingCursor_throwsInvalidCursor(String cursor) {
+      ReviewSearchRequest request =
+          new ReviewSearchRequest(
+              contentId,
+              cursor,
+              UUID.randomUUID(),
+              10,
+              SortDirection.DESCENDING,
+              ReviewSortBy.RATING);
+
+      assertThatThrownBy(() -> reviewService.getReviews(request))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR));
+    }
+
+    @Test
+    @DisplayName("createdAt 정렬에서 cursor가 ISO-8601 형식이 아니면 INVALID_CURSOR 예외가 발생한다")
+    void invalidCreatedAtCursor_throwsInvalidCursor() {
+      ReviewSearchRequest request =
+          new ReviewSearchRequest(
+              contentId,
+              "not-an-instant",
+              UUID.randomUUID(),
+              10,
+              SortDirection.DESCENDING,
+              ReviewSortBy.CREATED_AT);
+
+      assertThatThrownBy(() -> reviewService.getReviews(request))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR));
     }
   }
 

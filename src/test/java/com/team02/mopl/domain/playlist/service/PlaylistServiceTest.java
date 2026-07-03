@@ -35,6 +35,8 @@ import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
+import com.team02.mopl.global.exception.BusinessException;
+import com.team02.mopl.global.exception.ErrorCode;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -383,7 +385,7 @@ class PlaylistServiceTest {
 
       given(
               playlistRepository.findPlaylistsByCursor(
-                  null, PlaylistSortBy.SUBSCRIBE_COUNT, SortDirection.DESCENDING, "5", cursorId, 2))
+                  null, PlaylistSortBy.SUBSCRIBE_COUNT, SortDirection.DESCENDING, 5L, cursorId, 2))
           .willReturn(List.of(first, second));
       given(playlistRepository.countActive(null)).willReturn(2L);
       given(userRepository.findAllById(List.of(ownerId))).willReturn(List.of());
@@ -403,6 +405,50 @@ class PlaylistServiceTest {
       assertThat(response.nextCursor()).isEqualTo("42");
       assertThat(response.nextIdAfter()).isEqualTo(first.getId());
       assertThat(response.sortBy()).isEqualTo(PlaylistSortBy.SUBSCRIBE_COUNT.name());
+    }
+
+    @Test
+    @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_REQUEST 예외가 발생한다")
+    void partialCursor_throwsInvalidRequest() {
+      PlaylistSearchRequest cursorOnly =
+          new PlaylistSearchRequest(null, "2026-06-29T00:00:00Z", null, 20, null, null);
+      assertThatThrownBy(() -> playlistService.getPlaylists(cursorOnly, requesterId))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+
+      PlaylistSearchRequest idAfterOnly =
+          new PlaylistSearchRequest(null, null, UUID.randomUUID(), 20, null, null);
+      assertThatThrownBy(() -> playlistService.getPlaylists(idAfterOnly, requesterId))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+    }
+
+    @Test
+    @DisplayName("잘못된 cursor 형식이면 INVALID_CURSOR 예외가 발생한다")
+    void invalidCursor_throwsInvalidCursor() {
+      PlaylistSearchRequest request =
+          new PlaylistSearchRequest(
+              null, "not-an-instant", UUID.randomUUID(), 20, null, PlaylistSortBy.UPDATED_AT);
+
+      assertThatThrownBy(() -> playlistService.getPlaylists(request, requesterId))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR));
+    }
+
+    @Test
+    @DisplayName("SUBSCRIBE_COUNT 정렬에서 잘못된 cursor 형식이면 INVALID_CURSOR 예외가 발생한다")
+    void invalidCursor_forSubscribeCount_throwsInvalidCursor() {
+      PlaylistSearchRequest request =
+          new PlaylistSearchRequest(
+              null, "not-a-number", UUID.randomUUID(), 20, null, PlaylistSortBy.SUBSCRIBE_COUNT);
+
+      assertThatThrownBy(() -> playlistService.getPlaylists(request, requesterId))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR));
     }
   }
 
