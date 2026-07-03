@@ -1,10 +1,12 @@
 package com.team02.mopl.domain.dm.repository;
 
 import com.team02.mopl.domain.dm.entity.ConversationMember;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -42,15 +44,14 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
   boolean existsByConversationIdAndUserId(UUID conversationId, UUID userId);
 
   // 동시 요청 간 lost update를 막기 위한 조건부 UPDATE: 새 시각이 기존보다 클 때만 전진(뒤로 이동 방지).
-  @org.springframework.data.jpa.repository.Modifying
+  @Modifying
   @Query(
       """
       UPDATE ConversationMember cm
       SET cm.lastReadAt = :lastReadAt
       WHERE cm.id = :memberId AND cm.lastReadAt < :lastReadAt
       """)
-  int advanceLastReadAt(
-      @Param("memberId") UUID memberId, @Param("lastReadAt") java.time.Instant lastReadAt);
+  int advanceLastReadAt(@Param("memberId") UUID memberId, @Param("lastReadAt") Instant lastReadAt);
 
   @Query(
       """
