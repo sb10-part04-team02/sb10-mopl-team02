@@ -14,12 +14,12 @@ import org.springframework.http.ResponseEntity;
 @Tag(name = "플레이리스트 관리")
 public interface SubscriptionApi {
 
-  @Operation(summary = "플레이리스트 구독", description = "다른 사용자의 플레이리스트를 구독하고 소유자에게 알림을 전송합니다.")
+  @Operation(summary = "플레이리스트 구독")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "성공"),
     @ApiResponse(
         responseCode = "400",
-        description = "잘못된 요청(본인 소유·중복 구독)",
+        description = "잘못된 요청",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     @ApiResponse(
         responseCode = "401",
@@ -36,7 +36,7 @@ public interface SubscriptionApi {
   })
   ResponseEntity<Void> subscribe(UUID playlistId, @Parameter(hidden = true) UUID requesterId);
 
-  @Operation(summary = "플레이리스트 구독 취소", description = "구독 중인 플레이리스트의 구독을 취소합니다.")
+  @Operation(summary = "플레이리스트 구독 취소")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "성공"),
     @ApiResponse(
