@@ -21,7 +21,7 @@ public final class NotificationCursorConverter {
         case createdAt -> Instant.parse(cursor);
       };
     } catch (DateTimeParseException e) {
-      throw new NotificationInvalidCursorException(sortBy, cursor);
+      throw new NotificationInvalidCursorException(sortBy, cursor, e);
     }
   }
 }

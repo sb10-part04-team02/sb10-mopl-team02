@@ -8,4 +8,8 @@ public class DirectMessageException extends BusinessException {
   public DirectMessageException(ErrorCode errorCode) {
     super(errorCode);
   }
+
+  public DirectMessageException(ErrorCode errorCode, Throwable cause) {
+    super(errorCode, cause);
+  }
 }

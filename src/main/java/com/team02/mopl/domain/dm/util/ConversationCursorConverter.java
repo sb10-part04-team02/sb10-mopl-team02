@@ -21,7 +21,7 @@ public final class ConversationCursorConverter {
         case CREATED_AT -> Instant.parse(cursor);
       };
     } catch (DateTimeParseException e) {
-      throw new DmInvalidCursorException(sortBy.name(), cursor);
+      throw new DmInvalidCursorException(sortBy.name(), cursor, e);
     }
   }
 }

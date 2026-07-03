@@ -69,10 +69,7 @@ public class NotificationService {
     NotificationSortBy sortBy =
         request.sortBy() != null ? request.sortBy() : NotificationSortBy.createdAt;
 
-    // cursor와 idAfter는 함께 있거나 함께 없어야 한다 (첫 페이지: 둘 다 null)
-    boolean hasCursor = request.cursor() != null && !request.cursor().isBlank();
-    boolean hasIdAfter = request.idAfter() != null;
-    if (hasCursor != hasIdAfter) {
+    if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
       throw new BusinessException(ErrorCode.INVALID_REQUEST);
     }
 

@@ -32,4 +32,11 @@ public interface CursorPageRequest<S extends Enum<S>> {
   static SortDirection normalizeSortDirection(SortDirection direction) {
     return direction == null ? SortDirection.DESCENDING : direction;
   }
+
+  // cursor·idAfter는 항상 함께 와야 한다. 둘 다 있거나(다음 페이지) 둘 다 없어야(첫 페이지) 유효하다
+  static boolean isValidCursorCombo(String cursor, UUID idAfter) {
+    boolean hasCursor = cursor != null && !cursor.isBlank();
+    boolean hasIdAfter = idAfter != null;
+    return hasCursor == hasIdAfter;
+  }
 }

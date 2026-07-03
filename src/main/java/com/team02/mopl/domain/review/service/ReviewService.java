@@ -43,10 +43,7 @@ public class ReviewService {
     SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
     ReviewSortBy sortBy = request.sortBy() != null ? request.sortBy() : ReviewSortBy.CREATED_AT;
 
-    // cursor·idAfter는 항상 함께 와야 한다. 둘 다 없으면 첫 페이지, 하나만 있으면 잘못된 요청
-    boolean hasCursor = request.cursor() != null && !request.cursor().isBlank();
-    boolean hasIdAfter = request.idAfter() != null;
-    if (hasCursor != hasIdAfter) {
+    if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
       throw new BusinessException(ErrorCode.INVALID_REQUEST);
     }
 

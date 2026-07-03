@@ -23,7 +23,7 @@ public final class ReviewCursorConverter {
         case RATING -> parseRating(cursor);
       };
     } catch (DateTimeParseException | NumberFormatException e) {
-      throw new ReviewInvalidCursorException(sortBy, cursor);
+      throw new ReviewInvalidCursorException(sortBy, cursor, e);
     }
   }
 

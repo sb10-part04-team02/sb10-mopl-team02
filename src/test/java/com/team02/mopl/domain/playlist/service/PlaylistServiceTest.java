@@ -437,6 +437,19 @@ class PlaylistServiceTest {
               BusinessException.class,
               e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR));
     }
+
+    @Test
+    @DisplayName("SUBSCRIBE_COUNT 정렬에서 잘못된 cursor 형식이면 INVALID_CURSOR 예외가 발생한다")
+    void invalidCursor_forSubscribeCount_throwsInvalidCursor() {
+      PlaylistSearchRequest request =
+          new PlaylistSearchRequest(
+              null, "not-a-number", UUID.randomUUID(), 20, null, PlaylistSortBy.SUBSCRIBE_COUNT);
+
+      assertThatThrownBy(() -> playlistService.getPlaylists(request, requesterId))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR));
+    }
   }
 
   @Nested

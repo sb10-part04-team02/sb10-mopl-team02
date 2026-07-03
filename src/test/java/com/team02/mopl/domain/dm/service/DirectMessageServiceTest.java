@@ -633,11 +633,16 @@ class DirectMessageServiceTest {
   void getConversations_partialCursor_throwsInvalidRequest() {
     UUID requesterId = UUID.randomUUID();
 
-    assertThatThrownBy(
-            () ->
-                directMessageService.getConversations(
-                    requesterId,
-                    new ConversationSearchRequest("2026-06-30T10:15:30Z", null, null, null, null)))
+    ConversationSearchRequest cursorOnly =
+        new ConversationSearchRequest("2026-06-30T10:15:30Z", null, null, null, null);
+    assertThatThrownBy(() -> directMessageService.getConversations(requesterId, cursorOnly))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+
+    ConversationSearchRequest idAfterOnly =
+        new ConversationSearchRequest(null, UUID.randomUUID(), null, null, null);
+    assertThatThrownBy(() -> directMessageService.getConversations(requesterId, idAfterOnly))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
@@ -788,12 +793,18 @@ class DirectMessageServiceTest {
     given(conversationMemberRepository.existsByConversationIdAndUserId(conversationId, requesterId))
         .willReturn(true);
 
+    DirectMessageSearchRequest cursorOnly =
+        new DirectMessageSearchRequest("2026-06-30T10:15:30Z", null, null, null, null);
     assertThatThrownBy(
-            () ->
-                directMessageService.getDirectMessages(
-                    conversationId,
-                    requesterId,
-                    new DirectMessageSearchRequest("2026-06-30T10:15:30Z", null, null, null, null)))
+            () -> directMessageService.getDirectMessages(conversationId, requesterId, cursorOnly))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+
+    DirectMessageSearchRequest idAfterOnly =
+        new DirectMessageSearchRequest(null, UUID.randomUUID(), null, null, null);
+    assertThatThrownBy(
+            () -> directMessageService.getDirectMessages(conversationId, requesterId, idAfterOnly))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
