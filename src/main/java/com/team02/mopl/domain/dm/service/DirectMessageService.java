@@ -17,6 +17,7 @@ import com.team02.mopl.domain.dm.enums.DirectMessageSortBy;
 import com.team02.mopl.domain.dm.exception.ConversationAlreadyExistsException;
 import com.team02.mopl.domain.dm.exception.ConversationForbiddenException;
 import com.team02.mopl.domain.dm.exception.ConversationNotFoundException;
+import com.team02.mopl.domain.dm.exception.DirectMessageNotFoundException;
 import com.team02.mopl.domain.dm.exception.SelfConversationException;
 import com.team02.mopl.domain.dm.repository.ConversationMemberRepository;
 import com.team02.mopl.domain.dm.repository.ConversationRepository;
@@ -259,6 +260,25 @@ public class DirectMessageService {
     eventPublisher.publishEvent(new DmSentEvent(receiverUserId, saved.getId().toString(), dto));
 
     return dto;
+  }
+
+  @Transactional
+  public void markAsRead(UUID conversationId, UUID directMessageId, UUID requesterId) {
+    ConversationMember requesterMember =
+        conversationMemberRepository
+            .findByConversationIdAndUserId(conversationId, requesterId)
+            .orElseThrow(ConversationForbiddenException::new);
+
+    DirectMessage directMessage =
+        directMessageRepository
+            .findByIdAndConversationId(directMessageId, conversationId)
+            .orElseThrow(DirectMessageNotFoundException::new);
+
+    // 동시 요청 간 lost update를 막기 위해 조건부 UPDATE로 원자적으로 읽음 시점을 전진시킨다(뒤로 이동은 쿼리에서 차단).
+    // 벌크 UPDATE는 영속성 컨텍스트에 반영되지 않으므로, 이후 이 트랜잭션에서 requesterMember.getLastReadAt()을
+    // 다시 읽어야 한다면 @Modifying(clearAutomatically = true)가 필요하다. 현재는 이후 참조가 없어 불필요하다.
+    conversationMemberRepository.advanceLastReadAt(
+        requesterMember.getId(), directMessage.getCreatedAt());
   }
 
   private List<ConversationDto> buildConversationDtos(List<Conversation> page, UUID requesterId) {
