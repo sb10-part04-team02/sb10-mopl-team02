@@ -16,12 +16,6 @@ import com.team02.mopl.domain.content.entity.Tag;
 import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.content.repository.ContentRepository;
 import com.team02.mopl.domain.content.repository.TagRepository;
-import com.team02.mopl.domain.follow.entity.Follow;
-import com.team02.mopl.domain.follow.repository.FollowRepository;
-import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
-import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
-import com.team02.mopl.domain.notification.entity.enums.NotificationType;
-import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.playlist.dto.PlaylistCreateRequest;
 import com.team02.mopl.domain.playlist.dto.PlaylistDto;
 import com.team02.mopl.domain.playlist.dto.PlaylistSearchRequest;
@@ -29,6 +23,7 @@ import com.team02.mopl.domain.playlist.dto.PlaylistUpdateRequest;
 import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.entity.PlaylistContent;
 import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
+import com.team02.mopl.domain.playlist.event.PlaylistCreatedEvent;
 import com.team02.mopl.domain.playlist.exception.PlaylistForbiddenException;
 import com.team02.mopl.domain.playlist.exception.PlaylistNotFoundException;
 import com.team02.mopl.domain.playlist.mapper.PlaylistMapper;
@@ -58,6 +53,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 // TODO: JWT 인증 연결 후 PlaylistController @WebMvcTest 추가
@@ -79,9 +75,7 @@ class PlaylistServiceTest {
 
   @Mock PlaylistMapper playlistMapper;
 
-  @Mock FollowRepository followRepository;
-
-  @Mock NotificationService notificationService;
+  @Mock ApplicationEventPublisher eventPublisher;
 
   @InjectMocks PlaylistService playlistService;
 
@@ -114,8 +108,6 @@ class PlaylistServiceTest {
       // 플레이리스트 생성 전 owner가 존재하는지 확인
       given(userRepository.findByIdAndDeletedAtIsNull(ownerId)).willReturn(Optional.of(owner));
       given(playlistRepository.save(any(Playlist.class))).willReturn(saved);
-      // 팔로워가 없으면 주요 활동 알림을 생성 X
-      given(followRepository.findByFollowee_IdAndDeletedAtIsNull(ownerId)).willReturn(List.of());
       given(playlistMapper.toDto(any(Playlist.class), eq(false))).willReturn(expect);
 
       // when
@@ -125,7 +117,6 @@ class PlaylistServiceTest {
       assertThat(actual).isEqualTo(expect);
       then(playlistRepository).should().save(playlistCaptor.capture());
       then(playlistMapper).should().toDto(any(Playlist.class), eq(false));
-      then(notificationService).shouldHaveNoInteractions();
 
       Playlist captured = playlistCaptor.getValue();
       assertThat(captured.getOwnerId()).isEqualTo(ownerId);
@@ -134,12 +125,11 @@ class PlaylistServiceTest {
     }
 
     @Test
-    @DisplayName("플레이리스트를 생성하면 생성자를 팔로우 중인 사용자들에게 주요 활동 알림을 생성한다")
-    void success_sendsFollowingUserActivityNotifications() {
-      UUID followerId = UUID.randomUUID();
-      User owner = mockUserWithIdAndName(ownerId, ownerName);
-      User follower = mockUserWithId(followerId);
-      Follow follow = new Follow(follower, owner);
+    @DisplayName("플레이리스트를 생성하면 생성자를 팔로우 중인 사용자들에게 주요 활동 알림을 생성하기 위한 이벤트를 발행한다")
+    void success_publishesPlaylistCreatedEvent() {
+      User owner = mock(User.class);
+      given(owner.getId()).willReturn(ownerId);
+      given(owner.getName()).willReturn(ownerName);
 
       PlaylistCreateRequest request = new PlaylistCreateRequest(title, description);
       Playlist saved = new Playlist(ownerId, title, description);
@@ -156,25 +146,21 @@ class PlaylistServiceTest {
 
       given(userRepository.findByIdAndDeletedAtIsNull(ownerId)).willReturn(Optional.of(owner));
       given(playlistRepository.save(any(Playlist.class))).willReturn(saved);
-      // 플레이리스트 생성자를 팔로우 중인 사용자 목록을 조회
-      given(followRepository.findByFollowee_IdAndDeletedAtIsNull(ownerId))
-          .willReturn(List.of(follow));
       given(playlistMapper.toDto(any(Playlist.class), eq(false))).willReturn(expect);
 
       playlistService.create(ownerId, request);
 
-      ArgumentCaptor<NotificationCreateCommand> commandCaptor =
-          ArgumentCaptor.forClass(NotificationCreateCommand.class);
+      ArgumentCaptor<PlaylistCreatedEvent> eventCaptor =
+          ArgumentCaptor.forClass(PlaylistCreatedEvent.class);
 
-      then(notificationService).should().createNotification(commandCaptor.capture());
+      then(eventPublisher).should().publishEvent(eventCaptor.capture());
 
-      NotificationCreateCommand command = commandCaptor.getValue();
+      PlaylistCreatedEvent event = eventCaptor.getValue();
 
-      assertThat(command.receiverId()).isEqualTo(followerId);
-      assertThat(command.title()).isEqualTo(ownerName + "님이 플레이리스트를 만들었어요.");
-      assertThat(command.content()).isEqualTo("[" + title + "] " + description);
-      assertThat(command.level()).isEqualTo(NotificationLevel.INFO);
-      assertThat(command.notificationType()).isEqualTo(NotificationType.FOLLOWING_USER_ACTIVITY);
+      assertThat(event.ownerId()).isEqualTo(ownerId);
+      assertThat(event.ownerName()).isEqualTo(ownerName);
+      assertThat(event.playlistTitle()).isEqualTo(title);
+      assertThat(event.playlistDescription()).isEqualTo(description);
     }
 
     private User mockUserWithId(UUID id) {

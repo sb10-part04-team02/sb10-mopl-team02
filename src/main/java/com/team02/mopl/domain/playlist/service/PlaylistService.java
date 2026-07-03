@@ -5,12 +5,6 @@ import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.entity.Tag;
 import com.team02.mopl.domain.content.repository.ContentRepository;
 import com.team02.mopl.domain.content.repository.TagRepository;
-import com.team02.mopl.domain.follow.entity.Follow;
-import com.team02.mopl.domain.follow.repository.FollowRepository;
-import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
-import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
-import com.team02.mopl.domain.notification.entity.enums.NotificationType;
-import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.playlist.dto.PlaylistCreateRequest;
 import com.team02.mopl.domain.playlist.dto.PlaylistDto;
 import com.team02.mopl.domain.playlist.dto.PlaylistSearchRequest;
@@ -18,6 +12,7 @@ import com.team02.mopl.domain.playlist.dto.PlaylistUpdateRequest;
 import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.entity.PlaylistContent;
 import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
+import com.team02.mopl.domain.playlist.event.PlaylistCreatedEvent;
 import com.team02.mopl.domain.playlist.exception.PlaylistForbiddenException;
 import com.team02.mopl.domain.playlist.exception.PlaylistNotFoundException;
 import com.team02.mopl.domain.playlist.mapper.PlaylistMapper;
@@ -42,6 +37,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,8 +54,7 @@ public class PlaylistService {
   private final UserRepository userRepository;
   private final SubscriptionRepository subscriptionRepository;
   private final PlaylistMapper playlistMapper;
-  private final FollowRepository followRepository;
-  private final NotificationService notificationService;
+  private final ApplicationEventPublisher eventPublisher;
 
   // 플레이리스트 단건 조회 (소유자·포함 콘텐츠·구독자 수·요청자 구독 여부 포함, 논리 삭제 제외)
   public PlaylistDto get(UUID playlistId, UUID requesterId) {
@@ -130,8 +125,10 @@ public class PlaylistService {
     Playlist playlist = new Playlist(ownerId, request.title(), request.description());
     Playlist saved = playlistRepository.save(playlist);
 
-    // 유저가 플레이리스트 생성 시 본인 팔로우한 사용자에게 알림
-    sendFollowingUserActivityNotifications(owner, saved);
+    // 플레이리스트 생성 알림은 커밋 이후 이벤트 리스너에서 처리한다.
+    eventPublisher.publishEvent(
+        new PlaylistCreatedEvent(
+            owner.getId(), owner.getName(), saved.getTitle(), saved.getDescription()));
 
     // 방금 생성한 본인 플레이리스트이므로 subscribedByMe는 false
     PlaylistDto playlistDto = playlistMapper.toDto(saved, false);
@@ -160,20 +157,6 @@ public class PlaylistService {
 
     log.info("플레이리스트 수정 성공: playlistId={}, requesterId={}", playlistId, requesterId);
     return playlistDto;
-  }
-
-  private void sendFollowingUserActivityNotifications(User owner, Playlist playlist) {
-    List<Follow> followers = followRepository.findByFollowee_IdAndDeletedAtIsNull(owner.getId());
-
-    for (Follow follow : followers) {
-      notificationService.createNotification(
-          new NotificationCreateCommand(
-              follow.getFollower().getId(),
-              owner.getName() + "님이 플레이리스트를 만들었어요.",
-              "[" + playlist.getTitle() + "] " + playlist.getDescription(),
-              NotificationLevel.INFO,
-              NotificationType.FOLLOWING_USER_ACTIVITY));
-    }
   }
 
   private User getActiveUser(UUID userId) {
