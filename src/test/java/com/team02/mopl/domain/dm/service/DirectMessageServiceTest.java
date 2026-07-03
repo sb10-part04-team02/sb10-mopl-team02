@@ -843,6 +843,94 @@ class DirectMessageServiceTest {
     verify(eventPublisher, never()).publishEvent(any());
   }
 
+  @Test
+  @DisplayName("DM 읽음 처리 시 요청자의 lastReadAt을 해당 DM 생성 시각으로 갱신한다")
+  void markAsRead_advancesLastReadAt() {
+    UUID conversationId = UUID.randomUUID();
+    UUID directMessageId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+
+    Instant dmCreatedAt = Instant.parse("2026-07-02T00:00:00Z");
+    ConversationMember requesterMember =
+        mockConversationMember(requesterId, dmCreatedAt.minusSeconds(60));
+    DirectMessage dm =
+        mockDirectMessage(conversationId, UUID.randomUUID(), requesterId, dmCreatedAt);
+
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(Optional.of(requesterMember));
+    given(directMessageRepository.findByIdAndConversationId(directMessageId, conversationId))
+        .willReturn(Optional.of(dm));
+
+    directMessageService.markAsRead(conversationId, directMessageId, requesterId);
+
+    verify(requesterMember).updateLastReadAt(dmCreatedAt);
+  }
+
+  @Test
+  @DisplayName("이미 더 최근까지 읽은 경우 lastReadAt을 뒤로 이동시키지 않는다")
+  void markAsRead_doesNotMoveBackward() {
+    UUID conversationId = UUID.randomUUID();
+    UUID directMessageId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+
+    Instant dmCreatedAt = Instant.parse("2026-07-02T00:00:00Z");
+    ConversationMember requesterMember =
+        mockConversationMember(requesterId, dmCreatedAt.plusSeconds(60));
+    DirectMessage dm =
+        mockDirectMessage(conversationId, UUID.randomUUID(), requesterId, dmCreatedAt);
+
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(Optional.of(requesterMember));
+    given(directMessageRepository.findByIdAndConversationId(directMessageId, conversationId))
+        .willReturn(Optional.of(dm));
+
+    directMessageService.markAsRead(conversationId, directMessageId, requesterId);
+
+    verify(requesterMember, never()).updateLastReadAt(any());
+  }
+
+  @Test
+  @DisplayName("DM 읽음 처리 시 요청자가 대화방 멤버가 아니면 FORBIDDEN 예외가 발생한다")
+  void markAsRead_notMember_throwsForbidden() {
+    UUID conversationId = UUID.randomUUID();
+    UUID directMessageId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () -> directMessageService.markAsRead(conversationId, directMessageId, requesterId))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+
+    verify(directMessageRepository, never()).findByIdAndConversationId(any(), any());
+  }
+
+  @Test
+  @DisplayName("DM 읽음 처리 시 해당 대화방에 DM이 없으면 DIRECT_MESSAGE_NOT_FOUND 예외가 발생한다")
+  void markAsRead_dmNotFound_throwsNotFound() {
+    UUID conversationId = UUID.randomUUID();
+    UUID directMessageId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+
+    ConversationMember requesterMember = mockConversationMember(requesterId, Instant.now());
+
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(Optional.of(requesterMember));
+    given(directMessageRepository.findByIdAndConversationId(directMessageId, conversationId))
+        .willReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () -> directMessageService.markAsRead(conversationId, directMessageId, requesterId))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DIRECT_MESSAGE_NOT_FOUND));
+
+    verify(requesterMember, never()).updateLastReadAt(any());
+  }
+
   // ──────────────────────────────────────────────
   // helpers
   // ──────────────────────────────────────────────

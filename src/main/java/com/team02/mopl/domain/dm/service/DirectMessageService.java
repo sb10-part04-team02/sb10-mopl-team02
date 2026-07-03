@@ -17,6 +17,7 @@ import com.team02.mopl.domain.dm.enums.DirectMessageSortBy;
 import com.team02.mopl.domain.dm.exception.ConversationAlreadyExistsException;
 import com.team02.mopl.domain.dm.exception.ConversationForbiddenException;
 import com.team02.mopl.domain.dm.exception.ConversationNotFoundException;
+import com.team02.mopl.domain.dm.exception.DirectMessageNotFoundException;
 import com.team02.mopl.domain.dm.exception.SelfConversationException;
 import com.team02.mopl.domain.dm.repository.ConversationMemberRepository;
 import com.team02.mopl.domain.dm.repository.ConversationRepository;
@@ -259,6 +260,24 @@ public class DirectMessageService {
     eventPublisher.publishEvent(new DmSentEvent(receiverUserId, saved.getId().toString(), dto));
 
     return dto;
+  }
+
+  @Transactional
+  public void markAsRead(UUID conversationId, UUID directMessageId, UUID requesterId) {
+    ConversationMember requesterMember =
+        conversationMemberRepository
+            .findByConversationIdAndUserId(conversationId, requesterId)
+            .orElseThrow(ConversationForbiddenException::new);
+
+    DirectMessage directMessage =
+        directMessageRepository
+            .findByIdAndConversationId(directMessageId, conversationId)
+            .orElseThrow(DirectMessageNotFoundException::new);
+
+    // 읽음 시점은 뒤로 이동시키지 않는다(이미 더 최근까지 읽은 경우 유지)
+    if (directMessage.getCreatedAt().isAfter(requesterMember.getLastReadAt())) {
+      requesterMember.updateLastReadAt(directMessage.getCreatedAt());
+    }
   }
 
   private List<ConversationDto> buildConversationDtos(List<Conversation> page, UUID requesterId) {

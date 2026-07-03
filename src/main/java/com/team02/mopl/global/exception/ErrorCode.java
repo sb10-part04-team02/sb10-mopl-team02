@@ -47,6 +47,7 @@ public enum ErrorCode {
   CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "CONVERSATION_404", "대화를 찾을 수 없습니다."),
   SELF_CONVERSATION(HttpStatus.BAD_REQUEST, "CONVERSATION_400", "자기 자신과 대화방을 만들 수 없습니다."),
   CONVERSATION_ALREADY_EXISTS(HttpStatus.CONFLICT, "CONVERSATION_409", "이미 존재하는 대화방입니다."),
+  DIRECT_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "DIRECT_MESSAGE_404", "다이렉트 메시지를 찾을 수 없습니다."),
 
   // Watch Room
   WATCH_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "WATCH_ROOM_404", "시청방을 찾을 수 없습니다."),

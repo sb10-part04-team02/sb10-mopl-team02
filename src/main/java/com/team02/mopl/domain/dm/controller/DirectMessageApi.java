@@ -146,4 +146,29 @@ public interface DirectMessageApi {
       @Parameter(hidden = true) UUID userId,
       @Parameter(description = "대화방 UUID") UUID conversationId,
       @Valid @ModelAttribute DirectMessageSearchRequest request);
+
+  @Operation(summary = "DM 읽음 처리", description = "대화방의 특정 DM까지 읽음 처리합니다. 요청자가 해당 대화방의 참여자여야 합니다.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "성공"),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "대화방 멤버가 아님",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "DM을 찾을 수 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<Void> markDirectMessageAsRead(
+      @Parameter(hidden = true) UUID userId,
+      @Parameter(description = "대화방 UUID") UUID conversationId,
+      @Parameter(description = "DM UUID") UUID directMessageId);
 }
