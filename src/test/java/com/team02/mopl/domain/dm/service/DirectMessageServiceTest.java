@@ -844,15 +844,17 @@ class DirectMessageServiceTest {
   }
 
   @Test
-  @DisplayName("DM 읽음 처리 시 요청자의 lastReadAt을 해당 DM 생성 시각으로 갱신한다")
+  @DisplayName("DM 읽음 처리 시 요청자 멤버의 lastReadAt을 DM 생성 시각으로 전진시키는 조건부 UPDATE를 호출한다")
   void markAsRead_advancesLastReadAt() {
     UUID conversationId = UUID.randomUUID();
     UUID directMessageId = UUID.randomUUID();
     UUID requesterId = UUID.randomUUID();
+    UUID memberId = UUID.randomUUID();
 
     Instant dmCreatedAt = Instant.parse("2026-07-02T00:00:00Z");
     ConversationMember requesterMember =
         mockConversationMember(requesterId, dmCreatedAt.minusSeconds(60));
+    given(requesterMember.getId()).willReturn(memberId);
     DirectMessage dm =
         mockDirectMessage(conversationId, UUID.randomUUID(), requesterId, dmCreatedAt);
 
@@ -863,52 +865,7 @@ class DirectMessageServiceTest {
 
     directMessageService.markAsRead(conversationId, directMessageId, requesterId);
 
-    verify(requesterMember).updateLastReadAt(dmCreatedAt);
-  }
-
-  @Test
-  @DisplayName("이미 더 최근까지 읽은 경우 lastReadAt을 뒤로 이동시키지 않는다")
-  void markAsRead_doesNotMoveBackward() {
-    UUID conversationId = UUID.randomUUID();
-    UUID directMessageId = UUID.randomUUID();
-    UUID requesterId = UUID.randomUUID();
-
-    Instant dmCreatedAt = Instant.parse("2026-07-02T00:00:00Z");
-    ConversationMember requesterMember =
-        mockConversationMember(requesterId, dmCreatedAt.plusSeconds(60));
-    DirectMessage dm =
-        mockDirectMessage(conversationId, UUID.randomUUID(), requesterId, dmCreatedAt);
-
-    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
-        .willReturn(Optional.of(requesterMember));
-    given(directMessageRepository.findByIdAndConversationId(directMessageId, conversationId))
-        .willReturn(Optional.of(dm));
-
-    directMessageService.markAsRead(conversationId, directMessageId, requesterId);
-
-    verify(requesterMember, never()).updateLastReadAt(any());
-  }
-
-  @Test
-  @DisplayName("lastReadAt과 DM createdAt이 동일하면 lastReadAt을 갱신하지 않는다")
-  void markAsRead_sameTimestamp_doesNotUpdate() {
-    UUID conversationId = UUID.randomUUID();
-    UUID directMessageId = UUID.randomUUID();
-    UUID requesterId = UUID.randomUUID();
-
-    Instant dmCreatedAt = Instant.parse("2026-07-02T00:00:00Z");
-    ConversationMember requesterMember = mockConversationMember(requesterId, dmCreatedAt);
-    DirectMessage dm =
-        mockDirectMessage(conversationId, UUID.randomUUID(), requesterId, dmCreatedAt);
-
-    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
-        .willReturn(Optional.of(requesterMember));
-    given(directMessageRepository.findByIdAndConversationId(directMessageId, conversationId))
-        .willReturn(Optional.of(dm));
-
-    directMessageService.markAsRead(conversationId, directMessageId, requesterId);
-
-    verify(requesterMember, never()).updateLastReadAt(any());
+    verify(conversationMemberRepository).advanceLastReadAt(memberId, dmCreatedAt);
   }
 
   @Test
@@ -950,7 +907,7 @@ class DirectMessageServiceTest {
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DIRECT_MESSAGE_NOT_FOUND));
 
-    verify(requesterMember, never()).updateLastReadAt(any());
+    verify(conversationMemberRepository, never()).advanceLastReadAt(any(), any());
   }
 
   // ──────────────────────────────────────────────

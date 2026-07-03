@@ -38,8 +38,4 @@ public class ConversationMember extends BaseMutableEntity {
 
   @Column(name = "last_read_at", nullable = false)
   private Instant lastReadAt;
-
-  public void updateLastReadAt(Instant lastReadAt) {
-    this.lastReadAt = Objects.requireNonNull(lastReadAt);
-  }
 }

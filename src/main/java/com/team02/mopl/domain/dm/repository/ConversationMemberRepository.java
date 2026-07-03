@@ -41,6 +41,17 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
 
   boolean existsByConversationIdAndUserId(UUID conversationId, UUID userId);
 
+  // 동시 요청 간 lost update를 막기 위한 조건부 UPDATE: 새 시각이 기존보다 클 때만 전진(뒤로 이동 방지).
+  @org.springframework.data.jpa.repository.Modifying
+  @Query(
+      """
+      UPDATE ConversationMember cm
+      SET cm.lastReadAt = :lastReadAt
+      WHERE cm.id = :memberId AND cm.lastReadAt < :lastReadAt
+      """)
+  int advanceLastReadAt(
+      @Param("memberId") UUID memberId, @Param("lastReadAt") java.time.Instant lastReadAt);
+
   @Query(
       """
       SELECT cm FROM ConversationMember cm
