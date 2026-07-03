@@ -1,9 +1,8 @@
-package com.team02.mopl.domain.dm.controller;
+package com.team02.mopl.domain.contentchat.controller;
 
-import com.team02.mopl.domain.dm.dto.DirectMessageDto;
-import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
-import com.team02.mopl.domain.dm.exception.ConversationForbiddenException;
-import com.team02.mopl.domain.dm.service.DirectMessageService;
+import com.team02.mopl.domain.contentchat.dto.ContentChatDto;
+import com.team02.mopl.domain.contentchat.dto.ContentChatSendRequest;
+import com.team02.mopl.domain.contentchat.service.ContentChatService;
 import com.team02.mopl.global.exception.ErrorResponse;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
@@ -23,28 +22,20 @@ import org.springframework.stereotype.Controller;
 @Slf4j
 @Controller
 @RequiredArgsConstructor
-public class DirectMessageWebSocketController {
+public class ContentChatWebSocketController {
 
-  private final DirectMessageService directMessageService;
+  private final ContentChatService contentChatService;
   private final SimpMessagingTemplate messagingTemplate;
 
-  @MessageMapping("/conversations/{conversationId}/direct-messages")
-  public void sendDirectMessage(
-      @DestinationVariable UUID conversationId,
-      @Valid DirectMessageSendRequest request,
+  @MessageMapping("/contents/{contentId}/chat")
+  public void sendMessage(
+      @DestinationVariable UUID contentId,
+      @Valid ContentChatSendRequest request,
       Principal principal) {
     // CONNECT 단계에서 JWT 인증을 강제하므로 principal은 항상 존재한다.
     UUID senderId = UUID.fromString(principal.getName());
-    DirectMessageDto messageDto =
-        directMessageService.sendDirectMessage(conversationId, senderId, request);
-    messagingTemplate.convertAndSend(
-        "/sub/conversations/" + conversationId + "/direct-messages", messageDto);
-  }
-
-  @MessageExceptionHandler(ConversationForbiddenException.class)
-  @SendToUser("/queue/errors")
-  public ErrorResponse handleForbidden(ConversationForbiddenException e) {
-    return new ErrorResponse(e.getClass().getSimpleName(), e.getMessage(), Map.of());
+    ContentChatDto message = contentChatService.createMessage(senderId, request);
+    messagingTemplate.convertAndSend("/sub/contents/" + contentId + "/chat", message);
   }
 
   @MessageExceptionHandler(ConstraintViolationException.class)
@@ -61,7 +52,7 @@ public class DirectMessageWebSocketController {
   @MessageExceptionHandler(Exception.class)
   @SendToUser("/queue/errors")
   public ErrorResponse handleException(Exception e) {
-    log.warn("WebSocket 메시지 처리 중 예외 발생: {}", e.getMessage(), e);
+    log.warn("콘텐츠 채팅 메시지 처리 중 예외 발생: {}", e.getMessage(), e);
     return new ErrorResponse(e.getClass().getSimpleName(), e.getMessage(), Map.of());
   }
 }
