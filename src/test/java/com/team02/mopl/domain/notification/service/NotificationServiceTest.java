@@ -235,6 +235,40 @@ class NotificationServiceTest {
   }
 
   @Test
+  @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_REQUEST 예외가 발생한다")
+  void getNotifications_partialCursor_throwsInvalidRequest() {
+    UUID receiverId = UUID.randomUUID();
+
+    NotificationSearchRequest cursorOnly =
+        new NotificationSearchRequest("2026-06-29T00:00:00Z", null, null, null, null);
+    assertThatThrownBy(() -> notificationService.getNotifications(receiverId, cursorOnly))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+
+    NotificationSearchRequest idAfterOnly =
+        new NotificationSearchRequest(null, UUID.randomUUID(), null, null, null);
+    assertThatThrownBy(() -> notificationService.getNotifications(receiverId, idAfterOnly))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+  }
+
+  @Test
+  @DisplayName("잘못된 cursor 형식이면 INVALID_CURSOR 예외가 발생한다")
+  void getNotifications_invalidCursor_throwsInvalidCursor() {
+    UUID receiverId = UUID.randomUUID();
+
+    NotificationSearchRequest request =
+        new NotificationSearchRequest("not-an-instant", UUID.randomUUID(), null, null, null);
+
+    assertThatThrownBy(() -> notificationService.getNotifications(receiverId, request))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR));
+  }
+
+  @Test
   @DisplayName("본인의 알림을 읽음 처리하면 deletedAt이 설정된다")
   void markAsRead_success() {
     UUID receiverId = UUID.randomUUID();

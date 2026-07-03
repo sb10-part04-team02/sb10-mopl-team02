@@ -8,6 +8,7 @@ import com.team02.mopl.domain.notification.enums.NotificationSortBy;
 import com.team02.mopl.domain.notification.exception.NotificationForbiddenException;
 import com.team02.mopl.domain.notification.exception.NotificationNotFoundException;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
+import com.team02.mopl.domain.notification.util.NotificationCursorConverter;
 import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -17,6 +18,7 @@ import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import jakarta.validation.Valid;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -67,9 +69,18 @@ public class NotificationService {
     NotificationSortBy sortBy =
         request.sortBy() != null ? request.sortBy() : NotificationSortBy.createdAt;
 
+    // cursor와 idAfter는 함께 있거나 함께 없어야 한다 (첫 페이지: 둘 다 null)
+    boolean hasCursor = request.cursor() != null && !request.cursor().isBlank();
+    boolean hasIdAfter = request.idAfter() != null;
+    if (hasCursor != hasIdAfter) {
+      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+    }
+
+    Instant cursor = NotificationCursorConverter.toSortKey(sortBy, request.cursor());
+
     List<Notification> notifications =
         notificationRepository.findNotificationsByCursor(
-            receiverId, sortBy, direction, request.cursor(), request.idAfter(), limit + 1);
+            receiverId, sortBy, direction, cursor, request.idAfter(), limit + 1);
 
     boolean hasNext = notifications.size() > limit;
     List<Notification> page = hasNext ? notifications.subList(0, limit) : notifications;
