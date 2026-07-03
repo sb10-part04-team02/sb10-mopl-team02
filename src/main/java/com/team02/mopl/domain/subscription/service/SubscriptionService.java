@@ -13,9 +13,8 @@ import com.team02.mopl.domain.subscription.exception.SubscriptionAlreadyExistsEx
 import com.team02.mopl.domain.subscription.exception.SubscriptionNotFoundException;
 import com.team02.mopl.domain.subscription.repository.SubscriptionRepository;
 import com.team02.mopl.domain.user.entity.User;
+import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.repository.UserRepository;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,13 +55,17 @@ public class SubscriptionService {
     }
 
     try {
-      subscriptionRepository.save(new Subscription(requesterId, playlist));
+      subscriptionRepository.saveAndFlush(new Subscription(requesterId, playlist));
     } catch (DataIntegrityViolationException e) {
       throw new SubscriptionAlreadyExistsException();
     }
 
-    playlist.increaseSubscriberCount();
+    playlistRepository.increaseSubscriberCount(playlistId);
 
+    // TODO: notifyOwner가 구독과 같은 트랜잭션에서 동기로 실행되어, 소유자 계정이 비활성이면
+    //  createNotification 내부의 getActiveUser(ownerId)가 USER_NOT_FOUND를 던지면서 구독 자체가
+    //  롤백된다. 알림 발송을 AFTER_COMMIT 이벤트 리스너로 분리해 알림 실패가 구독을 롤백시키지 않도록
+    //  개선 필요. (참고: DmSentEvent + DmEventListener 패턴, PR #261의 PlaylistService.create 동일 이슈)
     notifyOwner(playlist, subscriber);
 
     log.info("플레이리스트 구독 성공: playlistId={}, requesterId={}", playlistId, requesterId);
@@ -73,10 +76,9 @@ public class SubscriptionService {
   public void unsubscribe(UUID playlistId, UUID requesterId) {
     log.debug("플레이리스트 구독 취소 시작: playlistId={}, requesterId={}", playlistId, requesterId);
 
-    Playlist playlist =
-        playlistRepository
-            .findByIdAndDeletedAtIsNull(playlistId)
-            .orElseThrow(PlaylistNotFoundException::new);
+    playlistRepository
+        .findByIdAndDeletedAtIsNull(playlistId)
+        .orElseThrow(PlaylistNotFoundException::new);
 
     Subscription subscription =
         subscriptionRepository
@@ -84,7 +86,7 @@ public class SubscriptionService {
             .orElseThrow(SubscriptionNotFoundException::new);
 
     subscription.delete();
-    playlist.decreaseSubscriberCount();
+    playlistRepository.decreaseSubscriberCount(playlistId);
 
     log.info("플레이리스트 구독 취소 성공: playlistId={}, requesterId={}", playlistId, requesterId);
   }
@@ -92,7 +94,7 @@ public class SubscriptionService {
   private User getActiveUser(UUID userId) {
     return userRepository
         .findByIdAndDeletedAtIsNull(userId)
-        .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        .orElseThrow(UserNotFoundException::new);
   }
 
   // 구독자 이름으로 소유자에게 구독 알림을 전송한다.
