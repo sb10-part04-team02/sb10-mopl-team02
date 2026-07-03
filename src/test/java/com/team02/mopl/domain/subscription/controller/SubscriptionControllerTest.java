@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.team02.mopl.domain.subscription.exception.SubscriptionAlreadyExistsException;
+import com.team02.mopl.domain.subscription.exception.SubscriptionNotFoundException;
 import com.team02.mopl.domain.subscription.service.SubscriptionService;
 import com.team02.mopl.global.exception.GlobalExceptionHandler;
 import com.team02.mopl.support.TestSecurityConfiguration;
@@ -76,6 +77,24 @@ class SubscriptionControllerTest {
         .andExpect(status().isNoContent());
 
     verify(subscriptionService).unsubscribe(playlistId, requesterId);
+  }
+
+  @Test
+  @DisplayName("구독 정보가 없으면 404를 반환한다")
+  void unsubscribe_notFound_returnsNotFound() throws Exception {
+    UUID playlistId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+
+    doThrow(new SubscriptionNotFoundException())
+        .when(subscriptionService)
+        .unsubscribe(playlistId, requesterId);
+
+    mockMvc
+        .perform(
+            delete("/api/playlists/{playlistId}/subscription", playlistId)
+                .with(authentication(authenticationWithPrincipal(requesterId))))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.exceptionName").value("SubscriptionNotFoundException"));
   }
 
   private TestingAuthenticationToken authenticationWithPrincipal(UUID principal) {
