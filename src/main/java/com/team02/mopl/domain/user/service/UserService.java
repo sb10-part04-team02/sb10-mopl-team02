@@ -77,13 +77,18 @@ public class UserService {
     User user =
         userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
 
-    String profileImageUrl = user.getProfileImageUrl();
+    String oldProfileImageUrl = user.getProfileImageUrl();
+    String profileImageUrl = oldProfileImageUrl;
+
     if (image != null && !image.isEmpty()) {
       validateProfileImage(image);
       profileImageUrl = fileStorage.store(image);
     }
 
     user.updateProfile(request.name(), profileImageUrl);
+    UserDto userDto = userMapper.toDto(user);
+
+    deleteOldProfileImageIfReplaced(oldProfileImageUrl, profileImageUrl);
 
     return userMapper.toDto(user);
   }
@@ -116,6 +121,19 @@ public class UserService {
     if (!StringUtils.hasText(contentType)
         || !ALLOWED_PROFILE_IMAGE_CONTENT_TYPES.contains(contentType)) {
       throw new UserInvalidProfileImageException();
+    }
+  }
+
+  private void deleteOldProfileImageIfReplaced(
+      String oldProfileImageUrl, String newProfileImageUrl) {
+    if (oldProfileImageUrl == null || oldProfileImageUrl.equals(newProfileImageUrl)) {
+      return;
+    }
+
+    try {
+      fileStorage.delete(oldProfileImageUrl);
+    } catch (RuntimeException e) {
+      log.warn("기존 프로필 이미지 삭제 실패. profileImageUrl={}", oldProfileImageUrl, e);
     }
   }
 }

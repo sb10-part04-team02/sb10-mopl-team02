@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 
@@ -369,6 +370,128 @@ class UserServiceTest {
           () -> userService.updateProfile(userId, userId, request, image));
 
       then(fileStorage).should(never()).store(any());
+    }
+
+    @Test
+    @DisplayName("프로필 이미지를 교체하면 기존 프로필 이미지를 삭제한다")
+    void success_shouldDeleteOldProfileImage_whenProfileImageReplaced() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      MultipartFile image = mock(MultipartFile.class);
+
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/old-profile.png",
+              Role.USER,
+              false);
+
+      UserDto expect =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-02T00:00:00Z"),
+              "woody@mopl.io",
+              "새이름",
+              "https://example.com/new-profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(image.isEmpty()).willReturn(false);
+      given(image.getSize()).willReturn(1024L);
+      given(image.getContentType()).willReturn("image/png");
+      given(fileStorage.store(image)).willReturn("https://example.com/new-profile.png");
+      given(userMapper.toDto(user)).willReturn(expect);
+
+      UserDto actual = userService.updateProfile(userId, userId, request, image);
+
+      assertThat(actual).isEqualTo(expect);
+      assertThat(user.getProfileImageUrl()).isEqualTo("https://example.com/new-profile.png");
+      then(fileStorage).should().store(image);
+      then(fileStorage).should().delete("https://example.com/old-profile.png");
+    }
+
+    @Test
+    @DisplayName("프로필 이미지가 빈 파일이면 기존 프로필 이미지를 삭제하지 않는다")
+    void success_shouldNotDeleteOldProfileImage_whenImageIsEmpty() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      MultipartFile image = mock(MultipartFile.class);
+
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+
+      UserDto expect =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-02T00:00:00Z"),
+              "woody@mopl.io",
+              "새이름",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(image.isEmpty()).willReturn(true);
+      given(userMapper.toDto(user)).willReturn(expect);
+
+      UserDto actual = userService.updateProfile(userId, userId, request, image);
+
+      assertThat(actual).isEqualTo(expect);
+      assertThat(user.getProfileImageUrl()).isEqualTo("https://example.com/profile.png");
+      then(fileStorage).should(never()).store(any());
+      then(fileStorage).should(never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("기존 프로필 이미지 삭제에 실패해도 프로필 수정은 성공한다")
+    void success_shouldUpdateProfileEvenWhenOldProfileImageDeleteFails() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      MultipartFile image = mock(MultipartFile.class);
+
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/old-profile.png",
+              Role.USER,
+              false);
+
+      UserDto expect =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-02T00:00:00Z"),
+              "woody@mopl.io",
+              "새이름",
+              "https://example.com/new-profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(image.isEmpty()).willReturn(false);
+      given(image.getSize()).willReturn(1024L);
+      given(image.getContentType()).willReturn("image/png");
+      given(fileStorage.store(image)).willReturn("https://example.com/new-profile.png");
+      willThrow(new RuntimeException("delete failed"))
+          .given(fileStorage)
+          .delete("https://example.com/old-profile.png");
+      given(userMapper.toDto(user)).willReturn(expect);
+
+      UserDto actual = userService.updateProfile(userId, userId, request, image);
+
+      assertThat(actual).isEqualTo(expect);
+      assertThat(user.getProfileImageUrl()).isEqualTo("https://example.com/new-profile.png");
+      then(fileStorage).should().delete("https://example.com/old-profile.png");
     }
   }
 }
