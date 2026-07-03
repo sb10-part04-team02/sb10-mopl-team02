@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class SubscriptionRepositoryTest extends RepositoryTestSupport {
 
@@ -77,6 +78,16 @@ class SubscriptionRepositoryTest extends RepositoryTestSupport {
     subscriptionRepository.save(new Subscription(userId, playlist));
 
     assertThatThrownBy(() -> em.flush()).isInstanceOf(ConstraintViolationException.class);
+  }
+
+  @Test
+  @DisplayName("saveAndFlush는 활성 중복 구독을 저장할 때 즉시 부분 유니크 인덱스 위반 예외를 던진다")
+  void saveAndFlush_duplicateActiveUserAndPlaylist_throwsImmediately() {
+    subscriptionRepository.saveAndFlush(new Subscription(userId, playlist));
+
+    assertThatThrownBy(
+            () -> subscriptionRepository.saveAndFlush(new Subscription(userId, playlist)))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test

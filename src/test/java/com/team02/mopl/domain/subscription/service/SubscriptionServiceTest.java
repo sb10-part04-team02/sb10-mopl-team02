@@ -18,6 +18,7 @@ import com.team02.mopl.domain.playlist.repository.PlaylistRepository;
 import com.team02.mopl.domain.subscription.entity.Subscription;
 import com.team02.mopl.domain.subscription.repository.SubscriptionRepository;
 import com.team02.mopl.domain.user.entity.User;
+import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
@@ -66,8 +67,8 @@ class SubscriptionServiceTest {
 
     subscriptionService.subscribe(playlistId, requesterId);
 
-    assertThat(playlist.getSubscriberCount()).isEqualTo(1L);
-    verify(subscriptionRepository).save(any(Subscription.class));
+    verify(playlistRepository).increaseSubscriberCount(playlistId);
+    verify(subscriptionRepository).saveAndFlush(any(Subscription.class));
 
     ArgumentCaptor<NotificationCreateCommand> commandCaptor =
         ArgumentCaptor.forClass(NotificationCreateCommand.class);
@@ -148,9 +149,7 @@ class SubscriptionServiceTest {
     given(userRepository.findByIdAndDeletedAtIsNull(requesterId)).willReturn(Optional.empty());
 
     assertThatThrownBy(() -> subscriptionService.subscribe(playlistId, requesterId))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.USER_NOT_FOUND));
+        .isInstanceOf(UserNotFoundException.class);
 
     verifyNoInteractions(notificationService);
   }
@@ -171,7 +170,7 @@ class SubscriptionServiceTest {
             subscriptionRepository.existsByUserIdAndPlaylist_IdAndDeletedAtIsNull(
                 requesterId, playlistId))
         .willReturn(false);
-    given(subscriptionRepository.save(any(Subscription.class)))
+    given(subscriptionRepository.saveAndFlush(any(Subscription.class)))
         .willThrow(DataIntegrityViolationException.class);
 
     assertThatThrownBy(() -> subscriptionService.subscribe(playlistId, requesterId))
@@ -189,7 +188,6 @@ class SubscriptionServiceTest {
     UUID requesterId = UUID.randomUUID();
     UUID playlistId = UUID.randomUUID();
     Playlist playlist = new Playlist(ownerId, "제목", "설명");
-    playlist.increaseSubscriberCount();
     Subscription subscription = new Subscription(requesterId, playlist);
 
     given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
@@ -202,7 +200,7 @@ class SubscriptionServiceTest {
     subscriptionService.unsubscribe(playlistId, requesterId);
 
     assertThat(subscription.getDeletedAt()).isNotNull();
-    assertThat(playlist.getSubscriberCount()).isEqualTo(0L);
+    verify(playlistRepository).decreaseSubscriberCount(playlistId);
   }
 
   @Test
