@@ -152,7 +152,7 @@ class PlaylistRepositoryTest extends RepositoryTestSupport {
             null,
             PlaylistSortBy.UPDATED_AT,
             SortDirection.DESCENDING,
-            second.getUpdatedAt().toString(),
+            second.getUpdatedAt(),
             second.getId(),
             10);
 
@@ -188,7 +188,7 @@ class PlaylistRepositoryTest extends RepositoryTestSupport {
             null,
             PlaylistSortBy.SUBSCRIBE_COUNT,
             SortDirection.DESCENDING,
-            Long.toString(mid.getSubscriberCount()),
+            mid.getSubscriberCount(),
             mid.getId(),
             10);
 
@@ -217,7 +217,7 @@ class PlaylistRepositoryTest extends RepositoryTestSupport {
             null,
             PlaylistSortBy.SUBSCRIBE_COUNT,
             SortDirection.DESCENDING,
-            Long.toString(cursor.getSubscriberCount()),
+            cursor.getSubscriberCount(),
             cursor.getId(),
             10);
 
@@ -254,7 +254,7 @@ class PlaylistRepositoryTest extends RepositoryTestSupport {
             null,
             PlaylistSortBy.UPDATED_AT,
             SortDirection.ASCENDING,
-            first.getUpdatedAt().toString(),
+            first.getUpdatedAt(),
             first.getId(),
             10);
 
@@ -290,7 +290,7 @@ class PlaylistRepositoryTest extends RepositoryTestSupport {
             null,
             PlaylistSortBy.SUBSCRIBE_COUNT,
             SortDirection.ASCENDING,
-            Long.toString(mid.getSubscriberCount()),
+            mid.getSubscriberCount(),
             mid.getId(),
             10);
 

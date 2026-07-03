@@ -8,11 +8,8 @@ import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.entity.QPlaylist;
 import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.UUID;
 import org.hibernate.jpa.HibernateHints;
@@ -32,15 +29,12 @@ public class PlaylistRepositoryImpl implements PlaylistRepositoryCustom {
       String keyword,
       PlaylistSortBy sortBy,
       SortDirection direction,
-      String cursor,
+      Comparable<?> cursor,
       UUID idAfter,
       int limit) {
     boolean ascending = direction == SortDirection.ASCENDING;
-    // cursor·idAfter는 항상 함께 와야 한다. 둘 다 없으면 첫 페이지, 하나만 있으면 잘못된 요청
+    // cursor·idAfter는 항상 함께 와야 한다. 둘 다 없으면 첫 페이지로 동작한다
     boolean firstPage = cursor == null && idAfter == null;
-    if (!firstPage && (cursor == null || idAfter == null)) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
 
     return queryFactory
         .selectFrom(playlist)
@@ -82,13 +76,11 @@ public class PlaylistRepositoryImpl implements PlaylistRepositoryCustom {
 
   // 복합키 (정렬값, id) 비교를 row-value 표현식으로 구성한다 (동률 다수 대응)
   private BooleanExpression cursorPredicate(
-      PlaylistSortBy sortBy, boolean ascending, String cursor, UUID idAfter) {
+      PlaylistSortBy sortBy, boolean ascending, Comparable<?> cursor, UUID idAfter) {
     if (sortBy == PlaylistSortBy.SUBSCRIBE_COUNT) {
-      long subscriberCount = parseLongCursor(cursor);
-      return rowComparison(playlist.subscriberCount, ascending, subscriberCount, idAfter);
+      return rowComparison(playlist.subscriberCount, ascending, (Long) cursor, idAfter);
     }
-    Instant updatedAt = parseInstantCursor(cursor);
-    return rowComparison(playlist.updatedAt, ascending, updatedAt, idAfter);
+    return rowComparison(playlist.updatedAt, ascending, (Instant) cursor, idAfter);
   }
 
   // (정렬키, id) row-value 비교: ASC면 >, DESC면 < 로 커서 이후 항목만 조회
@@ -115,21 +107,5 @@ public class PlaylistRepositoryImpl implements PlaylistRepositoryCustom {
     return ascending
         ? new OrderSpecifier<?>[] {playlist.updatedAt.asc(), playlist.id.asc()}
         : new OrderSpecifier<?>[] {playlist.updatedAt.desc(), playlist.id.desc()};
-  }
-
-  private Instant parseInstantCursor(String cursor) {
-    try {
-      return Instant.parse(cursor);
-    } catch (DateTimeParseException e) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
-  }
-
-  private long parseLongCursor(String cursor) {
-    try {
-      return Long.parseLong(cursor);
-    } catch (NumberFormatException e) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
   }
 }

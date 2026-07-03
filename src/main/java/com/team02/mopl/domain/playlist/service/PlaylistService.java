@@ -17,6 +17,7 @@ import com.team02.mopl.domain.playlist.exception.PlaylistNotFoundException;
 import com.team02.mopl.domain.playlist.mapper.PlaylistMapper;
 import com.team02.mopl.domain.playlist.repository.PlaylistContentRepository;
 import com.team02.mopl.domain.playlist.repository.PlaylistRepository;
+import com.team02.mopl.domain.playlist.util.PlaylistCursorConverter;
 import com.team02.mopl.domain.subscription.entity.Subscription;
 import com.team02.mopl.domain.subscription.repository.SubscriptionRepository;
 import com.team02.mopl.domain.user.dto.UserSummary;
@@ -25,6 +26,8 @@ import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
+import com.team02.mopl.global.exception.BusinessException;
+import com.team02.mopl.global.exception.ErrorCode;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -78,10 +81,19 @@ public class PlaylistService {
             ? request.keyword().trim()
             : null;
 
+    // cursor·idAfter는 항상 함께 와야 한다. 둘 다 없으면 첫 페이지, 하나만 있으면 잘못된 요청
+    boolean hasCursor = request.cursor() != null && !request.cursor().isBlank();
+    boolean hasIdAfter = request.idAfter() != null;
+    if (hasCursor != hasIdAfter) {
+      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+    }
+
+    Comparable<?> cursor = PlaylistCursorConverter.toSortKey(sortBy, request.cursor());
+
     // hasNext 판정을 위해 limit + 1건을 조회
     List<Playlist> playlists =
         playlistRepository.findPlaylistsByCursor(
-            keyword, sortBy, direction, request.cursor(), request.idAfter(), limit + 1);
+            keyword, sortBy, direction, cursor, request.idAfter(), limit + 1);
 
     boolean hasNext = playlists.size() > limit;
     List<Playlist> page = hasNext ? playlists.subList(0, limit) : playlists;
@@ -93,7 +105,7 @@ public class PlaylistService {
     UUID nextIdAfter = null;
     if (hasNext) {
       Playlist last = page.get(page.size() - 1);
-      nextCursor = encodeCursor(sortBy, last);
+      nextCursor = PlaylistCursorConverter.toCursor(sortBy, last);
       nextIdAfter = last.getId();
     }
 
@@ -171,12 +183,6 @@ public class PlaylistService {
   // ===
 
   // 정렬값을 원문 문자열로 인코딩 (updatedAt: ISO-8601, subscriberCount: 숫자)
-  private String encodeCursor(PlaylistSortBy sortBy, Playlist playlist) {
-    return sortBy == PlaylistSortBy.SUBSCRIBE_COUNT
-        ? Long.toString(playlist.getSubscriberCount())
-        : playlist.getUpdatedAt().toString();
-  }
-
   // 소유자 요약. 소유자가 논리 삭제되어 없으면 id만 담은 요약으로 대체
   private UserSummary toOwnerSummary(UUID ownerId) {
     return userRepository
