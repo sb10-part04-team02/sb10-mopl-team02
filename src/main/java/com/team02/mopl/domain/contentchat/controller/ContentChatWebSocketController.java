@@ -18,6 +18,7 @@ import org.springframework.messaging.handler.annotation.support.MethodArgumentNo
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Controller;
+import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 
 @Slf4j
@@ -43,13 +44,16 @@ public class ContentChatWebSocketController {
   @MessageExceptionHandler(MethodArgumentNotValidException.class)
   @SendToUser("/queue/errors")
   public ErrorResponse handleValidation(MethodArgumentNotValidException e) {
+    BindingResult bindingResult = e.getBindingResult();
     Map<String, String> details =
-        e.getBindingResult().getFieldErrors().stream()
-            .collect(
-                Collectors.toMap(
-                    FieldError::getField,
-                    fe -> fe.getDefaultMessage() == null ? "" : fe.getDefaultMessage(),
-                    (a, b) -> a));
+        bindingResult == null
+            ? Map.of()
+            : bindingResult.getFieldErrors().stream()
+                .collect(
+                    Collectors.toMap(
+                        FieldError::getField,
+                        fe -> fe.getDefaultMessage() == null ? "" : fe.getDefaultMessage(),
+                        (a, b) -> a));
     return new ErrorResponse(e.getClass().getSimpleName(), "입력값 검증에 실패했습니다.", details);
   }
 
