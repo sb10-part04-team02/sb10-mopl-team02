@@ -6,7 +6,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface PlaylistRepository extends JpaRepository<Playlist, UUID> {
+public interface PlaylistRepository
+    extends JpaRepository<Playlist, UUID>, PlaylistRepositoryCustom {
 
   List<Playlist> findByOwnerIdAndDeletedAtIsNull(UUID ownerId);
 
