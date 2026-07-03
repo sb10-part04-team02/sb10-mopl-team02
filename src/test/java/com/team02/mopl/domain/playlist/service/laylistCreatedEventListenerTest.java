@@ -1,19 +1,17 @@
 package com.team02.mopl.domain.playlist.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
-import com.team02.mopl.domain.follow.entity.Follow;
 import com.team02.mopl.domain.follow.repository.FollowRepository;
 import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.playlist.event.PlaylistCreatedEvent;
-import com.team02.mopl.domain.user.entity.User;
-import com.team02.mopl.domain.user.entity.enums.Role;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -23,7 +21,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class PlaylistCreatedEventListenerTest {
@@ -40,14 +37,10 @@ class PlaylistCreatedEventListenerTest {
     UUID ownerId = UUID.randomUUID();
     UUID followerId = UUID.randomUUID();
 
-    User owner = user(ownerId);
-    User follower = user(followerId);
-    Follow follow = new Follow(follower, owner);
-
     PlaylistCreatedEvent event = new PlaylistCreatedEvent(ownerId, "우디", "내 플리", "설명");
 
-    given(followRepository.findByFollowee_IdAndDeletedAtIsNull(ownerId))
-        .willReturn(List.of(follow));
+    given(followRepository.findActiveFollowerIdsByFolloweeId(ownerId))
+        .willReturn(List.of(followerId));
 
     listener.onPlaylistCreated(event);
 
@@ -72,13 +65,11 @@ class PlaylistCreatedEventListenerTest {
 
     PlaylistCreatedEvent event = new PlaylistCreatedEvent(ownerId, "우디", "내 플리", "설명");
 
-    given(followRepository.findByFollowee_IdAndDeletedAtIsNull(ownerId)).willReturn(List.of());
+    given(followRepository.findActiveFollowerIdsByFolloweeId(ownerId)).willReturn(List.of());
 
     listener.onPlaylistCreated(event);
 
-    then(notificationService)
-        .should(never())
-        .createNotification(org.mockito.ArgumentMatchers.any());
+    then(notificationService).should(never()).createNotification(any());
   }
 
   @Test
@@ -87,25 +78,15 @@ class PlaylistCreatedEventListenerTest {
     UUID ownerId = UUID.randomUUID();
     UUID followerId = UUID.randomUUID();
 
-    User owner = user(ownerId);
-    User follower = user(followerId);
-    Follow follow = new Follow(follower, owner);
-
     PlaylistCreatedEvent event = new PlaylistCreatedEvent(ownerId, "우디", "내 플리", "설명");
 
-    given(followRepository.findByFollowee_IdAndDeletedAtIsNull(ownerId))
-        .willReturn(List.of(follow));
-    given(notificationService.createNotification(org.mockito.ArgumentMatchers.any()))
+    given(followRepository.findActiveFollowerIdsByFolloweeId(ownerId))
+        .willReturn(List.of(followerId));
+    given(notificationService.createNotification(any()))
         .willThrow(new RuntimeException("notification failed"));
 
     listener.onPlaylistCreated(event);
 
-    then(notificationService).should().createNotification(org.mockito.ArgumentMatchers.any());
-  }
-
-  private User user(UUID userId) {
-    User user = new User("사용자", "user-" + userId + "@mopl.io", "password", null, Role.USER, false);
-    ReflectionTestUtils.setField(user, "id", userId);
-    return user;
+    then(notificationService).should().createNotification(any());
   }
 }
