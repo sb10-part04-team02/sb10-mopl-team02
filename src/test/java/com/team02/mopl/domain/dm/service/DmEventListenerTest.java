@@ -61,6 +61,8 @@ class DmEventListenerTest {
     NotificationCreateCommand command = commandCaptor.getValue();
 
     assertThat(command.receiverId()).isEqualTo(receiverId);
+    assertThat(command.title()).isEqualTo("새 메시지");
+    assertThat(command.content()).isEqualTo("발신자님이 메시지를 보냈습니다.");
     assertThat(command.level()).isEqualTo(NotificationLevel.INFO);
     assertThat(command.notificationType()).isEqualTo(NotificationType.DIRECT_MESSAGE_RECEIVED);
 

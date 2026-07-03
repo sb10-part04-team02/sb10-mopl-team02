@@ -168,12 +168,6 @@ class PlaylistServiceTest {
       given(user.getId()).willReturn(id);
       return user;
     }
-
-    private User mockUserWithIdAndName(UUID id, String name) {
-      User user = mockUserWithId(id);
-      given(user.getName()).willReturn(name);
-      return user;
-    }
   }
 
   @Nested
