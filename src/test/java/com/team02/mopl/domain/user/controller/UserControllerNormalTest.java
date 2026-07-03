@@ -2,6 +2,7 @@ package com.team02.mopl.domain.user.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -45,6 +46,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.multipart.MultipartFile;
 
 @WebMvcTest(UserController.class)
 @Import({TestSecurityConfiguration.class, GlobalExceptionHandler.class})
@@ -339,6 +341,60 @@ class UserControllerNormalTest {
           .andExpect(status().isBadRequest());
 
       then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("프로필 이미지가 포함된 수정 요청이면 image 파트를 서비스로 전달한다")
+    void success_shouldPassImageToService_whenImagePartExists() throws Exception {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest updateRequest = new UserUpdateRequest("새이름");
+      UserDto response =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-02T00:00:00Z"),
+              "woody@mopl.io",
+              "새이름",
+              "https://example.com/new-profile.png",
+              Role.USER,
+              false);
+
+      MockMultipartFile requestPart =
+          new MockMultipartFile(
+              "request",
+              "",
+              MediaType.APPLICATION_JSON_VALUE,
+              objectMapper.writeValueAsBytes(updateRequest));
+
+      MockMultipartFile imagePart =
+          new MockMultipartFile(
+              "image", "profile.png", MediaType.IMAGE_PNG_VALUE, "image".getBytes());
+
+      given(
+              userService.updateProfile(
+                  eq(userId), eq(userId), any(UserUpdateRequest.class), isA(MultipartFile.class)))
+          .willReturn(response);
+
+      mockMvc
+          .perform(
+              multipart("/api/users/{userId}", userId)
+                  .file(requestPart)
+                  .file(imagePart)
+                  .with(
+                      servletRequest -> {
+                        servletRequest.setMethod("PATCH");
+                        return servletRequest;
+                      })
+                  .with(authentication(authenticationWithPrincipal(userId)))
+                  .with(csrf()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.id").value(userId.toString()))
+          .andExpect(jsonPath("$.name").value("새이름"))
+          .andExpect(jsonPath("$.profileImageUrl").value("https://example.com/new-profile.png"));
+
+      then(userService)
+          .should()
+          .updateProfile(
+              eq(userId), eq(userId), any(UserUpdateRequest.class), isA(MultipartFile.class));
     }
   }
 
