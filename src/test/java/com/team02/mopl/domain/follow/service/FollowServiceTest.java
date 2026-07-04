@@ -11,11 +11,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.team02.mopl.domain.follow.dto.FollowDto;
 import com.team02.mopl.domain.follow.dto.FollowRequest;
 import com.team02.mopl.domain.follow.entity.Follow;
+import com.team02.mopl.domain.follow.event.FollowCreatedEvent;
 import com.team02.mopl.domain.follow.repository.FollowRepository;
-import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
-import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
-import com.team02.mopl.domain.notification.entity.enums.NotificationType;
-import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.exception.BusinessException;
@@ -29,6 +26,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,7 +36,7 @@ class FollowServiceTest {
 
   @Mock private UserRepository userRepository;
 
-  @Mock private NotificationService notificationService;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private FollowService followService;
 
@@ -79,16 +77,16 @@ class FollowServiceTest {
 
     verify(followRepository).save(any(Follow.class));
 
-    ArgumentCaptor<NotificationCreateCommand> commandCaptor =
-        ArgumentCaptor.forClass(NotificationCreateCommand.class);
+    ArgumentCaptor<FollowCreatedEvent> eventCaptor =
+        ArgumentCaptor.forClass(FollowCreatedEvent.class);
 
-    verify(notificationService).createNotification(commandCaptor.capture());
+    verify(eventPublisher).publishEvent(eventCaptor.capture());
 
-    NotificationCreateCommand notificationCommand = commandCaptor.getValue();
+    FollowCreatedEvent event = eventCaptor.getValue();
 
-    assertThat(notificationCommand.receiverId()).isEqualTo(followeeId);
-    assertThat(notificationCommand.level()).isEqualTo(NotificationLevel.INFO);
-    assertThat(notificationCommand.notificationType()).isEqualTo(NotificationType.USER_FOLLOWED);
+    assertThat(event.followerId()).isEqualTo(followerId);
+    assertThat(event.followerName()).isEqualTo("팔로워");
+    assertThat(event.followeeId()).isEqualTo(followeeId);
   }
 
   @Test
@@ -102,7 +100,7 @@ class FollowServiceTest {
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CANNOT_FOLLOW_SELF));
 
-    verifyNoInteractions(userRepository, followRepository, notificationService);
+    verifyNoInteractions(userRepository, followRepository, eventPublisher);
   }
 
   @Test

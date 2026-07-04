@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 
 import com.team02.mopl.domain.content.dto.ContentSummary;
@@ -22,6 +23,7 @@ import com.team02.mopl.domain.playlist.dto.PlaylistUpdateRequest;
 import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.entity.PlaylistContent;
 import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
+import com.team02.mopl.domain.playlist.event.PlaylistCreatedEvent;
 import com.team02.mopl.domain.playlist.exception.PlaylistForbiddenException;
 import com.team02.mopl.domain.playlist.exception.PlaylistNotFoundException;
 import com.team02.mopl.domain.playlist.mapper.PlaylistMapper;
@@ -51,6 +53,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 // TODO: JWT 인증 연결 후 PlaylistController @WebMvcTest 추가
@@ -72,6 +75,8 @@ class PlaylistServiceTest {
 
   @Mock PlaylistMapper playlistMapper;
 
+  @Mock ApplicationEventPublisher eventPublisher;
+
   @InjectMocks PlaylistService playlistService;
 
   @Captor ArgumentCaptor<Playlist> playlistCaptor;
@@ -79,13 +84,14 @@ class PlaylistServiceTest {
   @Nested
   class Create {
     private final UUID ownerId = UUID.randomUUID();
+    private final String ownerName = "우디";
     private final String title = "내 플리";
     private final String description = "설명";
 
     @Test
     @DisplayName("정상 요청이면 소유자를 요청자로 지정해 저장하고 PlaylistDto를 반환한다")
     void success_whenRequestIsValid() {
-      // given
+      User owner = mockUserWithId(ownerId);
       PlaylistCreateRequest request = new PlaylistCreateRequest(title, description);
       Playlist saved = new Playlist(ownerId, title, description);
       PlaylistDto expect =
@@ -98,6 +104,9 @@ class PlaylistServiceTest {
               0L,
               false,
               List.of());
+
+      // 플레이리스트 생성 전 owner가 존재하는지 확인
+      given(userRepository.findByIdAndDeletedAtIsNull(ownerId)).willReturn(Optional.of(owner));
       given(playlistRepository.save(any(Playlist.class))).willReturn(saved);
       given(playlistMapper.toDto(any(Playlist.class), eq(false))).willReturn(expect);
 
@@ -113,6 +122,51 @@ class PlaylistServiceTest {
       assertThat(captured.getOwnerId()).isEqualTo(ownerId);
       assertThat(captured.getTitle()).isEqualTo(title);
       assertThat(captured.getDescription()).isEqualTo(description);
+    }
+
+    @Test
+    @DisplayName("플레이리스트를 생성하면 생성자를 팔로우 중인 사용자들에게 주요 활동 알림을 생성하기 위한 이벤트를 발행한다")
+    void success_publishesPlaylistCreatedEvent() {
+      User owner = mock(User.class);
+      given(owner.getId()).willReturn(ownerId);
+      given(owner.getName()).willReturn(ownerName);
+
+      PlaylistCreateRequest request = new PlaylistCreateRequest(title, description);
+      Playlist saved = new Playlist(ownerId, title, description);
+      PlaylistDto expect =
+          new PlaylistDto(
+              UUID.randomUUID(),
+              new UserSummary(ownerId, null, null),
+              title,
+              description,
+              Instant.parse("2026-06-29T00:00:00Z"),
+              0L,
+              false,
+              List.of());
+
+      given(userRepository.findByIdAndDeletedAtIsNull(ownerId)).willReturn(Optional.of(owner));
+      given(playlistRepository.save(any(Playlist.class))).willReturn(saved);
+      given(playlistMapper.toDto(any(Playlist.class), eq(false))).willReturn(expect);
+
+      playlistService.create(ownerId, request);
+
+      ArgumentCaptor<PlaylistCreatedEvent> eventCaptor =
+          ArgumentCaptor.forClass(PlaylistCreatedEvent.class);
+
+      then(eventPublisher).should().publishEvent(eventCaptor.capture());
+
+      PlaylistCreatedEvent event = eventCaptor.getValue();
+
+      assertThat(event.ownerId()).isEqualTo(ownerId);
+      assertThat(event.ownerName()).isEqualTo(ownerName);
+      assertThat(event.playlistTitle()).isEqualTo(title);
+      assertThat(event.playlistDescription()).isEqualTo(description);
+    }
+
+    private User mockUserWithId(UUID id) {
+      User user = mock(User.class);
+      given(user.getId()).willReturn(id);
+      return user;
     }
   }
 
