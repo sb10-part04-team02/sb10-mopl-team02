@@ -6,10 +6,12 @@ import com.team02.mopl.global.enums.SortDirection;
 import java.util.UUID;
 
 public record PlaylistSearchRequest(
-    String keyword,
+    String keywordLike,
     String cursor,
     UUID idAfter,
     Integer limit,
     SortDirection sortDirection,
-    PlaylistSortBy sortBy)
+    PlaylistSortBy sortBy,
+    UUID ownerIdEqual,
+    UUID subscriberIdEqual)
     implements CursorPageRequest<PlaylistSortBy> {}
