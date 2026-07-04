@@ -6,12 +6,16 @@ import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
+import com.team02.mopl.domain.user.enums.UserSortBy;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.dto.CursorResponse;
+import com.team02.mopl.global.enums.SortDirection;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,7 +67,48 @@ public class UserService {
   }
 
   public CursorResponse<UserDto> getUsers(UserSearchRequest request) {
-    return null;
+    int limit = CursorPageRequest.normalizeLimit(request.limit());
+    SortDirection direction =
+        request.sortDirection() != null ? request.sortDirection() : SortDirection.ASCENDING;
+    UserSortBy sortBy = request.sortBy() != null ? request.sortBy() : UserSortBy.NAME;
+
+    List<User> users =
+        userRepository.findUsersByCursor(
+            request.emailLike(),
+            request.roleEqual(),
+            request.isLocked(),
+            request.cursor(),
+            request.idAfter(),
+            limit + 1,
+            direction,
+            sortBy);
+
+    boolean hasNext = users.size() > limit;
+    List<User> page = hasNext ? users.subList(0, limit) : users;
+
+    List<UserDto> data = page.stream().map(userMapper::toDto).toList();
+    long totalCount = userRepository.countByDeletedAtIsNull();
+
+    String nextCursor = null;
+    UUID nextIdAfter = null;
+    if (hasNext) {
+      User last = page.get(page.size() - 1);
+      nextCursor = encodeCursor(sortBy, last);
+      nextIdAfter = last.getId();
+    }
+
+    return new CursorResponse<>(
+        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.getValue(), direction.name());
+  }
+
+  private String encodeCursor(UserSortBy sortBy, User user) {
+    return switch (sortBy) {
+      case NAME -> user.getName();
+      case EMAIL -> user.getEmail();
+      case CREATED_AT -> user.getCreatedAt().toString();
+      case IS_LOCKED -> Boolean.toString(user.isLocked());
+      case ROLE -> user.getRole().name();
+    };
   }
 
   @Transactional
