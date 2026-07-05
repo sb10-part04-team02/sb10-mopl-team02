@@ -2,6 +2,7 @@ package com.team02.mopl.global.init;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,11 +31,15 @@ public class InitAdmin implements ApplicationRunner {
   public void run(ApplicationArguments args) throws Exception {
 
     // TODO: 기본구현 후 분산기능 도입 시 분산기능 추가
-    UserCreateRequest request = new UserCreateRequest(adminName, adminEmail, adminPassword);
-    UserDto adminDto = userService.createUser(request);
+    try {
+      UserCreateRequest request = new UserCreateRequest(adminName, adminEmail, adminPassword);
+      UserDto adminDto = userService.createUser(request);
 
-    // TODO: 권한변경 기능 추가되면 추가예정
+      // TODO: 권한변경 기능 추가되면 추가예정
 
-    log.info("어드민 계정 생성: adminId={}", adminDto.id());
+      log.info("어드민 계정 생성: adminId={}", adminDto.id());
+    } catch (UserEmailDuplicateException e) {
+      log.info("어드민 계정이 이미 존재해 초기화를 스킵합니다. adminEmail={}", adminEmail, e);
+    }
   }
 }

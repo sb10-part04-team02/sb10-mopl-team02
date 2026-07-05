@@ -1,5 +1,6 @@
 package com.team02.mopl.global.init;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -8,6 +9,7 @@ import static org.mockito.Mockito.times;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.service.UserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,5 +46,16 @@ class InitAdminTest {
 
     // then
     then(userService).should(times(1)).createUser(any(UserCreateRequest.class));
+  }
+
+  @Test
+  @DisplayName("어드민이 이미 존재할 경우 초기화 생성을 무시한다")
+  void success_shouldSkipInitialization_whenAdminAlreadyExists() {
+    // given
+    given(userService.createUser(any(UserCreateRequest.class)))
+        .willThrow(UserEmailDuplicateException.class);
+
+    // when & then
+    assertDoesNotThrow(() -> initAdmin.run(mock(ApplicationArguments.class)));
   }
 }
