@@ -8,8 +8,6 @@ import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.review.entity.Review;
 import com.team02.mopl.domain.review.enums.ReviewSortBy;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.support.RepositoryTestSupport;
 import jakarta.persistence.EntityManager;
 import java.util.List;
@@ -18,8 +16,6 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
 class ReviewRepositoryTest extends RepositoryTestSupport {
@@ -127,7 +123,7 @@ class ReviewRepositoryTest extends RepositoryTestSupport {
             contentId,
             ReviewSortBy.RATING,
             SortDirection.DESCENDING,
-            Double.toString(high.getRating()),
+            high.getRating(),
             high.getId(),
             10);
 
@@ -159,7 +155,7 @@ class ReviewRepositoryTest extends RepositoryTestSupport {
             contentId,
             ReviewSortBy.RATING,
             SortDirection.DESCENDING,
-            Double.toString(cursor.getRating()),
+            cursor.getRating(),
             cursor.getId(),
             10);
 
@@ -178,57 +174,6 @@ class ReviewRepositoryTest extends RepositoryTestSupport {
             contentId, ReviewSortBy.CREATED_AT, SortDirection.DESCENDING, null, null, 10);
 
     assertThat(page).extracting(Review::getId).containsExactly(second.getId(), first.getId());
-  }
-
-  @Test
-  @DisplayName("findReviewsByCursor는 rating 정렬에서 cursor가 숫자가 아니면 INVALID_REQUEST 예외를 던진다")
-  void findReviewsByCursor_invalidRatingCursor_throwsInvalidRequest() {
-    UUID idAfter = UUID.randomUUID();
-
-    assertThatThrownBy(
-            () ->
-                reviewRepository.findReviewsByCursor(
-                    contentId,
-                    ReviewSortBy.RATING,
-                    SortDirection.DESCENDING,
-                    "not-a-number",
-                    idAfter,
-                    10))
-        .isInstanceOf(BusinessException.class)
-        .extracting(e -> ((BusinessException) e).getErrorCode())
-        .isEqualTo(ErrorCode.INVALID_REQUEST);
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"NaN", "Infinity", "-Infinity"})
-  @DisplayName("findReviewsByCursor는 rating 커서가 NaN·Infinity면 INVALID_REQUEST 예외를 던진다")
-  void findReviewsByCursor_nonFiniteRatingCursor_throwsInvalidRequest(String cursor) {
-    UUID idAfter = UUID.randomUUID();
-
-    assertThatThrownBy(
-            () ->
-                reviewRepository.findReviewsByCursor(
-                    contentId, ReviewSortBy.RATING, SortDirection.DESCENDING, cursor, idAfter, 10))
-        .isInstanceOf(BusinessException.class)
-        .extracting(e -> ((BusinessException) e).getErrorCode())
-        .isEqualTo(ErrorCode.INVALID_REQUEST);
-  }
-
-  @Test
-  @DisplayName("findReviewsByCursor는 cursor·idAfter 중 하나만 전달되면 INVALID_REQUEST 예외를 던진다")
-  void findReviewsByCursor_partialCursor_throwsInvalidRequest() {
-    assertThatThrownBy(
-            () ->
-                reviewRepository.findReviewsByCursor(
-                    contentId,
-                    ReviewSortBy.CREATED_AT,
-                    SortDirection.DESCENDING,
-                    null,
-                    UUID.randomUUID(),
-                    10))
-        .isInstanceOf(BusinessException.class)
-        .extracting(e -> ((BusinessException) e).getErrorCode())
-        .isEqualTo(ErrorCode.INVALID_REQUEST);
   }
 
   private UUID insertUser() {

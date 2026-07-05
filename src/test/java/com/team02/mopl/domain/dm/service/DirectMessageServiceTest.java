@@ -608,10 +608,11 @@ class DirectMessageServiceTest {
     UUID requesterId = UUID.randomUUID();
     UUID idAfter = UUID.randomUUID();
     String cursor = "2026-06-30T10:15:30Z";
+    Instant cursorInstant = Instant.parse(cursor);
 
     given(
             conversationRepository.findConversationsByCursor(
-                requesterId, SortDirection.ASCENDING, cursor, idAfter, 6))
+                requesterId, SortDirection.ASCENDING, cursorInstant, idAfter, 6))
         .willReturn(List.of());
     given(conversationRepository.countByMemberUserId(requesterId)).willReturn(0L);
 
@@ -622,9 +623,45 @@ class DirectMessageServiceTest {
                 cursor, idAfter, 5, SortDirection.ASCENDING, ConversationSortBy.CREATED_AT));
 
     verify(conversationRepository)
-        .findConversationsByCursor(requesterId, SortDirection.ASCENDING, cursor, idAfter, 6);
+        .findConversationsByCursor(requesterId, SortDirection.ASCENDING, cursorInstant, idAfter, 6);
     assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING.name());
     assertThat(result.data()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_REQUEST 예외가 발생한다")
+  void getConversations_partialCursor_throwsInvalidRequest() {
+    UUID requesterId = UUID.randomUUID();
+
+    ConversationSearchRequest cursorOnly =
+        new ConversationSearchRequest("2026-06-30T10:15:30Z", null, null, null, null);
+    assertThatThrownBy(() -> directMessageService.getConversations(requesterId, cursorOnly))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+
+    ConversationSearchRequest idAfterOnly =
+        new ConversationSearchRequest(null, UUID.randomUUID(), null, null, null);
+    assertThatThrownBy(() -> directMessageService.getConversations(requesterId, idAfterOnly))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+  }
+
+  @Test
+  @DisplayName("잘못된 cursor 형식이면 INVALID_CURSOR 예외가 발생한다")
+  void getConversations_invalidCursor_throwsInvalidCursor() {
+    UUID requesterId = UUID.randomUUID();
+
+    assertThatThrownBy(
+            () ->
+                directMessageService.getConversations(
+                    requesterId,
+                    new ConversationSearchRequest(
+                        "not-a-date", UUID.randomUUID(), null, null, null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR));
   }
 
   // ──────────────────────────────────────────────
@@ -723,12 +760,13 @@ class DirectMessageServiceTest {
     UUID requesterId = UUID.randomUUID();
     UUID idAfter = UUID.randomUUID();
     String cursor = "2026-06-30T10:15:30Z";
+    Instant cursorInstant = Instant.parse(cursor);
 
     given(conversationMemberRepository.existsByConversationIdAndUserId(conversationId, requesterId))
         .willReturn(true);
     given(
             directMessageRepository.findDirectMessagesByCursor(
-                conversationId, SortDirection.ASCENDING, cursor, idAfter, 6))
+                conversationId, SortDirection.ASCENDING, cursorInstant, idAfter, 6))
         .willReturn(List.of());
     given(directMessageRepository.countByConversationId(conversationId)).willReturn(0L);
 
@@ -740,9 +778,57 @@ class DirectMessageServiceTest {
                 cursor, idAfter, 5, SortDirection.ASCENDING, DirectMessageSortBy.CREATED_AT));
 
     verify(directMessageRepository)
-        .findDirectMessagesByCursor(conversationId, SortDirection.ASCENDING, cursor, idAfter, 6);
+        .findDirectMessagesByCursor(
+            conversationId, SortDirection.ASCENDING, cursorInstant, idAfter, 6);
     assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING.name());
     assertThat(result.sortBy()).isEqualTo(DirectMessageSortBy.CREATED_AT.name());
+  }
+
+  @Test
+  @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_REQUEST 예외가 발생한다")
+  void getDirectMessages_partialCursor_throwsInvalidRequest() {
+    UUID conversationId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+
+    given(conversationMemberRepository.existsByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(true);
+
+    DirectMessageSearchRequest cursorOnly =
+        new DirectMessageSearchRequest("2026-06-30T10:15:30Z", null, null, null, null);
+    assertThatThrownBy(
+            () -> directMessageService.getDirectMessages(conversationId, requesterId, cursorOnly))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+
+    DirectMessageSearchRequest idAfterOnly =
+        new DirectMessageSearchRequest(null, UUID.randomUUID(), null, null, null);
+    assertThatThrownBy(
+            () -> directMessageService.getDirectMessages(conversationId, requesterId, idAfterOnly))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+  }
+
+  @Test
+  @DisplayName("잘못된 cursor 형식이면 INVALID_CURSOR 예외가 발생한다")
+  void getDirectMessages_invalidCursor_throwsInvalidCursor() {
+    UUID conversationId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+
+    given(conversationMemberRepository.existsByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(true);
+
+    assertThatThrownBy(
+            () ->
+                directMessageService.getDirectMessages(
+                    conversationId,
+                    requesterId,
+                    new DirectMessageSearchRequest(
+                        "not-a-date", UUID.randomUUID(), null, null, null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR));
   }
 
   // ──────────────────────────────────────────────
@@ -841,6 +927,73 @@ class DirectMessageServiceTest {
 
     verify(directMessageRepository, never()).save(any());
     verify(eventPublisher, never()).publishEvent(any());
+  }
+
+  @Test
+  @DisplayName("DM 읽음 처리 시 요청자 멤버의 lastReadAt을 DM 생성 시각으로 전진시키는 조건부 UPDATE를 호출한다")
+  void markAsRead_advancesLastReadAt() {
+    UUID conversationId = UUID.randomUUID();
+    UUID directMessageId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+    UUID memberId = UUID.randomUUID();
+
+    Instant dmCreatedAt = Instant.parse("2026-07-02T00:00:00Z");
+    ConversationMember requesterMember =
+        mockConversationMember(requesterId, dmCreatedAt.minusSeconds(60));
+    given(requesterMember.getId()).willReturn(memberId);
+    DirectMessage dm =
+        mockDirectMessage(conversationId, UUID.randomUUID(), requesterId, dmCreatedAt);
+
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(Optional.of(requesterMember));
+    given(directMessageRepository.findByIdAndConversationId(directMessageId, conversationId))
+        .willReturn(Optional.of(dm));
+
+    directMessageService.markAsRead(conversationId, directMessageId, requesterId);
+
+    verify(conversationMemberRepository).advanceLastReadAt(memberId, dmCreatedAt);
+  }
+
+  @Test
+  @DisplayName("DM 읽음 처리 시 요청자가 대화방 멤버가 아니면 FORBIDDEN 예외가 발생한다")
+  void markAsRead_notMember_throwsForbidden() {
+    UUID conversationId = UUID.randomUUID();
+    UUID directMessageId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () -> directMessageService.markAsRead(conversationId, directMessageId, requesterId))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+
+    verify(directMessageRepository, never()).findByIdAndConversationId(any(), any());
+  }
+
+  @Test
+  @DisplayName("DM 읽음 처리 시 해당 대화방에 DM이 없으면 DIRECT_MESSAGE_NOT_FOUND 예외가 발생한다")
+  void markAsRead_dmNotFound_throwsNotFound() {
+    UUID conversationId = UUID.randomUUID();
+    UUID directMessageId = UUID.randomUUID();
+    UUID requesterId = UUID.randomUUID();
+
+    ConversationMember requesterMember = mockConversationMember(requesterId, Instant.now());
+
+    given(conversationMemberRepository.findByConversationIdAndUserId(conversationId, requesterId))
+        .willReturn(Optional.of(requesterMember));
+    given(directMessageRepository.findByIdAndConversationId(directMessageId, conversationId))
+        .willReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () -> directMessageService.markAsRead(conversationId, directMessageId, requesterId))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DIRECT_MESSAGE_NOT_FOUND));
+
+    verify(conversationMemberRepository, never()).advanceLastReadAt(any(), any());
   }
 
   // ──────────────────────────────────────────────

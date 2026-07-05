@@ -33,11 +33,7 @@ public class DirectMessageWebSocketController {
       @DestinationVariable UUID conversationId,
       @Valid DirectMessageSendRequest request,
       Principal principal) {
-    // JWT 인증이 연동되기 전까지 principal이 null일 수 있음 (FIXME: WebSocket JWT 인증 구현 후 제거)
-    if (principal == null) {
-      log.warn("인증되지 않은 WebSocket 연결에서 DM 전송 시도. conversationId={}", conversationId);
-      return;
-    }
+    // CONNECT 단계에서 JWT 인증을 강제하므로 principal은 항상 존재한다.
     UUID senderId = UUID.fromString(principal.getName());
     DirectMessageDto messageDto =
         directMessageService.sendDirectMessage(conversationId, senderId, request);

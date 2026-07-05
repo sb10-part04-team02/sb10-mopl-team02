@@ -1,14 +1,11 @@
 package com.team02.mopl.domain.dm.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.domain.dm.entity.ConversationMember;
 import com.team02.mopl.domain.dm.entity.DirectMessage;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.support.RepositoryTestSupport;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
@@ -76,7 +73,7 @@ class DirectMessageRepositoryTest extends RepositoryTestSupport {
 
     List<DirectMessage> result =
         directMessageRepository.findDirectMessagesByCursor(
-            conversation.getId(), SortDirection.DESCENDING, t3.toString(), id3, 10);
+            conversation.getId(), SortDirection.DESCENDING, t3, id3, 10);
 
     assertThat(result).extracting(DirectMessage::getId).containsExactly(id2, id1);
   }
@@ -95,7 +92,7 @@ class DirectMessageRepositoryTest extends RepositoryTestSupport {
 
     List<DirectMessage> result =
         directMessageRepository.findDirectMessagesByCursor(
-            conversation.getId(), SortDirection.ASCENDING, t1.toString(), id1, 10);
+            conversation.getId(), SortDirection.ASCENDING, t1, id1, 10);
 
     assertThat(result).extracting(DirectMessage::getId).containsExactly(id2, id3);
   }
@@ -123,7 +120,7 @@ class DirectMessageRepositoryTest extends RepositoryTestSupport {
         directMessageRepository.findDirectMessagesByCursor(
             conversation.getId(),
             SortDirection.DESCENDING,
-            cursor.getCreatedAt().toString(),
+            cursor.getCreatedAt(),
             cursor.getId(),
             10);
 
@@ -158,34 +155,6 @@ class DirectMessageRepositoryTest extends RepositoryTestSupport {
             UUID.randomUUID(), SortDirection.DESCENDING, null, null, 10);
 
     assertThat(result).isEmpty();
-  }
-
-  @Test
-  @DisplayName("cursor와 idAfter 중 하나만 전달되면 INVALID_REQUEST 예외를 던진다")
-  void findDirectMessagesByCursor_partialCursor_throwsInvalidRequest() {
-    assertThatThrownBy(
-            () ->
-                directMessageRepository.findDirectMessagesByCursor(
-                    conversation.getId(), SortDirection.DESCENDING, null, UUID.randomUUID(), 10))
-        .isInstanceOf(BusinessException.class)
-        .extracting(e -> ((BusinessException) e).getErrorCode())
-        .isEqualTo(ErrorCode.INVALID_REQUEST);
-  }
-
-  @Test
-  @DisplayName("cursor가 ISO-8601 형식이 아니면 INVALID_REQUEST 예외를 던진다")
-  void findDirectMessagesByCursor_invalidCursorFormat_throwsInvalidRequest() {
-    assertThatThrownBy(
-            () ->
-                directMessageRepository.findDirectMessagesByCursor(
-                    conversation.getId(),
-                    SortDirection.DESCENDING,
-                    "not-a-timestamp",
-                    UUID.randomUUID(),
-                    10))
-        .isInstanceOf(BusinessException.class)
-        .extracting(e -> ((BusinessException) e).getErrorCode())
-        .isEqualTo(ErrorCode.INVALID_REQUEST);
   }
 
   @Test
