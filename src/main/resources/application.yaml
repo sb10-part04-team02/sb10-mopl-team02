@@ -16,6 +16,10 @@ spring:
       max-request-size: 20MB  # 단일 요청 전체의 최대 크기
 
 app:
+  admin:
+    email: "${ADMIN_EMAIL:?관리자 환경변수가 누락되었습니다}"
+    password: "${ADMIN_PASSWORD:?관리자 패스워드가 누락되었습니다}"
+    name: "${ADMIN_NAME:?관리자 이름이 누락되었습니다}"
   storage:
     local:
       base-path: storage   # 파일이 저장되는 디스크상의 디렉터리 경로
