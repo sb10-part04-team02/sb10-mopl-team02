@@ -20,7 +20,7 @@ public interface UserRepository extends JpaRepository<User, UUID>, UserRepositor
       """
   SELECT COUNT(u) FROM User u
    WHERE u.deletedAt IS NULL
-     AND (:email IS NULL OR u.email LIKE %:email%)
+     AND (:email IS NULL OR u.email LIKE CONCAT('%', :email, '%'))
      AND (:role IS NULL OR u.role = :role)
      AND (:isLocked IS NULL OR u.isLocked = :isLocked)
   """)
