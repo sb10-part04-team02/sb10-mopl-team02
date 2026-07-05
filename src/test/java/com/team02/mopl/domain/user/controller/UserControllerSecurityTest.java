@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -100,11 +101,12 @@ public class UserControllerSecurityTest {
           .andExpect(jsonPath("$").value(notNullValue()));
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(strings = {"limit", "sortDirection", "sortBy"})
     @DisplayName("필수 파라미터가 누락된 경우 400을 반환한다")
-    void fail_shouldReturn400_whenRequiredParamIsMissing() throws Exception {
+    void fail_shouldReturn400_whenRequiredParamIsMissing(String missingParam) throws Exception {
       // given
-      params.remove("sortBy");
+      params.remove(missingParam);
 
       // when & then
       mockMvc.perform(createGetUserListRequest(params)).andExpect(status().isBadRequest());

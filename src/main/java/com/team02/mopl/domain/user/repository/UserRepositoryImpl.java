@@ -121,7 +121,7 @@ public class UserRepositoryImpl implements UserRepositoryCustom {
     try {
       return Instant.parse(cursor);
     } catch (DateTimeParseException e) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new BusinessException(ErrorCode.INVALID_REQUEST, e);
     }
   }
 
@@ -136,7 +136,7 @@ public class UserRepositoryImpl implements UserRepositoryCustom {
     try {
       return Role.valueOf(cursor.toUpperCase());
     } catch (IllegalArgumentException e) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new BusinessException(ErrorCode.INVALID_REQUEST, e);
     }
   }
 }

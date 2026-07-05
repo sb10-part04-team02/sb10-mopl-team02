@@ -95,7 +95,9 @@ public class UserService {
     List<User> page = hasNext ? users.subList(0, limit) : users;
 
     List<UserDto> data = page.stream().map(userMapper::toDto).toList();
-    long totalCount = userRepository.countByDeletedAtIsNull();
+    long totalCount =
+        userRepository.countUsersByCursor(
+            request.emailLike(), request.roleEqual(), request.isLocked());
 
     String nextCursor = null;
     UUID nextIdAfter = null;

@@ -204,7 +204,10 @@ class UserServiceTest {
                   any(), any(), any(), any(), any(), anyInt(), any(), any()))
           .willReturn(users);
       given(userMapper.toDto(any(User.class))).willReturn(mock(UserDto.class));
-      given(userRepository.countByDeletedAtIsNull()).willReturn(totalCount);
+      given(
+              userRepository.countUsersByCursor(
+                  request.emailLike(), request.roleEqual(), request.isLocked()))
+          .willReturn(totalCount);
 
       // when
       CursorResponse<UserDto> actual = userService.getUsers(request);
@@ -247,7 +250,10 @@ class UserServiceTest {
               userRepository.findUsersByCursor(
                   any(), any(), any(), any(), any(), anyInt(), any(), any()))
           .willReturn(List.of());
-      given(userRepository.countByDeletedAtIsNull()).willReturn(0L);
+      given(
+              userRepository.countUsersByCursor(
+                  request.emailLike(), request.roleEqual(), request.isLocked()))
+          .willReturn(0L);
 
       // when
       CursorResponse<UserDto> actual = userService.getUsers(request);
@@ -292,7 +298,10 @@ class UserServiceTest {
       given(userMapper.toDto(any(User.class))).willReturn(mock(UserDto.class));
 
       long totalCount = 10L;
-      given(userRepository.countByDeletedAtIsNull()).willReturn(totalCount);
+      given(
+              userRepository.countUsersByCursor(
+                  request.emailLike(), request.roleEqual(), request.isLocked()))
+          .willReturn(totalCount);
 
       // when
       CursorResponse<UserDto> actual = userService.getUsers(request);
@@ -326,7 +335,10 @@ class UserServiceTest {
                   any(), any(), any(), any(), any(), anyInt(), any(), any()))
           .willReturn(users);
       given(userMapper.toDto(any(User.class))).willReturn(mock(UserDto.class));
-      given(userRepository.countByDeletedAtIsNull()).willReturn(10L);
+      given(
+              userRepository.countUsersByCursor(
+                  request.emailLike(), request.roleEqual(), request.isLocked()))
+          .willReturn(10L);
 
       // when
       CursorResponse<UserDto> actual = userService.getUsers(request);
