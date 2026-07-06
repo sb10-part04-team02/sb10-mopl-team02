@@ -13,6 +13,8 @@ import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.entity.PlaylistContent;
 import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
 import com.team02.mopl.domain.playlist.event.PlaylistCreatedEvent;
+import com.team02.mopl.domain.playlist.exception.PlaylistContentAlreadyExistsException;
+import com.team02.mopl.domain.playlist.exception.PlaylistContentNotFoundException;
 import com.team02.mopl.domain.playlist.exception.PlaylistForbiddenException;
 import com.team02.mopl.domain.playlist.exception.PlaylistNotFoundException;
 import com.team02.mopl.domain.playlist.mapper.PlaylistMapper;
@@ -38,6 +40,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -80,8 +83,8 @@ public class PlaylistService {
     SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
     PlaylistSortBy sortBy = request.sortBy() != null ? request.sortBy() : PlaylistSortBy.UPDATED_AT;
     String keyword =
-        (request.keyword() != null && !request.keyword().isBlank())
-            ? request.keyword().trim()
+        (request.keywordLike() != null && !request.keywordLike().isBlank())
+            ? request.keywordLike().trim()
             : null;
 
     if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
@@ -93,13 +96,22 @@ public class PlaylistService {
     // hasNext 판정을 위해 limit + 1건을 조회
     List<Playlist> playlists =
         playlistRepository.findPlaylistsByCursor(
-            keyword, sortBy, direction, cursor, request.idAfter(), limit + 1);
+            keyword,
+            sortBy,
+            direction,
+            cursor,
+            request.idAfter(),
+            limit + 1,
+            request.ownerIdEqual(),
+            request.subscriberIdEqual());
 
     boolean hasNext = playlists.size() > limit;
     List<Playlist> page = hasNext ? playlists.subList(0, limit) : playlists;
 
     List<PlaylistDto> data = toDtos(page, requesterId);
-    long totalCount = playlistRepository.countActive(keyword);
+    long totalCount =
+        playlistRepository.countActive(
+            keyword, request.ownerIdEqual(), request.subscriberIdEqual());
 
     String nextCursor = null;
     UUID nextIdAfter = null;
@@ -191,6 +203,78 @@ public class PlaylistService {
         playlistId,
         requesterId,
         subscriptions.size());
+  }
+
+  // 플레이리스트에 콘텐츠 추가 (소유자 본인만, 중복·미존재 콘텐츠 차단)
+  @Transactional
+  public void addContent(UUID playlistId, UUID requesterId, UUID contentId) {
+    log.debug(
+        "플레이리스트 콘텐츠 추가 시작: playlistId={}, requesterId={}, contentId={}",
+        playlistId,
+        requesterId,
+        contentId);
+
+    Playlist playlist = getOwnedPlaylist(playlistId, requesterId);
+
+    Content content =
+        contentRepository
+            .findByIdAndDeletedAtIsNull(contentId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CONTENT_NOT_FOUND));
+
+    if (playlistContentRepository.existsByPlaylistIdAndContentId(playlistId, content.getId())) {
+      throw new PlaylistContentAlreadyExistsException();
+    }
+
+    try {
+      playlistContentRepository.saveAndFlush(new PlaylistContent(playlist, content.getId()));
+    } catch (DataIntegrityViolationException e) {
+      throw new PlaylistContentAlreadyExistsException();
+    }
+
+    // TODO: 구독 중인 플레이리스트에 콘텐츠가 추가되면 구독자에게 알림을 보내야 한다
+    //  (NotificationType.PLAYLIST_CONTENT_ADDED). create()처럼 커밋 이후 이벤트 리스너에서
+    //  처리하도록 별도 이슈에서 연동한다.
+    log.info(
+        "플레이리스트 콘텐츠 추가 성공: playlistId={}, requesterId={}, contentId={}",
+        playlistId,
+        requesterId,
+        contentId);
+  }
+
+  // 플레이리스트에서 콘텐츠 삭제 (소유자 본인만, 미포함 콘텐츠 차단)
+  @Transactional
+  public void removeContent(UUID playlistId, UUID requesterId, UUID contentId) {
+    log.debug(
+        "플레이리스트 콘텐츠 삭제 시작: playlistId={}, requesterId={}, contentId={}",
+        playlistId,
+        requesterId,
+        contentId);
+
+    getOwnedPlaylist(playlistId, requesterId);
+
+    // 삭제된 행이 없으면 플레이리스트에 미포함 (exists 조회 없이 단일 쿼리로 판정)
+    if (playlistContentRepository.deleteByPlaylistIdAndContentId(playlistId, contentId) == 0) {
+      throw new PlaylistContentNotFoundException();
+    }
+
+    log.info(
+        "플레이리스트 콘텐츠 삭제 성공: playlistId={}, requesterId={}, contentId={}",
+        playlistId,
+        requesterId,
+        contentId);
+  }
+
+  // 소유자 본인의 플레이리스트를 조회 (미존재 404, 비소유자 403)
+  private Playlist getOwnedPlaylist(UUID playlistId, UUID requesterId) {
+    Playlist playlist =
+        playlistRepository
+            .findByIdAndDeletedAtIsNull(playlistId)
+            .orElseThrow(PlaylistNotFoundException::new);
+
+    if (!playlist.getOwnerId().equals(requesterId)) {
+      throw new PlaylistForbiddenException();
+    }
+    return playlist;
   }
 
   // ===

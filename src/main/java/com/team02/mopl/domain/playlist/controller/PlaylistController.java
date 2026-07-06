@@ -65,4 +65,22 @@ public class PlaylistController implements PlaylistApi {
     playlistService.delete(playlistId, requesterId);
     return ResponseEntity.noContent().build();
   }
+
+  @PostMapping("/{playlistId}/contents/{contentId}")
+  public ResponseEntity<Void> addContent(
+      @PathVariable UUID playlistId,
+      @PathVariable UUID contentId,
+      @AuthenticationPrincipal UUID requesterId) {
+    playlistService.addContent(playlistId, requesterId, contentId);
+    return ResponseEntity.noContent().build();
+  }
+
+  @DeleteMapping("/{playlistId}/contents/{contentId}")
+  public ResponseEntity<Void> removeContent(
+      @PathVariable UUID playlistId,
+      @PathVariable UUID contentId,
+      @AuthenticationPrincipal UUID requesterId) {
+    playlistService.removeContent(playlistId, requesterId, contentId);
+    return ResponseEntity.noContent().build();
+  }
 }

@@ -24,6 +24,8 @@ import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.entity.PlaylistContent;
 import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
 import com.team02.mopl.domain.playlist.event.PlaylistCreatedEvent;
+import com.team02.mopl.domain.playlist.exception.PlaylistContentAlreadyExistsException;
+import com.team02.mopl.domain.playlist.exception.PlaylistContentNotFoundException;
 import com.team02.mopl.domain.playlist.exception.PlaylistForbiddenException;
 import com.team02.mopl.domain.playlist.exception.PlaylistNotFoundException;
 import com.team02.mopl.domain.playlist.mapper.PlaylistMapper;
@@ -54,6 +56,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 // TODO: JWT 인증 연결 후 PlaylistController @WebMvcTest 추가
@@ -373,13 +376,21 @@ class PlaylistServiceTest {
       ReflectionTestUtils.setField(second, "updatedAt", Instant.parse("2026-06-28T00:00:00Z"));
 
       PlaylistSearchRequest request =
-          new PlaylistSearchRequest(null, null, null, 1, SortDirection.DESCENDING, null);
+          new PlaylistSearchRequest(
+              null, null, null, 1, SortDirection.DESCENDING, null, null, null);
 
       given(
               playlistRepository.findPlaylistsByCursor(
-                  null, PlaylistSortBy.UPDATED_AT, SortDirection.DESCENDING, null, null, 2))
+                  null,
+                  PlaylistSortBy.UPDATED_AT,
+                  SortDirection.DESCENDING,
+                  null,
+                  null,
+                  2,
+                  null,
+                  null))
           .willReturn(List.of(first, second));
-      given(playlistRepository.countActive(null)).willReturn(2L);
+      given(playlistRepository.countActive(null, null, null)).willReturn(2L);
       given(userRepository.findAllById(List.of(ownerId))).willReturn(List.of());
       given(
               playlistContentRepository.findByPlaylistIdInOrderByCreatedAtAscIdAsc(
@@ -405,13 +416,21 @@ class PlaylistServiceTest {
     @DisplayName("결과가 없으면 hasNext=false, 데이터가 비어 있고 다음 커서는 null이다")
     void success_whenEmpty() {
       PlaylistSearchRequest request =
-          new PlaylistSearchRequest("없는키워드", null, null, 20, SortDirection.DESCENDING, null);
+          new PlaylistSearchRequest(
+              "없는키워드", null, null, 20, SortDirection.DESCENDING, null, null, null);
 
       given(
               playlistRepository.findPlaylistsByCursor(
-                  "없는키워드", PlaylistSortBy.UPDATED_AT, SortDirection.DESCENDING, null, null, 21))
+                  "없는키워드",
+                  PlaylistSortBy.UPDATED_AT,
+                  SortDirection.DESCENDING,
+                  null,
+                  null,
+                  21,
+                  null,
+                  null))
           .willReturn(List.of());
-      given(playlistRepository.countActive("없는키워드")).willReturn(0L);
+      given(playlistRepository.countActive("없는키워드", null, null)).willReturn(0L);
 
       CursorResponse<PlaylistDto> response = playlistService.getPlaylists(request, requesterId);
 
@@ -435,13 +454,27 @@ class PlaylistServiceTest {
       UUID cursorId = UUID.randomUUID();
       PlaylistSearchRequest request =
           new PlaylistSearchRequest(
-              null, "5", cursorId, 1, SortDirection.DESCENDING, PlaylistSortBy.SUBSCRIBE_COUNT);
+              null,
+              "5",
+              cursorId,
+              1,
+              SortDirection.DESCENDING,
+              PlaylistSortBy.SUBSCRIBE_COUNT,
+              null,
+              null);
 
       given(
               playlistRepository.findPlaylistsByCursor(
-                  null, PlaylistSortBy.SUBSCRIBE_COUNT, SortDirection.DESCENDING, 5L, cursorId, 2))
+                  null,
+                  PlaylistSortBy.SUBSCRIBE_COUNT,
+                  SortDirection.DESCENDING,
+                  5L,
+                  cursorId,
+                  2,
+                  null,
+                  null))
           .willReturn(List.of(first, second));
-      given(playlistRepository.countActive(null)).willReturn(2L);
+      given(playlistRepository.countActive(null, null, null)).willReturn(2L);
       given(userRepository.findAllById(List.of(ownerId))).willReturn(List.of());
       given(
               playlistContentRepository.findByPlaylistIdInOrderByCreatedAtAscIdAsc(
@@ -465,14 +498,14 @@ class PlaylistServiceTest {
     @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_REQUEST 예외가 발생한다")
     void partialCursor_throwsInvalidRequest() {
       PlaylistSearchRequest cursorOnly =
-          new PlaylistSearchRequest(null, "2026-06-29T00:00:00Z", null, 20, null, null);
+          new PlaylistSearchRequest(null, "2026-06-29T00:00:00Z", null, 20, null, null, null, null);
       assertThatThrownBy(() -> playlistService.getPlaylists(cursorOnly, requesterId))
           .isInstanceOfSatisfying(
               BusinessException.class,
               e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
 
       PlaylistSearchRequest idAfterOnly =
-          new PlaylistSearchRequest(null, null, UUID.randomUUID(), 20, null, null);
+          new PlaylistSearchRequest(null, null, UUID.randomUUID(), 20, null, null, null, null);
       assertThatThrownBy(() -> playlistService.getPlaylists(idAfterOnly, requesterId))
           .isInstanceOfSatisfying(
               BusinessException.class,
@@ -484,7 +517,14 @@ class PlaylistServiceTest {
     void invalidCursor_throwsInvalidCursor() {
       PlaylistSearchRequest request =
           new PlaylistSearchRequest(
-              null, "not-an-instant", UUID.randomUUID(), 20, null, PlaylistSortBy.UPDATED_AT);
+              null,
+              "not-an-instant",
+              UUID.randomUUID(),
+              20,
+              null,
+              PlaylistSortBy.UPDATED_AT,
+              null,
+              null);
 
       assertThatThrownBy(() -> playlistService.getPlaylists(request, requesterId))
           .isInstanceOfSatisfying(
@@ -497,12 +537,114 @@ class PlaylistServiceTest {
     void invalidCursor_forSubscribeCount_throwsInvalidCursor() {
       PlaylistSearchRequest request =
           new PlaylistSearchRequest(
-              null, "not-a-number", UUID.randomUUID(), 20, null, PlaylistSortBy.SUBSCRIBE_COUNT);
+              null,
+              "not-a-number",
+              UUID.randomUUID(),
+              20,
+              null,
+              PlaylistSortBy.SUBSCRIBE_COUNT,
+              null,
+              null);
 
       assertThatThrownBy(() -> playlistService.getPlaylists(request, requesterId))
           .isInstanceOfSatisfying(
               BusinessException.class,
               e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR));
+    }
+
+    @Test
+    @DisplayName("ownerIdEqual·subscriberIdEqual을 그대로 리포지토리 조회·카운트에 전달한다")
+    void success_passesOwnerAndSubscriberFiltersToRepository() {
+      // given
+      UUID filterOwnerId = UUID.randomUUID();
+      UUID filterSubscriberId = UUID.randomUUID();
+      PlaylistSearchRequest request =
+          new PlaylistSearchRequest(
+              null,
+              null,
+              null,
+              20,
+              SortDirection.DESCENDING,
+              null,
+              filterOwnerId,
+              filterSubscriberId);
+
+      given(
+              playlistRepository.findPlaylistsByCursor(
+                  null,
+                  PlaylistSortBy.UPDATED_AT,
+                  SortDirection.DESCENDING,
+                  null,
+                  null,
+                  21,
+                  filterOwnerId,
+                  filterSubscriberId))
+          .willReturn(List.of());
+      given(playlistRepository.countActive(null, filterOwnerId, filterSubscriberId)).willReturn(0L);
+
+      // when
+      playlistService.getPlaylists(request, requesterId);
+
+      // then: 두 필터가 조회·카운트에 정확히 전달됐는지 검증
+      then(playlistRepository)
+          .should()
+          .findPlaylistsByCursor(
+              null,
+              PlaylistSortBy.UPDATED_AT,
+              SortDirection.DESCENDING,
+              null,
+              null,
+              21,
+              filterOwnerId,
+              filterSubscriberId);
+      then(playlistRepository).should().countActive(null, filterOwnerId, filterSubscriberId);
+    }
+
+    @Test
+    @DisplayName("subscriberIdEqual이 다른 유저여도 subscribedByMe는 요청자 기준으로 계산한다")
+    void success_subscribedByMeStaysRequesterBased() {
+      // given: 구독 목록 필터 대상(otherUser)과 요청자(requesterId)가 다른 상황
+      UUID otherUserId = UUID.randomUUID();
+      Playlist playlist = new Playlist(ownerId, "구독됨", "설명");
+      ReflectionTestUtils.setField(playlist, "id", UUID.randomUUID());
+      ReflectionTestUtils.setField(playlist, "updatedAt", Instant.parse("2026-06-29T00:00:00Z"));
+
+      PlaylistSearchRequest request =
+          new PlaylistSearchRequest(
+              null, null, null, 20, SortDirection.DESCENDING, null, null, otherUserId);
+
+      given(
+              playlistRepository.findPlaylistsByCursor(
+                  null,
+                  PlaylistSortBy.UPDATED_AT,
+                  SortDirection.DESCENDING,
+                  null,
+                  null,
+                  21,
+                  null,
+                  otherUserId))
+          .willReturn(List.of(playlist));
+      given(playlistRepository.countActive(null, null, otherUserId)).willReturn(1L);
+      given(userRepository.findAllById(List.of(ownerId))).willReturn(List.of());
+      given(
+              playlistContentRepository.findByPlaylistIdInOrderByCreatedAtAscIdAsc(
+                  List.of(playlist.getId())))
+          .willReturn(List.of());
+      // 요청자 기준 구독 여부: requesterId로 조회되고 결과가 그대로 subscribedByMe=true로 반영돼야 한다
+      given(
+              subscriptionRepository.findSubscribedPlaylistIds(
+                  requesterId, List.of(playlist.getId())))
+          .willReturn(List.of(playlist.getId()));
+      given(playlistMapper.toDto(eq(playlist), any(), any(), eq(true))).willReturn(null);
+
+      // when
+      playlistService.getPlaylists(request, requesterId);
+
+      // then: subscribedByMe는 subscriberIdEqual(otherUser)이 아니라 requesterId로 계산된다
+      then(subscriptionRepository)
+          .should()
+          .findSubscribedPlaylistIds(requesterId, List.of(playlist.getId()));
+      then(playlistMapper).should().toDto(eq(playlist), any(), any(), eq(true));
     }
   }
 
@@ -561,6 +703,171 @@ class PlaylistServiceTest {
       assertThat(playlist.isDeleted()).isFalse();
       then(subscriptionRepository).should(never()).findByPlaylist_IdAndDeletedAtIsNull(any());
       then(playlistRepository).should(never()).flush();
+    }
+  }
+
+  @Nested
+  class AddContent {
+    private final UUID playlistId = UUID.randomUUID();
+    private final UUID ownerId = UUID.randomUUID();
+    private final UUID contentId = UUID.randomUUID();
+
+    @Test
+    @DisplayName("소유자가 요청하면 콘텐츠를 플레이리스트에 추가한다")
+    void success_whenRequesterIsOwner() {
+      // given
+      Playlist playlist = new Playlist(ownerId, "제목", "설명");
+      Content content = new Content(ContentType.MOVIE, "영화", "설명", "http://img");
+      ReflectionTestUtils.setField(content, "id", contentId);
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
+      given(contentRepository.findByIdAndDeletedAtIsNull(contentId))
+          .willReturn(Optional.of(content));
+      given(playlistContentRepository.existsByPlaylistIdAndContentId(playlistId, contentId))
+          .willReturn(false);
+
+      // when
+      playlistService.addContent(playlistId, ownerId, contentId);
+
+      // then
+      ArgumentCaptor<PlaylistContent> captor = ArgumentCaptor.forClass(PlaylistContent.class);
+      then(playlistContentRepository).should().saveAndFlush(captor.capture());
+      assertThat(captor.getValue().getPlaylist()).isEqualTo(playlist);
+      assertThat(captor.getValue().getContentId()).isEqualTo(contentId);
+    }
+
+    @Test
+    @DisplayName("플레이리스트가 없으면 PLAYLIST_NOT_FOUND 예외를 던지고 저장하지 않는다")
+    void fail_whenPlaylistNotFound() {
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId)).willReturn(Optional.empty());
+
+      assertThatThrownBy(() -> playlistService.addContent(playlistId, ownerId, contentId))
+          .isInstanceOf(PlaylistNotFoundException.class);
+      then(playlistContentRepository).should(never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("요청자가 소유자가 아니면 FORBIDDEN 예외를 던지고 저장하지 않는다")
+    void fail_whenRequesterIsNotOwner() {
+      Playlist playlist = new Playlist(ownerId, "제목", "설명");
+      UUID otherUserId = UUID.randomUUID();
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
+
+      assertThatThrownBy(() -> playlistService.addContent(playlistId, otherUserId, contentId))
+          .isInstanceOf(PlaylistForbiddenException.class);
+      then(playlistContentRepository).should(never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("콘텐츠가 없으면 CONTENT_NOT_FOUND 예외를 던지고 저장하지 않는다")
+    void fail_whenContentNotFound() {
+      Playlist playlist = new Playlist(ownerId, "제목", "설명");
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
+      given(contentRepository.findByIdAndDeletedAtIsNull(contentId)).willReturn(Optional.empty());
+
+      assertThatThrownBy(() -> playlistService.addContent(playlistId, ownerId, contentId))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CONTENT_NOT_FOUND));
+      then(playlistContentRepository).should(never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("이미 추가된 콘텐츠면 PLAYLIST_CONTENT_ALREADY_EXISTS 예외를 던지고 저장하지 않는다")
+    void fail_whenAlreadyExists() {
+      Playlist playlist = new Playlist(ownerId, "제목", "설명");
+      Content content = new Content(ContentType.MOVIE, "영화", "설명", "http://img");
+      ReflectionTestUtils.setField(content, "id", contentId);
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
+      given(contentRepository.findByIdAndDeletedAtIsNull(contentId))
+          .willReturn(Optional.of(content));
+      given(playlistContentRepository.existsByPlaylistIdAndContentId(playlistId, contentId))
+          .willReturn(true);
+
+      assertThatThrownBy(() -> playlistService.addContent(playlistId, ownerId, contentId))
+          .isInstanceOf(PlaylistContentAlreadyExistsException.class);
+      then(playlistContentRepository).should(never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("동시 추가로 유니크 제약을 위반하면 PLAYLIST_CONTENT_ALREADY_EXISTS 예외로 변환한다")
+    void fail_whenConcurrentInsertViolatesUniqueConstraint() {
+      Playlist playlist = new Playlist(ownerId, "제목", "설명");
+      Content content = new Content(ContentType.MOVIE, "영화", "설명", "http://img");
+      ReflectionTestUtils.setField(content, "id", contentId);
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
+      given(contentRepository.findByIdAndDeletedAtIsNull(contentId))
+          .willReturn(Optional.of(content));
+      given(playlistContentRepository.existsByPlaylistIdAndContentId(playlistId, contentId))
+          .willReturn(false);
+      given(playlistContentRepository.saveAndFlush(any()))
+          .willThrow(new DataIntegrityViolationException("unique violation"));
+
+      assertThatThrownBy(() -> playlistService.addContent(playlistId, ownerId, contentId))
+          .isInstanceOf(PlaylistContentAlreadyExistsException.class);
+    }
+  }
+
+  @Nested
+  class RemoveContent {
+    private final UUID playlistId = UUID.randomUUID();
+    private final UUID ownerId = UUID.randomUUID();
+    private final UUID contentId = UUID.randomUUID();
+
+    @Test
+    @DisplayName("소유자가 요청하면 콘텐츠를 플레이리스트에서 삭제한다")
+    void success_whenRequesterIsOwner() {
+      Playlist playlist = new Playlist(ownerId, "제목", "설명");
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
+      given(playlistContentRepository.deleteByPlaylistIdAndContentId(playlistId, contentId))
+          .willReturn(1);
+
+      playlistService.removeContent(playlistId, ownerId, contentId);
+
+      then(playlistContentRepository)
+          .should()
+          .deleteByPlaylistIdAndContentId(playlistId, contentId);
+    }
+
+    @Test
+    @DisplayName("플레이리스트가 없으면 PLAYLIST_NOT_FOUND 예외를 던지고 삭제하지 않는다")
+    void fail_whenPlaylistNotFound() {
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId)).willReturn(Optional.empty());
+
+      assertThatThrownBy(() -> playlistService.removeContent(playlistId, ownerId, contentId))
+          .isInstanceOf(PlaylistNotFoundException.class);
+      then(playlistContentRepository).should(never()).deleteByPlaylistIdAndContentId(any(), any());
+    }
+
+    @Test
+    @DisplayName("요청자가 소유자가 아니면 FORBIDDEN 예외를 던지고 삭제하지 않는다")
+    void fail_whenRequesterIsNotOwner() {
+      Playlist playlist = new Playlist(ownerId, "제목", "설명");
+      UUID otherUserId = UUID.randomUUID();
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
+
+      assertThatThrownBy(() -> playlistService.removeContent(playlistId, otherUserId, contentId))
+          .isInstanceOf(PlaylistForbiddenException.class);
+      then(playlistContentRepository).should(never()).deleteByPlaylistIdAndContentId(any(), any());
+    }
+
+    @Test
+    @DisplayName("삭제된 행이 없으면(미포함) PLAYLIST_CONTENT_NOT_FOUND 예외를 던진다")
+    void fail_whenContentNotInPlaylist() {
+      Playlist playlist = new Playlist(ownerId, "제목", "설명");
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
+      given(playlistContentRepository.deleteByPlaylistIdAndContentId(playlistId, contentId))
+          .willReturn(0);
+
+      assertThatThrownBy(() -> playlistService.removeContent(playlistId, ownerId, contentId))
+          .isInstanceOf(PlaylistContentNotFoundException.class);
     }
   }
 }

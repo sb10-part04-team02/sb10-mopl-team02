@@ -7,7 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface WatchingSessionRepository extends JpaRepository<WatchingSession, UUID> {
+public interface WatchingSessionRepository
+    extends JpaRepository<WatchingSession, UUID>, WatchingSessionRepositoryCustom {
 
   // 단건 콘텐츠의 활성 시청자 수
   @Query(

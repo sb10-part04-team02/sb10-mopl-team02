@@ -35,6 +35,11 @@
       <Class name="~com\.team02\.mopl\.domain\.auth\.jwt\.(JwtRegistry|JwtAuthenticationProvider|handler\..*)"/>
       <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
+    <!-- userService를 활용해서 여기서도 EI2 패턴을 제외 -->
+    <Match>
+      <Class name="~com\.team02\.mopl\.global\.init\..*" />
+      <Bug pattern="EI_EXPOSE_REP2" />
+    </Match>
 
     <!-- QueryDSL 생성 Q타입(Q*)은 정적 분석 대상에서 제외 -->
     <Match>
