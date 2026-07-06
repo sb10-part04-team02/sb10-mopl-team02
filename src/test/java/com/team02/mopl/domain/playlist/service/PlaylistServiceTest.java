@@ -804,8 +804,8 @@ class PlaylistServiceTest {
       Playlist playlist = new Playlist(ownerId, "제목", "설명");
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
-      given(playlistContentRepository.existsByPlaylistIdAndContentId(playlistId, contentId))
-          .willReturn(true);
+      given(playlistContentRepository.deleteByPlaylistIdAndContentId(playlistId, contentId))
+          .willReturn(1);
 
       playlistService.removeContent(playlistId, ownerId, contentId);
 
@@ -838,17 +838,16 @@ class PlaylistServiceTest {
     }
 
     @Test
-    @DisplayName("플레이리스트에 포함되지 않은 콘텐츠면 PLAYLIST_CONTENT_NOT_FOUND 예외를 던지고 삭제하지 않는다")
+    @DisplayName("삭제된 행이 없으면(미포함) PLAYLIST_CONTENT_NOT_FOUND 예외를 던진다")
     void fail_whenContentNotInPlaylist() {
       Playlist playlist = new Playlist(ownerId, "제목", "설명");
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
-      given(playlistContentRepository.existsByPlaylistIdAndContentId(playlistId, contentId))
-          .willReturn(false);
+      given(playlistContentRepository.deleteByPlaylistIdAndContentId(playlistId, contentId))
+          .willReturn(0);
 
       assertThatThrownBy(() -> playlistService.removeContent(playlistId, ownerId, contentId))
           .isInstanceOf(PlaylistContentNotFoundException.class);
-      then(playlistContentRepository).should(never()).deleteByPlaylistIdAndContentId(any(), any());
     }
   }
 }

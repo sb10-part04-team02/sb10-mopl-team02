@@ -226,6 +226,9 @@ public class PlaylistService {
 
     playlistContentRepository.save(new PlaylistContent(playlist, content.getId()));
 
+    // TODO: 구독 중인 플레이리스트에 콘텐츠가 추가되면 구독자에게 알림을 보내야 한다
+    //  (NotificationType.PLAYLIST_CONTENT_ADDED). create()처럼 커밋 이후 이벤트 리스너에서
+    //  처리하도록 별도 이슈에서 연동한다.
     log.info(
         "플레이리스트 콘텐츠 추가 성공: playlistId={}, requesterId={}, contentId={}",
         playlistId,
@@ -244,11 +247,10 @@ public class PlaylistService {
 
     getOwnedPlaylist(playlistId, requesterId);
 
-    if (!playlistContentRepository.existsByPlaylistIdAndContentId(playlistId, contentId)) {
+    // 삭제된 행이 없으면 플레이리스트에 미포함 (exists 조회 없이 단일 쿼리로 판정)
+    if (playlistContentRepository.deleteByPlaylistIdAndContentId(playlistId, contentId) == 0) {
       throw new PlaylistContentNotFoundException();
     }
-
-    playlistContentRepository.deleteByPlaylistIdAndContentId(playlistId, contentId);
 
     log.info(
         "플레이리스트 콘텐츠 삭제 성공: playlistId={}, requesterId={}, contentId={}",
