@@ -2,12 +2,17 @@ package com.team02.mopl.domain.user.service;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
+import com.team02.mopl.domain.user.exception.UserForbiddenException;
+import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.global.storage.FileStorage;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +20,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Service
@@ -25,6 +32,11 @@ public class UserService {
   private final UserRepository userRepository;
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
+  private final FileStorage fileStorage;
+  // 이미지 검증용
+  private static final long MAX_PROFILE_IMAGE_SIZE = 5 * 1024 * 1024;
+  private static final List<String> ALLOWED_PROFILE_IMAGE_CONTENT_TYPES =
+      List.of("image/jpeg", "image/png", "image/webp");
 
   @Transactional
   public UserDto createUser(UserCreateRequest request) {
@@ -42,7 +54,7 @@ public class UserService {
           userRepository.saveAndFlush(
               new User(request.name(), request.email(), encryptedPassword, null, Role.USER, false));
     } catch (DataIntegrityViolationException e) {
-      throw new UserEmailDuplicateException();
+      throw new UserEmailDuplicateException(e);
     }
     UserDto userDto = userMapper.toDto(savedUser);
 
@@ -57,6 +69,36 @@ public class UserService {
     return userMapper.toDto(user);
   }
 
+  @Transactional
+  public UserDto updateProfile(
+      UUID requesterId, UUID userId, UserUpdateRequest request, MultipartFile image) {
+    validateOwner(requesterId, userId);
+
+    User user =
+        userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
+
+    String oldProfileImageUrl = user.getProfileImageUrl();
+    String profileImageUrl = oldProfileImageUrl;
+
+    if (image != null && !image.isEmpty()) {
+      validateProfileImage(image);
+      profileImageUrl = fileStorage.store(image);
+    }
+
+    user.updateProfile(request.name(), profileImageUrl);
+    UserDto userDto = userMapper.toDto(user);
+
+    deleteOldProfileImageIfReplaced(oldProfileImageUrl, profileImageUrl);
+
+    return userDto;
+  }
+
+  private void validateOwner(UUID requesterId, UUID userId) {
+    if (!userId.equals(requesterId)) {
+      throw new UserForbiddenException();
+    }
+  }
+
   private String maskValidEmail(String validEmail) {
     String[] parts = validEmail.split("@");
     String local = parts[0];
@@ -68,5 +110,30 @@ public class UserService {
 
     // 앞글자 2글자만 공개
     return local.substring(0, 2) + "*".repeat(local.length() - 2) + "@" + domain;
+  }
+
+  private void validateProfileImage(MultipartFile image) {
+    if (image.getSize() > MAX_PROFILE_IMAGE_SIZE) {
+      throw new UserInvalidProfileImageException();
+    }
+
+    String contentType = image.getContentType();
+    if (!StringUtils.hasText(contentType)
+        || !ALLOWED_PROFILE_IMAGE_CONTENT_TYPES.contains(contentType)) {
+      throw new UserInvalidProfileImageException();
+    }
+  }
+
+  private void deleteOldProfileImageIfReplaced(
+      String oldProfileImageUrl, String newProfileImageUrl) {
+    if (oldProfileImageUrl == null || oldProfileImageUrl.equals(newProfileImageUrl)) {
+      return;
+    }
+
+    try {
+      fileStorage.delete(oldProfileImageUrl);
+    } catch (RuntimeException e) {
+      log.warn("기존 프로필 이미지 삭제 실패. profileImageUrl={}", oldProfileImageUrl, e);
+    }
   }
 }

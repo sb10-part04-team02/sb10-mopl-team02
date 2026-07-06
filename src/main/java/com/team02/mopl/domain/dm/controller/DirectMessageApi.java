@@ -2,6 +2,7 @@ package com.team02.mopl.domain.dm.controller;
 
 import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
+import com.team02.mopl.domain.dm.dto.ConversationSearchRequest;
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageSearchRequest;
 import com.team02.mopl.global.dto.CursorResponse;
@@ -15,6 +16,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,6 +24,26 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 @Tag(name = "대화방 관리")
 public interface DirectMessageApi {
+
+  @Operation(summary = "대화 목록 조회", description = "로그인 사용자의 대화 목록을 커서 페이지네이션으로 조회합니다.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 커서/페이지네이션 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<CursorResponse<ConversationDto>> getConversations(
+      @Parameter(hidden = true) UUID userId,
+      @ParameterObject @Valid ConversationSearchRequest request);
 
   @Operation(summary = "대화방 생성", description = "로그인 사용자가 상대방과의 1:1 대화방을 생성합니다.")
   @ApiResponses({
@@ -124,4 +146,29 @@ public interface DirectMessageApi {
       @Parameter(hidden = true) UUID userId,
       @Parameter(description = "대화방 UUID") UUID conversationId,
       @Valid @ModelAttribute DirectMessageSearchRequest request);
+
+  @Operation(summary = "DM 읽음 처리", description = "대화방의 특정 DM까지 읽음 처리합니다. 요청자가 해당 대화방의 참여자여야 합니다.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "성공"),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "대화방 멤버가 아님",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "DM을 찾을 수 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<Void> markDirectMessageAsRead(
+      @Parameter(hidden = true) UUID userId,
+      @Parameter(description = "대화방 UUID") UUID conversationId,
+      @Parameter(description = "DM UUID") UUID directMessageId);
 }

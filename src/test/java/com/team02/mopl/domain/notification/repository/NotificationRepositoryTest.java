@@ -1,7 +1,6 @@
 package com.team02.mopl.domain.notification.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.team02.mopl.domain.notification.entity.Notification;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
@@ -10,8 +9,6 @@ import com.team02.mopl.domain.notification.enums.NotificationSortBy;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.support.RepositoryTestSupport;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
@@ -83,7 +80,7 @@ class NotificationRepositoryTest extends RepositoryTestSupport {
             receiver.getId(),
             NotificationSortBy.createdAt,
             SortDirection.DESCENDING,
-            newest.getCreatedAt().toString(),
+            newest.getCreatedAt(),
             newest.getId(),
             10);
 
@@ -116,53 +113,6 @@ class NotificationRepositoryTest extends RepositoryTestSupport {
     assertThat(result)
         .extracting(Notification::getId)
         .containsExactly(oldest.getId(), middle.getId(), newest.getId());
-  }
-
-  @Test
-  @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_REQUEST 예외가 발생한다")
-  void findNotificationsByCursor_partialCursor_throwsInvalidRequest() {
-    assertThatThrownBy(
-            () ->
-                notificationRepository.findNotificationsByCursor(
-                    receiver.getId(),
-                    NotificationSortBy.createdAt,
-                    SortDirection.DESCENDING,
-                    "2026-06-29T00:00:00Z",
-                    null,
-                    10))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
-
-    assertThatThrownBy(
-            () ->
-                notificationRepository.findNotificationsByCursor(
-                    receiver.getId(),
-                    NotificationSortBy.createdAt,
-                    SortDirection.DESCENDING,
-                    null,
-                    UUID.randomUUID(),
-                    10))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
-  }
-
-  @Test
-  @DisplayName("잘못된 cursor 형식이면 INVALID_REQUEST 예외가 발생한다")
-  void findNotificationsByCursor_invalidCursor_throwsInvalidRequest() {
-    assertThatThrownBy(
-            () ->
-                notificationRepository.findNotificationsByCursor(
-                    receiver.getId(),
-                    NotificationSortBy.createdAt,
-                    SortDirection.DESCENDING,
-                    "not-an-instant",
-                    UUID.randomUUID(),
-                    10))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
   }
 
   @Test

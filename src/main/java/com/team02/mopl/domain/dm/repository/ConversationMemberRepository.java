@@ -1,9 +1,12 @@
 package com.team02.mopl.domain.dm.repository;
 
 import com.team02.mopl.domain.dm.entity.ConversationMember;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -39,6 +42,35 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
   Optional<ConversationMember> findByConversationIdAndUserId(UUID conversationId, UUID userId);
 
   boolean existsByConversationIdAndUserId(UUID conversationId, UUID userId);
+
+  // 동시 요청 간 lost update를 막기 위한 조건부 UPDATE: 새 시각이 기존보다 클 때만 전진(뒤로 이동 방지).
+  @Modifying
+  @Query(
+      """
+      UPDATE ConversationMember cm
+      SET cm.lastReadAt = :lastReadAt
+      WHERE cm.id = :memberId AND cm.lastReadAt < :lastReadAt
+      """)
+  int advanceLastReadAt(@Param("memberId") UUID memberId, @Param("lastReadAt") Instant lastReadAt);
+
+  @Query(
+      """
+      SELECT cm FROM ConversationMember cm
+      JOIN FETCH cm.user
+      WHERE cm.conversation.id IN :conversationIds
+      AND cm.user.id != :requesterId
+      """)
+  List<ConversationMember> findWithUserMembersForConversations(
+      @Param("conversationIds") List<UUID> conversationIds, @Param("requesterId") UUID requesterId);
+
+  @Query(
+      """
+      SELECT cm FROM ConversationMember cm
+      WHERE cm.conversation.id IN :conversationIds
+      AND cm.user.id = :requesterId
+      """)
+  List<ConversationMember> findByConversationIdsAndUserId(
+      @Param("conversationIds") List<UUID> conversationIds, @Param("requesterId") UUID requesterId);
 
   // 두 유저가 공유하는 대화방에서 상대방 멤버 조회
   @Query(

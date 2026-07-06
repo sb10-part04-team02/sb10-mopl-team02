@@ -51,4 +51,9 @@ public class User extends BaseMutableEntity {
     this.role = role == null ? Role.USER : role;
     this.isLocked = isLocked;
   }
+
+  public void updateProfile(String name, String profileImageUrl) {
+    this.name = Objects.requireNonNull(name, "name은 null일 수 없습니다.");
+    this.profileImageUrl = profileImageUrl;
+  }
 }

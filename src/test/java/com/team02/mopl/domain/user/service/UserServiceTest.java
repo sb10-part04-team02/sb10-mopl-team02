@@ -6,15 +6,22 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
+import com.team02.mopl.domain.user.exception.UserForbiddenException;
+import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.global.storage.FileStorage;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,6 +38,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.multipart.MultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -38,6 +46,8 @@ class UserServiceTest {
   @Mock UserRepository userRepository;
 
   @Mock UserMapper userMapper;
+
+  @Mock FileStorage fileStorage;
 
   @InjectMocks UserService userService;
 
@@ -161,6 +171,327 @@ class UserServiceTest {
       assertThrows(UserNotFoundException.class, () -> userService.getUser(userId));
 
       then(userRepository).should().findByIdAndDeletedAtIsNull(userId);
+    }
+  }
+
+  @Nested
+  class UpdateProfile {
+
+    @Test
+    @DisplayName("본인이 프로필을 수정하면 이름을 변경하고 UserDto를 반환한다")
+    void success_shouldUpdateNameAndReturnUserDto_whenRequesterIsOwner() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+      UserDto expect =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-02T00:00:00Z"),
+              "woody@mopl.io",
+              "새이름",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(userMapper.toDto(user)).willReturn(expect);
+
+      UserDto actual = userService.updateProfile(userId, userId, request, null);
+
+      assertThat(actual).isEqualTo(expect);
+      assertThat(user.getName()).isEqualTo("새이름");
+      assertThat(user.getProfileImageUrl()).isEqualTo("https://example.com/profile.png");
+      then(userRepository).should().findByIdAndDeletedAtIsNull(userId);
+      then(userMapper).should().toDto(user);
+      then(fileStorage).should(never()).store(any());
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 프로필을 수정하면 UserForbiddenException이 발생한다")
+    void fail_shouldThrowUserForbiddenException_whenRequesterIsNotOwner() {
+      UUID requesterId = UUID.randomUUID();
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+
+      assertThrows(
+          UserForbiddenException.class,
+          () -> userService.updateProfile(requesterId, userId, request, null));
+
+      then(userRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("존재하지 않거나 삭제된 사용자의 프로필을 수정하면 UserNotFoundException이 발생한다")
+    void fail_shouldThrowUserNotFoundException_whenUserDoesNotExist() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.empty());
+
+      assertThrows(
+          UserNotFoundException.class,
+          () -> userService.updateProfile(userId, userId, request, null));
+
+      then(userRepository).should().findByIdAndDeletedAtIsNull(userId);
+    }
+
+    @Test
+    @DisplayName("프로필 이미지가 있으면 파일 저장 후 반환된 URL로 프로필 이미지를 변경한다")
+    void success_shouldUpdateProfileImageUrl_whenImageExists() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      MultipartFile image = mock(MultipartFile.class);
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/old-profile.png",
+              Role.USER,
+              false);
+      UserDto expect =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-02T00:00:00Z"),
+              "woody@mopl.io",
+              "새이름",
+              "https://example.com/new-profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(image.isEmpty()).willReturn(false);
+      given(image.getSize()).willReturn(1024L);
+      given(image.getContentType()).willReturn("image/png");
+      given(fileStorage.store(image)).willReturn("https://example.com/new-profile.png");
+      given(userMapper.toDto(user)).willReturn(expect);
+
+      UserDto actual = userService.updateProfile(userId, userId, request, image);
+
+      assertThat(actual).isEqualTo(expect);
+      assertThat(user.getName()).isEqualTo("새이름");
+      assertThat(user.getProfileImageUrl()).isEqualTo("https://example.com/new-profile.png");
+      then(fileStorage).should().store(image);
+      then(userMapper).should().toDto(user);
+    }
+
+    @Test
+    @DisplayName("프로필 이미지가 빈 파일이면 저장하지 않고 기존 프로필 이미지 URL을 유지한다")
+    void success_shouldKeepExistingProfileImageUrl_whenImageIsEmpty() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      MultipartFile image = mock(MultipartFile.class);
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+      UserDto expect =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-02T00:00:00Z"),
+              "woody@mopl.io",
+              "새이름",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(image.isEmpty()).willReturn(true);
+      given(userMapper.toDto(user)).willReturn(expect);
+
+      UserDto actual = userService.updateProfile(userId, userId, request, image);
+
+      assertThat(actual).isEqualTo(expect);
+      assertThat(user.getName()).isEqualTo("새이름");
+      assertThat(user.getProfileImageUrl()).isEqualTo("https://example.com/profile.png");
+      then(fileStorage).should(never()).store(any());
+      then(userMapper).should().toDto(user);
+    }
+
+    @Test
+    @DisplayName("프로필 이미지 Content-Type이 허용되지 않으면 UserInvalidProfileImageException이 발생한다")
+    void fail_shouldThrowUserInvalidProfileImageException_whenContentTypeIsNotAllowed() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      MultipartFile image = mock(MultipartFile.class);
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(image.isEmpty()).willReturn(false);
+      given(image.getSize()).willReturn(1024L);
+      given(image.getContentType()).willReturn("application/pdf");
+
+      assertThrows(
+          UserInvalidProfileImageException.class,
+          () -> userService.updateProfile(userId, userId, request, image));
+
+      then(fileStorage).should(never()).store(any());
+    }
+
+    @Test
+    @DisplayName("프로필 이미지 크기가 제한을 초과하면 UserInvalidProfileImageException이 발생한다")
+    void fail_shouldThrowUserInvalidProfileImageException_whenImageSizeExceeded() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      MultipartFile image = mock(MultipartFile.class);
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(image.isEmpty()).willReturn(false);
+      given(image.getSize()).willReturn(5 * 1024 * 1024 + 1L);
+
+      assertThrows(
+          UserInvalidProfileImageException.class,
+          () -> userService.updateProfile(userId, userId, request, image));
+
+      then(fileStorage).should(never()).store(any());
+    }
+
+    @Test
+    @DisplayName("프로필 이미지를 교체하면 기존 프로필 이미지를 삭제한다")
+    void success_shouldDeleteOldProfileImage_whenProfileImageReplaced() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      MultipartFile image = mock(MultipartFile.class);
+
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/old-profile.png",
+              Role.USER,
+              false);
+
+      UserDto expect =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-02T00:00:00Z"),
+              "woody@mopl.io",
+              "새이름",
+              "https://example.com/new-profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(image.isEmpty()).willReturn(false);
+      given(image.getSize()).willReturn(1024L);
+      given(image.getContentType()).willReturn("image/png");
+      given(fileStorage.store(image)).willReturn("https://example.com/new-profile.png");
+      given(userMapper.toDto(user)).willReturn(expect);
+
+      UserDto actual = userService.updateProfile(userId, userId, request, image);
+
+      assertThat(actual).isEqualTo(expect);
+      assertThat(user.getProfileImageUrl()).isEqualTo("https://example.com/new-profile.png");
+      then(fileStorage).should().store(image);
+      then(fileStorage).should().delete("https://example.com/old-profile.png");
+    }
+
+    @Test
+    @DisplayName("프로필 이미지가 빈 파일이면 기존 프로필 이미지를 삭제하지 않는다")
+    void success_shouldNotDeleteOldProfileImage_whenImageIsEmpty() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      MultipartFile image = mock(MultipartFile.class);
+
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+
+      UserDto expect =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-02T00:00:00Z"),
+              "woody@mopl.io",
+              "새이름",
+              "https://example.com/profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(image.isEmpty()).willReturn(true);
+      given(userMapper.toDto(user)).willReturn(expect);
+
+      UserDto actual = userService.updateProfile(userId, userId, request, image);
+
+      assertThat(actual).isEqualTo(expect);
+      assertThat(user.getProfileImageUrl()).isEqualTo("https://example.com/profile.png");
+      then(fileStorage).should(never()).store(any());
+      then(fileStorage).should(never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("기존 프로필 이미지 삭제에 실패해도 프로필 수정은 성공한다")
+    void success_shouldUpdateProfileEvenWhenOldProfileImageDeleteFails() {
+      UUID userId = UUID.randomUUID();
+      UserUpdateRequest request = new UserUpdateRequest("새이름");
+      MultipartFile image = mock(MultipartFile.class);
+
+      User user =
+          new User(
+              "기존이름",
+              "woody@mopl.io",
+              "password",
+              "https://example.com/old-profile.png",
+              Role.USER,
+              false);
+
+      UserDto expect =
+          new UserDto(
+              userId,
+              Instant.parse("2026-07-02T00:00:00Z"),
+              "woody@mopl.io",
+              "새이름",
+              "https://example.com/new-profile.png",
+              Role.USER,
+              false);
+
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+      given(image.isEmpty()).willReturn(false);
+      given(image.getSize()).willReturn(1024L);
+      given(image.getContentType()).willReturn("image/png");
+      given(fileStorage.store(image)).willReturn("https://example.com/new-profile.png");
+      willThrow(new RuntimeException("delete failed"))
+          .given(fileStorage)
+          .delete("https://example.com/old-profile.png");
+      given(userMapper.toDto(user)).willReturn(expect);
+
+      UserDto actual = userService.updateProfile(userId, userId, request, image);
+
+      assertThat(actual).isEqualTo(expect);
+      assertThat(user.getProfileImageUrl()).isEqualTo("https://example.com/new-profile.png");
+      then(fileStorage).should().delete("https://example.com/old-profile.png");
     }
   }
 }

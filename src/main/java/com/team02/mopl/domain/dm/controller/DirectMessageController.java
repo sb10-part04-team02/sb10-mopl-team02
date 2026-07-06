@@ -2,6 +2,7 @@ package com.team02.mopl.domain.dm.controller;
 
 import com.team02.mopl.domain.dm.dto.ConversationCreateRequest;
 import com.team02.mopl.domain.dm.dto.ConversationDto;
+import com.team02.mopl.domain.dm.dto.ConversationSearchRequest;
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageSearchRequest;
 import com.team02.mopl.domain.dm.service.DirectMessageService;
@@ -9,6 +10,7 @@ import com.team02.mopl.global.dto.CursorResponse;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,6 +28,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class DirectMessageController implements DirectMessageApi {
 
   private final DirectMessageService directMessageService;
+
+  @GetMapping
+  public ResponseEntity<CursorResponse<ConversationDto>> getConversations(
+      @AuthenticationPrincipal UUID userId,
+      @ParameterObject @ModelAttribute @Valid ConversationSearchRequest request) {
+    return ResponseEntity.ok(directMessageService.getConversations(userId, request));
+  }
 
   @PostMapping
   public ResponseEntity<ConversationDto> createConversation(
@@ -53,5 +62,14 @@ public class DirectMessageController implements DirectMessageApi {
       @Valid @ModelAttribute DirectMessageSearchRequest request) {
     return ResponseEntity.ok(
         directMessageService.getDirectMessages(conversationId, userId, request));
+  }
+
+  @PostMapping("/{conversationId}/direct-messages/{directMessageId}/read")
+  public ResponseEntity<Void> markDirectMessageAsRead(
+      @AuthenticationPrincipal UUID userId,
+      @PathVariable UUID conversationId,
+      @PathVariable UUID directMessageId) {
+    directMessageService.markAsRead(conversationId, directMessageId, userId);
+    return ResponseEntity.noContent().build();
   }
 }

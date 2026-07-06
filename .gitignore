@@ -50,6 +50,9 @@ out/
 ### Logs ###
 logs/
 
+### Local Storage ###
+/storage/
+
 #===================================================================================================
 # Created by https://www.toptal.com/developers/gitignore/api/intellij,java,windows,macos,linux
 # Edit at https://www.toptal.com/developers/gitignore?templates=intellij,java,windows,macos,linux

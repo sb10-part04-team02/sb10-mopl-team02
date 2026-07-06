@@ -8,4 +8,8 @@ public class PlaylistException extends BusinessException {
   public PlaylistException(ErrorCode errorCode) {
     super(errorCode);
   }
+
+  public PlaylistException(ErrorCode errorCode, Throwable cause) {
+    super(errorCode, cause);
+  }
 }
