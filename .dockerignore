@@ -4,5 +4,5 @@ build/
 *.md
 .idea/
 ref/
-.env*
+.env
 .local/
