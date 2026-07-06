@@ -145,7 +145,7 @@ class WatchingSessionServiceTest {
     verify(watchingSessionRepository)
         .findActiveSessionsByCursor(
             eq(contentId), isNull(), eq(SortDirection.DESCENDING), isNull(), isNull(), eq(21));
-    assertThat(result.sortBy()).isEqualTo(WatchingSessionSortBy.CREATED_AT.name());
+    assertThat(result.sortBy()).isEqualTo(WatchingSessionSortBy.createdAt.name());
     assertThat(result.sortDirection()).isEqualTo(SortDirection.DESCENDING.name());
   }
 

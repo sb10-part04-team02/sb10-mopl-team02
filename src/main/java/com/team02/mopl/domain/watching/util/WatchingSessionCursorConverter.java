@@ -17,7 +17,7 @@ public final class WatchingSessionCursorConverter {
     try {
       return Instant.parse(cursor);
     } catch (DateTimeParseException e) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new BusinessException(ErrorCode.INVALID_REQUEST, e);
     }
   }
 }

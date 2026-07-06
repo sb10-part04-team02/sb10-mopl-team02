@@ -87,7 +87,7 @@ public class WatchingSessionService {
         nextIdAfter,
         hasNext,
         totalCount,
-        WatchingSessionSortBy.CREATED_AT.name(),
+        WatchingSessionSortBy.createdAt.name(),
         direction.name());
   }
 }
