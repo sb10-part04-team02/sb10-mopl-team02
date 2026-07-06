@@ -42,9 +42,7 @@ public interface PlaylistApi {
   ResponseEntity<PlaylistDto> getPlaylist(
       UUID playlistId, @Parameter(hidden = true) UUID requesterId);
 
-  @Operation(
-      summary = "플레이리스트 목록 조회",
-      description = "플레이리스트 목록을 커서 기반 페이지네이션으로 조회합니다. keyword로 제목·설명을 부분일치 검색할 수 있습니다.")
+  @Operation(summary = "플레이리스트 목록 조회 (커서 페이지네이션)")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "성공"),
     @ApiResponse(

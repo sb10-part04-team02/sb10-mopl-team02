@@ -80,8 +80,8 @@ public class PlaylistService {
     SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
     PlaylistSortBy sortBy = request.sortBy() != null ? request.sortBy() : PlaylistSortBy.UPDATED_AT;
     String keyword =
-        (request.keyword() != null && !request.keyword().isBlank())
-            ? request.keyword().trim()
+        (request.keywordLike() != null && !request.keywordLike().isBlank())
+            ? request.keywordLike().trim()
             : null;
 
     if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
@@ -93,13 +93,22 @@ public class PlaylistService {
     // hasNext 판정을 위해 limit + 1건을 조회
     List<Playlist> playlists =
         playlistRepository.findPlaylistsByCursor(
-            keyword, sortBy, direction, cursor, request.idAfter(), limit + 1);
+            keyword,
+            sortBy,
+            direction,
+            cursor,
+            request.idAfter(),
+            limit + 1,
+            request.ownerIdEqual(),
+            request.subscriberIdEqual());
 
     boolean hasNext = playlists.size() > limit;
     List<Playlist> page = hasNext ? playlists.subList(0, limit) : playlists;
 
     List<PlaylistDto> data = toDtos(page, requesterId);
-    long totalCount = playlistRepository.countActive(keyword);
+    long totalCount =
+        playlistRepository.countActive(
+            keyword, request.ownerIdEqual(), request.subscriberIdEqual());
 
     String nextCursor = null;
     UUID nextIdAfter = null;

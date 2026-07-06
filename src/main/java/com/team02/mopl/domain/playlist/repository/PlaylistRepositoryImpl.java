@@ -3,10 +3,12 @@ package com.team02.mopl.domain.playlist.repository;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.entity.QPlaylist;
 import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
+import com.team02.mopl.domain.subscription.entity.QSubscription;
 import com.team02.mopl.global.enums.SortDirection;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
@@ -17,6 +19,7 @@ import org.hibernate.jpa.HibernateHints;
 public class PlaylistRepositoryImpl implements PlaylistRepositoryCustom {
 
   private static final QPlaylist playlist = QPlaylist.playlist;
+  private static final QSubscription subscription = QSubscription.subscription;
 
   private final JPAQueryFactory queryFactory;
 
@@ -31,7 +34,9 @@ public class PlaylistRepositoryImpl implements PlaylistRepositoryCustom {
       SortDirection direction,
       Comparable<?> cursor,
       UUID idAfter,
-      int limit) {
+      int limit,
+      UUID ownerIdEqual,
+      UUID subscriberIdEqual) {
     boolean ascending = direction == SortDirection.ASCENDING;
     // cursor·idAfter는 항상 함께 와야 한다. 둘 다 없으면 첫 페이지로 동작한다
     boolean firstPage = cursor == null && idAfter == null;
@@ -41,6 +46,8 @@ public class PlaylistRepositoryImpl implements PlaylistRepositoryCustom {
         .where(
             playlist.deletedAt.isNull(),
             keywordContains(keyword),
+            ownerIdEquals(ownerIdEqual),
+            subscriberIdEquals(subscriberIdEqual),
             firstPage ? null : cursorPredicate(sortBy, ascending, cursor, idAfter))
         .orderBy(orderSpecifiers(sortBy, ascending))
         // 조회 전용이므로 영속성 스냅샷 생성을 생략
@@ -50,12 +57,16 @@ public class PlaylistRepositoryImpl implements PlaylistRepositoryCustom {
   }
 
   @Override
-  public long countActive(String keyword) {
+  public long countActive(String keyword, UUID ownerIdEqual, UUID subscriberIdEqual) {
     Long count =
         queryFactory
             .select(playlist.count())
             .from(playlist)
-            .where(playlist.deletedAt.isNull(), keywordContains(keyword))
+            .where(
+                playlist.deletedAt.isNull(),
+                keywordContains(keyword),
+                ownerIdEquals(ownerIdEqual),
+                subscriberIdEquals(subscriberIdEqual))
             .fetchOne();
     return count == null ? 0L : count;
   }
@@ -72,6 +83,26 @@ public class PlaylistRepositoryImpl implements PlaylistRepositoryCustom {
         .title
         .containsIgnoreCase(keyword)
         .or(playlist.description.containsIgnoreCase(keyword));
+  }
+
+  // 소유자 필터: ownerIdEqual이 없으면 미적용
+  private BooleanExpression ownerIdEquals(UUID ownerIdEqual) {
+    return ownerIdEqual == null ? null : playlist.ownerId.eq(ownerIdEqual);
+  }
+
+  // 구독자 필터: 해당 유저의 활성(삭제되지 않은) 구독이 존재하는 플레이리스트만. subscriberIdEqual이 없으면 미적용.
+  // EXISTS 서브쿼리로 표현해 조인 중복 행을 만들지 않고 커서 정렬을 그대로 유지한다
+  private BooleanExpression subscriberIdEquals(UUID subscriberIdEqual) {
+    if (subscriberIdEqual == null) {
+      return null;
+    }
+    return JPAExpressions.selectOne()
+        .from(subscription)
+        .where(
+            subscription.playlist.id.eq(playlist.id),
+            subscription.userId.eq(subscriberIdEqual),
+            subscription.deletedAt.isNull())
+        .exists();
   }
 
   // 복합키 (정렬값, id) 비교를 row-value 표현식으로 구성한다 (동률 다수 대응)
