@@ -3,7 +3,6 @@ package com.team02.mopl.domain.subscription.repository;
 import com.team02.mopl.domain.subscription.entity.Subscription;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -14,10 +13,8 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
 
   boolean existsByUserIdAndPlaylist_IdAndDeletedAtIsNull(UUID userId, UUID playlistId);
 
-  Optional<Subscription> findByUserIdAndPlaylist_IdAndDeletedAtIsNull(UUID userId, UUID playlistId);
-
   // 활성 구독만 논리 삭제. 이미 삭제됐으면 0 반환 (동시 취소 시 이중 감소 방지)
-  @Modifying
+  @Modifying(clearAutomatically = true)
   @Query(
       "UPDATE Subscription s SET s.deletedAt = :now "
           + "WHERE s.userId = :userId AND s.playlist.id = :playlistId AND s.deletedAt IS NULL")

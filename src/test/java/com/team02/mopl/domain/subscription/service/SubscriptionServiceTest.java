@@ -221,4 +221,19 @@ class SubscriptionServiceTest {
 
     verify(playlistRepository, never()).decreaseSubscriberCount(playlistId);
   }
+
+  @Test
+  @DisplayName("구독 취소 대상 플레이리스트가 없으면 PLAYLIST_NOT_FOUND 예외가 발생한다")
+  void unsubscribe_playlistNotFound_throwsException() {
+    UUID requesterId = UUID.randomUUID();
+    UUID playlistId = UUID.randomUUID();
+
+    given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> subscriptionService.unsubscribe(playlistId, requesterId))
+        .isInstanceOf(PlaylistNotFoundException.class);
+
+    verify(subscriptionRepository, never()).softDeleteActive(any(), any(), any());
+    verify(playlistRepository, never()).decreaseSubscriberCount(playlistId);
+  }
 }
