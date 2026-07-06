@@ -260,3 +260,10 @@ CREATE INDEX ix_reviews_content_rating_id
 
 CREATE INDEX ix_direct_messages_conversation_created_id
     ON direct_messages (conversation_id, created_at DESC, id DESC);
+
+--==================================================================================================
+-- 콘텐츠별 활성 시청 세션 커서 조회용 복합 인덱스 (활성 세션만: exited_at IS NULL AND deleted_at IS NULL 부분 인덱스)
+--==================================================================================================
+
+CREATE INDEX ix_watching_sessions_content_created_id
+    ON watching_sessions (content_id, created_at, id) WHERE exited_at IS NULL AND deleted_at IS NULL;
