@@ -11,11 +11,8 @@ import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -36,17 +33,16 @@ public class UserRepositoryImpl implements UserRepositoryCustom {
       String emailLike,
       Role roleEqual,
       Boolean isLocked,
-      String cursor,
+      Comparable<?> cursor,
       UUID idAfter,
       Integer limit,
       SortDirection sortDirection,
       UserSortBy sortBy) {
 
     boolean ascending = sortDirection == SortDirection.ASCENDING;
-    boolean firstPage = cursor == null && idAfter == null;
-    if (cursor == null ^ idAfter == null) { // XOR: 둘 중 하나만 있을 경우
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
+    // service에서 사전에 cursor와 idAfter가 둘이 동시에 있는지 여부에 관한 체크를 진행하여
+    // cursor 유무만으로 firstPage 판별을 진행함
+    boolean firstPage = cursor == null;
 
     return queryFactory
         .selectFrom(user)
@@ -76,16 +72,17 @@ public class UserRepositoryImpl implements UserRepositoryCustom {
   }
 
   private BooleanExpression cursorPredicate(
-      UserSortBy sortBy, boolean ascending, String cursor, UUID idAfter) {
+      UserSortBy sortBy, boolean ascending, Comparable<?> cursor, UUID idAfter) {
     record CursorTuple(Expression<?> sortKey, Object cursorValue) {}
 
     CursorTuple tuple =
         switch (sortBy) {
           case NAME -> new CursorTuple(user.name, cursor);
           case EMAIL -> new CursorTuple(user.email, cursor);
-          case CREATED_AT -> new CursorTuple(user.createdAt, parseInstantCursor(cursor));
-          case IS_LOCKED -> new CursorTuple(user.isLocked, parseBooleanCursor(cursor));
-          case ROLE -> new CursorTuple(user.role, parseRoleCursor(cursor).name());
+          case CREATED_AT -> new CursorTuple(user.createdAt, (Instant) cursor);
+          case IS_LOCKED -> new CursorTuple(user.isLocked, (Boolean) cursor);
+            // ROLE이 DB에 EnumType.STRING형태로 저장될거라 Enum이름값 사용
+          case ROLE -> new CursorTuple(user.role, ((Role) cursor).name());
         };
 
     String op = ascending ? ">" : "<";
@@ -115,28 +112,5 @@ public class UserRepositoryImpl implements UserRepositoryCustom {
     orders.add(new OrderSpecifier<>(order, user.id)); // 2차정렬은 id
 
     return orders.toArray(OrderSpecifier[]::new);
-  }
-
-  private Instant parseInstantCursor(String cursor) {
-    try {
-      return Instant.parse(cursor);
-    } catch (DateTimeParseException e) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST, e);
-    }
-  }
-
-  private Boolean parseBooleanCursor(String cursor) {
-    if (!"true".equalsIgnoreCase(cursor) && !"false".equalsIgnoreCase(cursor)) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
-    return Boolean.parseBoolean(cursor);
-  }
-
-  private Role parseRoleCursor(String cursor) {
-    try {
-      return Role.valueOf(cursor.toUpperCase());
-    } catch (IllegalArgumentException e) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST, e);
-    }
   }
 }

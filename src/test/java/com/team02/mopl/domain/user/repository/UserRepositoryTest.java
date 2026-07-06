@@ -2,24 +2,19 @@ package com.team02.mopl.domain.user.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.BDDAssertions.tuple;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
+import com.team02.mopl.domain.user.util.UserCursorConverter;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.support.RepositoryTestSupport;
 import jakarta.persistence.EntityManager;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
 class UserRepositoryTest extends RepositoryTestSupport {
@@ -108,11 +103,12 @@ class UserRepositoryTest extends RepositoryTestSupport {
     User cursorUser = totalUser.get(1);
     User user1 = totalUser.get(2);
     User user2 = totalUser.get(3);
+    Comparable<?> cursor = UserCursorConverter.toSortKey(sortBy, cursorUser.getName());
 
     // when
     List<User> result =
         userRepository.findUsersByCursor(
-            null, null, null, cursorUser.getName(), cursorUser.getId(), 10, direction, sortBy);
+            null, null, null, cursor, cursorUser.getId(), 10, direction, sortBy);
 
     // then
     assertThat(cursorUser.getName()).isEqualTo(user1.getName());
@@ -140,11 +136,12 @@ class UserRepositoryTest extends RepositoryTestSupport {
     User cursorUser = totalUser.get(1);
     User user1 = totalUser.get(2);
     User user2 = totalUser.get(3);
+    Comparable<?> cursor = UserCursorConverter.toSortKey(sortBy, cursorUser.getEmail());
 
     // when
     List<User> result =
         userRepository.findUsersByCursor(
-            null, null, null, cursorUser.getEmail(), cursorUser.getId(), 10, direction, sortBy);
+            null, null, null, cursor, cursorUser.getId(), 10, direction, sortBy);
 
     // then
     assertThat(cursorUser.getEmail()).isNotEqualTo(user1.getEmail());
@@ -183,18 +180,13 @@ class UserRepositoryTest extends RepositoryTestSupport {
     User cursorUser = sortedUser.get(1);
     User user1 = sortedUser.get(2);
     User user2 = sortedUser.get(3);
+    Comparable<?> cursor =
+        UserCursorConverter.toSortKey(sortBy, cursorUser.getCreatedAt().toString());
 
     // when
     List<User> result =
         userRepository.findUsersByCursor(
-            null,
-            null,
-            null,
-            cursorUser.getCreatedAt().toString(),
-            cursorUser.getId(),
-            10,
-            direction,
-            sortBy);
+            null, null, null, cursor, cursorUser.getId(), 10, direction, sortBy);
 
     // then
     assertThat(result)
@@ -232,18 +224,13 @@ class UserRepositoryTest extends RepositoryTestSupport {
     User cursorUser = sortedUser.get(1);
     User user1 = sortedUser.get(2);
     User user2 = sortedUser.get(3);
+    Comparable<?> cursor =
+        UserCursorConverter.toSortKey(sortBy, Boolean.toString(cursorUser.isLocked()));
 
     // when
     List<User> result =
         userRepository.findUsersByCursor(
-            null,
-            null,
-            null,
-            Boolean.toString(cursorUser.isLocked()),
-            cursorUser.getId(),
-            10,
-            direction,
-            sortBy);
+            null, null, null, cursor, cursorUser.getId(), 10, direction, sortBy);
 
     // then
     assertThat(result)
@@ -281,18 +268,12 @@ class UserRepositoryTest extends RepositoryTestSupport {
     User cursorUser = sortedUser.get(1);
     User user1 = sortedUser.get(2);
     User user2 = sortedUser.get(3);
+    Comparable<?> cursor = UserCursorConverter.toSortKey(sortBy, cursorUser.getRole().name());
 
     // when
     List<User> result =
         userRepository.findUsersByCursor(
-            null,
-            null,
-            null,
-            cursorUser.getRole().name(),
-            cursorUser.getId(),
-            10,
-            direction,
-            sortBy);
+            null, null, null, cursor, cursorUser.getId(), 10, direction, sortBy);
 
     // then
     assertThat(result)
@@ -300,45 +281,6 @@ class UserRepositoryTest extends RepositoryTestSupport {
         .extracting(User::getRole, User::getId)
         .containsExactly( // user1 < user2 순서 확인 포함
             tuple(user1.getRole(), user1.getId()), tuple(user2.getRole(), user2.getId()));
-  }
-
-  private static Stream<Arguments> provideCursorOrIdAfterMissing() {
-    return Stream.of(
-        Arguments.of(null, UUID.randomUUID(), "cursor 누락"),
-        Arguments.of("cursor", null, "idAfter 누락"));
-  }
-
-  @ParameterizedTest
-  @MethodSource("provideCursorOrIdAfterMissing")
-  @DisplayName("첫 페이지 조회가 아닐때 커서와 idAfter 둘 중 하나만 누락되면 예외를 던진다")
-  void fail_shouldThrowException_whenCursorOrIdAfterIsMissing(
-      String cursor, UUID idAfter, String description) {
-    // when & then
-    assertThrows(
-        BusinessException.class,
-        () ->
-            userRepository.findUsersByCursor(
-                null, null, null, cursor, idAfter, 10, SortDirection.DESCENDING, UserSortBy.NAME));
-  }
-
-  private static Stream<Arguments> provideInvalidCursor() {
-    return Stream.of(
-        Arguments.of("invalid instant time", UserSortBy.CREATED_AT, "효력없는 createdAt"),
-        Arguments.of("invalid boolean", UserSortBy.IS_LOCKED, "효력없는 isLocked"),
-        Arguments.of("invalid role", UserSortBy.ROLE, "효력없는 Role"));
-  }
-
-  @ParameterizedTest
-  @MethodSource("provideInvalidCursor")
-  @DisplayName("정렬을 파싱하는데 실패한다면 예외를 던진다")
-  void fail_shouldThrowException_whenUserSortByParsingFails(
-      String cursor, UserSortBy sortBy, String description) {
-    // when & then
-    assertThrows(
-        BusinessException.class,
-        () ->
-            userRepository.findUsersByCursor(
-                null, null, null, cursor, UUID.randomUUID(), 1, SortDirection.DESCENDING, sortBy));
   }
 
   private User saveUser(String name, String email, Role role, boolean isLocked) {

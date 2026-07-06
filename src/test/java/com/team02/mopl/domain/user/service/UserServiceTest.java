@@ -27,17 +27,21 @@ import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
+import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.storage.FileStorage;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -365,7 +369,7 @@ class UserServiceTest {
     @ParameterizedTest
     @EnumSource(UserSortBy.class)
     @DisplayName("각 정렬이 주어지면 대응하는 필드값으로 커서를 올바르게 반환한다")
-    void shouldEncodeCursorCorrectly_whenEachSortByOptionIsProvided(UserSortBy sortBy) {
+    void success_shouldEncodeCursorCorrectly_whenEachSortByOptionIsProvided(UserSortBy sortBy) {
       // given
       UserSearchRequest request =
           new UserSearchRequest(null, null, null, null, null, 1, SortDirection.ASCENDING, sortBy);
@@ -394,6 +398,25 @@ class UserServiceTest {
           };
 
       assertThat(actual.nextCursor()).isEqualTo(expectedCursor);
+    }
+
+    private static Stream<Arguments> provideCursorOrIdAfterMissing() {
+      return Stream.of(
+          Arguments.of(null, UUID.randomUUID(), "cursor 누락"),
+          Arguments.of("cursor", null, "idAfter 누락"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideCursorOrIdAfterMissing")
+    @DisplayName("cursor나 idAfter 둘 중 하나만 있으면 예외를 던진다")
+    void fail_shouldThrowException_whenCursorOrIdAfterIsMissing(String cursor, UUID idAfter) {
+      //
+      UserSearchRequest request =
+          new UserSearchRequest(
+              null, null, null, cursor, idAfter, 10, SortDirection.ASCENDING, UserSortBy.NAME);
+
+      // when & then
+      assertThrows(BusinessException.class, () -> userService.getUsers(request));
     }
   }
 

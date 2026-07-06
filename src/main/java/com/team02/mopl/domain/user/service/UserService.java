@@ -13,9 +13,12 @@ import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.domain.user.util.UserCursorConverter;
 import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
+import com.team02.mopl.global.exception.BusinessException;
+import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.global.storage.FileStorage;
 import java.util.List;
 import java.util.UUID;
@@ -80,12 +83,19 @@ public class UserService {
         request.sortDirection() != null ? request.sortDirection() : SortDirection.ASCENDING;
     UserSortBy sortBy = request.sortBy() != null ? request.sortBy() : UserSortBy.NAME;
 
+    if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
+      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+    }
+
+    Comparable<?> cursor = UserCursorConverter.toSortKey(sortBy, request.cursor());
+
+    // hasNext 판정을 위해 limit + 1건을 조회
     List<User> users =
         userRepository.findUsersByCursor(
             request.emailLike(),
             request.roleEqual(),
             request.isLocked(),
-            request.cursor(),
+            cursor,
             request.idAfter(),
             limit + 1,
             direction,
@@ -103,22 +113,12 @@ public class UserService {
     UUID nextIdAfter = null;
     if (hasNext) {
       User last = page.get(page.size() - 1);
-      nextCursor = encodeCursor(sortBy, last);
+      nextCursor = UserCursorConverter.toCursor(sortBy, last);
       nextIdAfter = last.getId();
     }
 
     return new CursorResponse<>(
         data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.getValue(), direction.name());
-  }
-
-  private String encodeCursor(UserSortBy sortBy, User user) {
-    return switch (sortBy) {
-      case NAME -> user.getName();
-      case EMAIL -> user.getEmail();
-      case CREATED_AT -> user.getCreatedAt().toString();
-      case IS_LOCKED -> Boolean.toString(user.isLocked());
-      case ROLE -> user.getRole().name();
-    };
   }
 
   @Transactional

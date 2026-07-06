@@ -13,7 +13,7 @@ public interface UserRepositoryCustom {
       String emailLike,
       Role roleEqual,
       Boolean isLocked,
-      String cursor,
+      Comparable<?> cursor,
       UUID idAfter,
       Integer limit,
       SortDirection sortDirection,
