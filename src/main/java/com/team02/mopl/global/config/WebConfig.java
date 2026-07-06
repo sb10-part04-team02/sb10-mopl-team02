@@ -13,15 +13,12 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-  private final StringToEnumConverterFactory stringToEnumConverterFactory;
   private final String basePath;
   private final String baseUrl;
 
   public WebConfig(
-      StringToEnumConverterFactory stringToEnumConverterFactory,
       @Value("${app.storage.local.base-path:storage}") String basePath,
       @Value("${app.storage.local.base-url:/files}") String baseUrl) {
-    this.stringToEnumConverterFactory = stringToEnumConverterFactory;
     this.basePath = basePath;
     this.baseUrl = baseUrl;
   }
@@ -39,6 +36,7 @@ public class WebConfig implements WebMvcConfigurer {
 
   @Override
   public void addFormatters(FormatterRegistry registry) {
-    registry.addConverterFactory(stringToEnumConverterFactory);
+    // Enum Converter 추가
+    registry.addConverterFactory(new StringToEnumConverterFactory());
   }
 }

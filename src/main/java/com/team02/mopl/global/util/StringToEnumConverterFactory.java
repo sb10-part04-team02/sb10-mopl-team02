@@ -7,10 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.core.convert.converter.ConverterFactory;
-import org.springframework.stereotype.Component;
 
 @Slf4j
-@Component
 @SuppressWarnings({"rawtypes"})
 public class StringToEnumConverterFactory implements ConverterFactory<String, Enum> {
 
