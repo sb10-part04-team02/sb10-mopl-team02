@@ -2,6 +2,7 @@ package com.team02.mopl.domain.watching.websocket;
 
 import com.team02.mopl.domain.watching.dto.WatchingSessionChange;
 import com.team02.mopl.domain.watching.service.WatchingSessionService;
+import com.team02.mopl.domain.watching.websocket.WatchingSubscriptionRegistry.WatchingSubscription;
 import java.security.Principal;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -65,7 +66,10 @@ public class WatchingSessionWebSocketEventListener {
     // 구독 자체는 이미 성립한 뒤라 예외를 던져도 거부할 수 없으므로, 실패 시 로그만 남긴다.
     try {
       WatchingSessionChange change = watchingSessionService.join(contentId, userId);
-      subscriptionRegistry.register(wsSessionId, subscriptionId, change.watchingSession().id());
+      subscriptionRegistry.register(
+          wsSessionId,
+          subscriptionId,
+          new WatchingSubscription(change.watchingSession().id(), userId));
       broadcast(contentId, change);
       log.debug("시청 세션 JOIN. contentId={}, userId={}", contentId, userId);
     } catch (Exception e) {
@@ -90,13 +94,13 @@ public class WatchingSessionWebSocketEventListener {
     subscriptionRegistry.removeAll(event.getSessionId()).forEach(this::leaveAndBroadcast);
   }
 
-  private void leaveAndBroadcast(UUID watchingSessionId) {
+  private void leaveAndBroadcast(WatchingSubscription subscription) {
     try {
       watchingSessionService
-          .leave(watchingSessionId)
+          .leave(subscription.watchingSessionId(), subscription.userId())
           .ifPresent(change -> broadcast(change.watchingSession().content().id(), change));
     } catch (Exception e) {
-      log.warn("시청 세션 LEAVE 처리 실패. watchingSessionId={}", watchingSessionId, e);
+      log.warn("시청 세션 LEAVE 처리 실패. watchingSessionId={}", subscription.watchingSessionId(), e);
     }
   }
 

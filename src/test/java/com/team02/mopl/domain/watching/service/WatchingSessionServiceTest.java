@@ -304,9 +304,10 @@ class WatchingSessionServiceTest {
     Content content = mockContent(contentId);
     given(tagRepository.findByContentIdAndDeletedAtIsNull(contentId)).willReturn(List.of());
 
+    UUID ownerId = UUID.randomUUID();
     UUID watchingSessionId = UUID.randomUUID();
     WatchingSession session =
-        mockSession(watchingSessionId, Instant.now(), mockUser(UUID.randomUUID(), "시청자", null));
+        mockSession(watchingSessionId, Instant.now(), mockUser(ownerId, "시청자", null));
     given(session.getExitedAt()).willReturn(null);
     given(session.getContent()).willReturn(content);
     given(watchingSessionRepository.findById(watchingSessionId)).willReturn(Optional.of(session));
@@ -316,7 +317,8 @@ class WatchingSessionServiceTest {
     given(watchingSessionMapper.toDto(eq(session), any())).willReturn(dto);
 
     // when
-    Optional<WatchingSessionChange> change = watchingSessionService.leave(watchingSessionId);
+    Optional<WatchingSessionChange> change =
+        watchingSessionService.leave(watchingSessionId, ownerId);
 
     // then
     assertThat(change).isPresent();
@@ -327,17 +329,58 @@ class WatchingSessionServiceTest {
   }
 
   @Test
-  @DisplayName("leave 시 이미 종료된 세션이면 empty를 반환하고 종료하지 않는다")
-  void leave_alreadyExited_returnsEmpty() {
+  @DisplayName("leave 시 요청자가 세션 소유자가 아니면 FORBIDDEN 예외가 발생한다")
+  void leave_notOwner_throwsForbidden() {
     // given
     UUID watchingSessionId = UUID.randomUUID();
     WatchingSession session =
         mockSession(watchingSessionId, Instant.now(), mockUser(UUID.randomUUID(), "시청자", null));
+    given(session.getExitedAt()).willReturn(null);
+    given(watchingSessionRepository.findById(watchingSessionId)).willReturn(Optional.of(session));
+
+    // when & then
+    assertThatThrownBy(() -> watchingSessionService.leave(watchingSessionId, UUID.randomUUID()))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+    verify(session, never()).exit();
+  }
+
+  @Test
+  @DisplayName("leave 시 이미 종료된 세션이면 empty를 반환하고 종료하지 않는다")
+  void leave_alreadyExited_returnsEmpty() {
+    // given
+    UUID ownerId = UUID.randomUUID();
+    UUID watchingSessionId = UUID.randomUUID();
+    WatchingSession session =
+        mockSession(watchingSessionId, Instant.now(), mockUser(ownerId, "시청자", null));
     given(session.getExitedAt()).willReturn(Instant.now());
     given(watchingSessionRepository.findById(watchingSessionId)).willReturn(Optional.of(session));
 
     // when
-    Optional<WatchingSessionChange> change = watchingSessionService.leave(watchingSessionId);
+    Optional<WatchingSessionChange> change =
+        watchingSessionService.leave(watchingSessionId, ownerId);
+
+    // then
+    assertThat(change).isEmpty();
+    verify(session, never()).exit();
+  }
+
+  @Test
+  @DisplayName("leave 시 삭제된 세션이면 empty를 반환하고 종료하지 않는다")
+  void leave_deletedSession_returnsEmpty() {
+    // given
+    UUID ownerId = UUID.randomUUID();
+    UUID watchingSessionId = UUID.randomUUID();
+    WatchingSession session =
+        mockSession(watchingSessionId, Instant.now(), mockUser(ownerId, "시청자", null));
+    given(session.getExitedAt()).willReturn(null);
+    given(session.isDeleted()).willReturn(true);
+    given(watchingSessionRepository.findById(watchingSessionId)).willReturn(Optional.of(session));
+
+    // when
+    Optional<WatchingSessionChange> change =
+        watchingSessionService.leave(watchingSessionId, ownerId);
 
     // then
     assertThat(change).isEmpty();
@@ -352,7 +395,7 @@ class WatchingSessionServiceTest {
     given(watchingSessionRepository.findById(watchingSessionId)).willReturn(Optional.empty());
 
     // when & then
-    assertThat(watchingSessionService.leave(watchingSessionId)).isEmpty();
+    assertThat(watchingSessionService.leave(watchingSessionId, UUID.randomUUID())).isEmpty();
   }
 
   private WatchingSessionSearchRequest request(

@@ -61,12 +61,16 @@ public class WatchingSessionService {
 
   // 시청 세션 이탈: 세션을 종료하고 전파할 LEAVE 변경 정보를 반환한다. 이미 종료됐거나 없으면 empty.
   @Transactional
-  public Optional<WatchingSessionChange> leave(UUID watchingSessionId) {
+  public Optional<WatchingSessionChange> leave(UUID watchingSessionId, UUID requesterId) {
     return watchingSessionRepository
         .findById(watchingSessionId)
         .filter(session -> session.getExitedAt() == null && !session.isDeleted())
         .map(
             session -> {
+              // 세션 소유자만 종료할 수 있다.
+              if (!session.getUser().getId().equals(requesterId)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN);
+              }
               session.exit();
               return toChange(ChangeType.LEAVE, session, session.getContent());
             });

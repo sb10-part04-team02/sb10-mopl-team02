@@ -1,5 +1,6 @@
 package com.team02.mopl.domain.watching.websocket;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -112,13 +113,14 @@ class WatchingSessionWebSocketEventListenerTest {
     // given
     givenJoined("ws1", "sub1");
     WatchingSessionChange leaveChange = change(ChangeType.LEAVE, 0L);
-    given(watchingSessionService.leave(watchingSessionId)).willReturn(Optional.of(leaveChange));
+    given(watchingSessionService.leave(watchingSessionId, userId))
+        .willReturn(Optional.of(leaveChange));
 
     // when
     listener.handleUnsubscribe(unsubscribeEvent("ws1", "sub1"));
 
     // then
-    verify(watchingSessionService).leave(watchingSessionId);
+    verify(watchingSessionService).leave(watchingSessionId, userId);
     verify(messagingTemplate).convertAndSend(watchDestination(), leaveChange);
   }
 
@@ -127,7 +129,7 @@ class WatchingSessionWebSocketEventListenerTest {
   void handleUnsubscribe_untrackedOrDuplicate_ignored() {
     // given
     givenJoined("ws1", "sub1");
-    given(watchingSessionService.leave(watchingSessionId)).willReturn(Optional.empty());
+    given(watchingSessionService.leave(watchingSessionId, userId)).willReturn(Optional.empty());
 
     // when
     listener.handleUnsubscribe(unsubscribeEvent("ws1", "unknown-sub"));
@@ -135,7 +137,7 @@ class WatchingSessionWebSocketEventListenerTest {
     listener.handleUnsubscribe(unsubscribeEvent("ws1", "sub1")); // 중복
 
     // then
-    verify(watchingSessionService, times(1)).leave(watchingSessionId);
+    verify(watchingSessionService, times(1)).leave(watchingSessionId, userId);
   }
 
   @Test
@@ -144,14 +146,15 @@ class WatchingSessionWebSocketEventListenerTest {
     // given
     givenJoined("ws1", "sub1");
     WatchingSessionChange leaveChange = change(ChangeType.LEAVE, 0L);
-    given(watchingSessionService.leave(watchingSessionId)).willReturn(Optional.of(leaveChange));
+    given(watchingSessionService.leave(watchingSessionId, userId))
+        .willReturn(Optional.of(leaveChange));
 
     // when
     listener.handleDisconnect(disconnectEvent("ws1"));
     listener.handleDisconnect(disconnectEvent("ws1")); // 중복 발화
 
     // then
-    verify(watchingSessionService, times(1)).leave(watchingSessionId);
+    verify(watchingSessionService, times(1)).leave(watchingSessionId, userId);
     verify(messagingTemplate).convertAndSend(watchDestination(), leaveChange);
   }
 
@@ -160,12 +163,26 @@ class WatchingSessionWebSocketEventListenerTest {
   void handleUnsubscribe_leaveEmpty_noBroadcast() {
     // given
     givenJoined("ws1", "sub1");
-    given(watchingSessionService.leave(watchingSessionId)).willReturn(Optional.empty());
+    given(watchingSessionService.leave(watchingSessionId, userId)).willReturn(Optional.empty());
 
     // when
     listener.handleUnsubscribe(unsubscribeEvent("ws1", "sub1"));
 
     // then
+    verifyNoMoreInteractions(messagingTemplate);
+  }
+
+  @Test
+  @DisplayName("leave 처리 중 예외가 발생해도 예외를 전파하지 않고 브로드캐스트하지 않는다")
+  void handleUnsubscribe_leaveThrows_doesNotPropagate() {
+    // given
+    givenJoined("ws1", "sub1");
+    given(watchingSessionService.leave(watchingSessionId, userId))
+        .willThrow(new RuntimeException("boom"));
+
+    // when & then
+    assertThatCode(() -> listener.handleUnsubscribe(unsubscribeEvent("ws1", "sub1")))
+        .doesNotThrowAnyException();
     verifyNoMoreInteractions(messagingTemplate);
   }
 
