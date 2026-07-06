@@ -3,8 +3,10 @@ package com.team02.mopl.domain.subscription.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -182,29 +184,25 @@ class SubscriptionServiceTest {
   }
 
   @Test
-  @DisplayName("구독을 취소하면 구독이 논리 삭제되고 구독자 수가 감소한다")
+  @DisplayName("구독을 취소하면 활성 구독이 논리 삭제되고 구독자 수가 감소한다")
   void unsubscribe_success() {
     UUID ownerId = UUID.randomUUID();
     UUID requesterId = UUID.randomUUID();
     UUID playlistId = UUID.randomUUID();
     Playlist playlist = new Playlist(ownerId, "제목", "설명");
-    Subscription subscription = new Subscription(requesterId, playlist);
 
     given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
         .willReturn(Optional.of(playlist));
-    given(
-            subscriptionRepository.findByUserIdAndPlaylist_IdAndDeletedAtIsNull(
-                requesterId, playlistId))
-        .willReturn(Optional.of(subscription));
+    given(subscriptionRepository.softDeleteActive(eq(requesterId), eq(playlistId), any()))
+        .willReturn(1);
 
     subscriptionService.unsubscribe(playlistId, requesterId);
 
-    assertThat(subscription.getDeletedAt()).isNotNull();
     verify(playlistRepository).decreaseSubscriberCount(playlistId);
   }
 
   @Test
-  @DisplayName("구독 정보가 없으면 SUBSCRIPTION_NOT_FOUND 예외가 발생한다")
+  @DisplayName("활성 구독이 없으면 SUBSCRIPTION_NOT_FOUND 예외가 발생하고 구독자 수는 감소하지 않는다")
   void unsubscribe_notFound_throwsException() {
     UUID ownerId = UUID.randomUUID();
     UUID requesterId = UUID.randomUUID();
@@ -213,14 +211,14 @@ class SubscriptionServiceTest {
 
     given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
         .willReturn(Optional.of(playlist));
-    given(
-            subscriptionRepository.findByUserIdAndPlaylist_IdAndDeletedAtIsNull(
-                requesterId, playlistId))
-        .willReturn(Optional.empty());
+    given(subscriptionRepository.softDeleteActive(eq(requesterId), eq(playlistId), any()))
+        .willReturn(0);
 
     assertThatThrownBy(() -> subscriptionService.unsubscribe(playlistId, requesterId))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.SUBSCRIPTION_NOT_FOUND));
+
+    verify(playlistRepository, never()).decreaseSubscriberCount(playlistId);
   }
 }

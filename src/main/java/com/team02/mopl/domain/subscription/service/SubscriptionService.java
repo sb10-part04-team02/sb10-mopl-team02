@@ -15,6 +15,7 @@ import com.team02.mopl.domain.subscription.repository.SubscriptionRepository;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -80,12 +81,12 @@ public class SubscriptionService {
         .findByIdAndDeletedAtIsNull(playlistId)
         .orElseThrow(PlaylistNotFoundException::new);
 
-    Subscription subscription =
-        subscriptionRepository
-            .findByUserIdAndPlaylist_IdAndDeletedAtIsNull(requesterId, playlistId)
-            .orElseThrow(SubscriptionNotFoundException::new);
+    // 활성 구독을 원자적으로 논리 삭제. 동시 취소 시 두 번째 요청은 0을 받아 이중 감소를 막는다.
+    int deleted = subscriptionRepository.softDeleteActive(requesterId, playlistId, Instant.now());
+    if (deleted == 0) {
+      throw new SubscriptionNotFoundException();
+    }
 
-    subscription.delete();
     playlistRepository.decreaseSubscriberCount(playlistId);
 
     log.info("플레이리스트 구독 취소 성공: playlistId={}, requesterId={}", playlistId, requesterId);
