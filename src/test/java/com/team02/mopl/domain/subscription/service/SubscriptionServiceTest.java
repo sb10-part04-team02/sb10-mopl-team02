@@ -10,14 +10,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
-import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
-import com.team02.mopl.domain.notification.entity.enums.NotificationType;
-import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.exception.PlaylistNotFoundException;
 import com.team02.mopl.domain.playlist.repository.PlaylistRepository;
 import com.team02.mopl.domain.subscription.entity.Subscription;
+import com.team02.mopl.domain.subscription.event.SubscriptionCreatedEvent;
 import com.team02.mopl.domain.subscription.repository.SubscriptionRepository;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
@@ -33,6 +30,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,7 +42,7 @@ class SubscriptionServiceTest {
 
   @Mock private UserRepository userRepository;
 
-  @Mock private NotificationService notificationService;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private SubscriptionService subscriptionService;
 
@@ -56,6 +54,7 @@ class SubscriptionServiceTest {
     UUID playlistId = UUID.randomUUID();
     Playlist playlist = new Playlist(ownerId, "제목", "설명");
     User subscriber = mock(User.class);
+    given(subscriber.getId()).willReturn(requesterId);
     given(subscriber.getName()).willReturn("구독자");
 
     given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
@@ -72,15 +71,17 @@ class SubscriptionServiceTest {
     verify(playlistRepository).increaseSubscriberCount(playlistId);
     verify(subscriptionRepository).saveAndFlush(any(Subscription.class));
 
-    ArgumentCaptor<NotificationCreateCommand> commandCaptor =
-        ArgumentCaptor.forClass(NotificationCreateCommand.class);
-    verify(notificationService).createNotification(commandCaptor.capture());
+    ArgumentCaptor<SubscriptionCreatedEvent> eventCaptor =
+        ArgumentCaptor.forClass(SubscriptionCreatedEvent.class);
 
-    NotificationCreateCommand command = commandCaptor.getValue();
-    assertThat(command.receiverId()).isEqualTo(ownerId);
-    assertThat(command.level()).isEqualTo(NotificationLevel.INFO);
-    assertThat(command.notificationType()).isEqualTo(NotificationType.PLAYLIST_SUBSCRIBED);
-    assertThat(command.content()).contains("구독자");
+    verify(eventPublisher).publishEvent(eventCaptor.capture());
+
+    SubscriptionCreatedEvent event = eventCaptor.getValue();
+
+    assertThat(event.subscriberId()).isEqualTo(requesterId);
+    assertThat(event.subscriberName()).isEqualTo("구독자");
+    assertThat(event.playlistOwnerId()).isEqualTo(ownerId);
+    assertThat(event.playlistTitle()).isEqualTo("제목");
   }
 
   @Test
@@ -98,7 +99,7 @@ class SubscriptionServiceTest {
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CANNOT_SUBSCRIBE_OWN_PLAYLIST));
 
-    verifyNoInteractions(notificationService);
+    verifyNoInteractions(eventPublisher);
   }
 
   @Test
@@ -123,7 +124,7 @@ class SubscriptionServiceTest {
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.SUBSCRIPTION_ALREADY_EXISTS));
 
-    verifyNoInteractions(notificationService);
+    verifyNoInteractions(eventPublisher);
   }
 
   @Test
@@ -153,7 +154,7 @@ class SubscriptionServiceTest {
     assertThatThrownBy(() -> subscriptionService.subscribe(playlistId, requesterId))
         .isInstanceOf(UserNotFoundException.class);
 
-    verifyNoInteractions(notificationService);
+    verifyNoInteractions(eventPublisher);
   }
 
   @Test
@@ -180,7 +181,7 @@ class SubscriptionServiceTest {
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.SUBSCRIPTION_ALREADY_EXISTS));
 
-    verifyNoInteractions(notificationService);
+    verifyNoInteractions(eventPublisher);
   }
 
   @Test
@@ -220,6 +221,7 @@ class SubscriptionServiceTest {
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.SUBSCRIPTION_NOT_FOUND));
 
     verify(playlistRepository, never()).decreaseSubscriberCount(playlistId);
+    verifyNoInteractions(eventPublisher);
   }
 
   @Test
