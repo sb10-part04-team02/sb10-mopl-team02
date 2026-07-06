@@ -2,15 +2,23 @@ package com.team02.mopl.domain.user.service;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
+import com.team02.mopl.domain.user.enums.UserSortBy;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.domain.user.util.UserCursorConverter;
+import com.team02.mopl.global.dto.CursorPageRequest;
+import com.team02.mopl.global.dto.CursorResponse;
+import com.team02.mopl.global.enums.SortDirection;
+import com.team02.mopl.global.exception.BusinessException;
+import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.global.storage.FileStorage;
 import java.util.List;
 import java.util.UUID;
@@ -67,6 +75,50 @@ public class UserService {
         userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
 
     return userMapper.toDto(user);
+  }
+
+  public CursorResponse<UserDto> getUsers(UserSearchRequest request) {
+    int limit = CursorPageRequest.normalizeLimit(request.limit());
+    SortDirection direction =
+        request.sortDirection() != null ? request.sortDirection() : SortDirection.ASCENDING;
+    UserSortBy sortBy = request.sortBy() != null ? request.sortBy() : UserSortBy.NAME;
+
+    if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
+      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+    }
+
+    Comparable<?> cursor = UserCursorConverter.toSortKey(sortBy, request.cursor());
+
+    // hasNext 판정을 위해 limit + 1건을 조회
+    List<User> users =
+        userRepository.findUsersByCursor(
+            request.emailLike(),
+            request.roleEqual(),
+            request.isLocked(),
+            cursor,
+            request.idAfter(),
+            limit + 1,
+            direction,
+            sortBy);
+
+    boolean hasNext = users.size() > limit;
+    List<User> page = hasNext ? users.subList(0, limit) : users;
+
+    List<UserDto> data = page.stream().map(userMapper::toDto).toList();
+    long totalCount =
+        userRepository.countUsersByCursor(
+            request.emailLike(), request.roleEqual(), request.isLocked());
+
+    String nextCursor = null;
+    UUID nextIdAfter = null;
+    if (hasNext) {
+      User last = page.get(page.size() - 1);
+      nextCursor = UserCursorConverter.toCursor(sortBy, last);
+      nextIdAfter = last.getId();
+    }
+
+    return new CursorResponse<>(
+        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.getValue(), direction.name());
   }
 
   @Transactional
