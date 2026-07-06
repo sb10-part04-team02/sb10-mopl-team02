@@ -13,6 +13,8 @@ import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.entity.PlaylistContent;
 import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
 import com.team02.mopl.domain.playlist.event.PlaylistCreatedEvent;
+import com.team02.mopl.domain.playlist.exception.PlaylistContentAlreadyExistsException;
+import com.team02.mopl.domain.playlist.exception.PlaylistContentNotFoundException;
 import com.team02.mopl.domain.playlist.exception.PlaylistForbiddenException;
 import com.team02.mopl.domain.playlist.exception.PlaylistNotFoundException;
 import com.team02.mopl.domain.playlist.mapper.PlaylistMapper;
@@ -200,6 +202,72 @@ public class PlaylistService {
         playlistId,
         requesterId,
         subscriptions.size());
+  }
+
+  // 플레이리스트에 콘텐츠 추가 (소유자 본인만, 중복·미존재 콘텐츠 차단)
+  @Transactional
+  public void addContent(UUID playlistId, UUID requesterId, UUID contentId) {
+    log.debug(
+        "플레이리스트 콘텐츠 추가 시작: playlistId={}, requesterId={}, contentId={}",
+        playlistId,
+        requesterId,
+        contentId);
+
+    Playlist playlist = getOwnedPlaylist(playlistId, requesterId);
+
+    Content content =
+        contentRepository
+            .findByIdAndDeletedAtIsNull(contentId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CONTENT_NOT_FOUND));
+
+    if (playlistContentRepository.existsByPlaylistIdAndContentId(playlistId, content.getId())) {
+      throw new PlaylistContentAlreadyExistsException();
+    }
+
+    playlistContentRepository.save(new PlaylistContent(playlist, content.getId()));
+
+    log.info(
+        "플레이리스트 콘텐츠 추가 성공: playlistId={}, requesterId={}, contentId={}",
+        playlistId,
+        requesterId,
+        contentId);
+  }
+
+  // 플레이리스트에서 콘텐츠 삭제 (소유자 본인만, 미포함 콘텐츠 차단)
+  @Transactional
+  public void removeContent(UUID playlistId, UUID requesterId, UUID contentId) {
+    log.debug(
+        "플레이리스트 콘텐츠 삭제 시작: playlistId={}, requesterId={}, contentId={}",
+        playlistId,
+        requesterId,
+        contentId);
+
+    getOwnedPlaylist(playlistId, requesterId);
+
+    if (!playlistContentRepository.existsByPlaylistIdAndContentId(playlistId, contentId)) {
+      throw new PlaylistContentNotFoundException();
+    }
+
+    playlistContentRepository.deleteByPlaylistIdAndContentId(playlistId, contentId);
+
+    log.info(
+        "플레이리스트 콘텐츠 삭제 성공: playlistId={}, requesterId={}, contentId={}",
+        playlistId,
+        requesterId,
+        contentId);
+  }
+
+  // 소유자 본인의 플레이리스트를 조회 (미존재 404, 비소유자 403)
+  private Playlist getOwnedPlaylist(UUID playlistId, UUID requesterId) {
+    Playlist playlist =
+        playlistRepository
+            .findByIdAndDeletedAtIsNull(playlistId)
+            .orElseThrow(PlaylistNotFoundException::new);
+
+    if (!playlist.getOwnerId().equals(requesterId)) {
+      throw new PlaylistForbiddenException();
+    }
+    return playlist;
   }
 
   // ===
