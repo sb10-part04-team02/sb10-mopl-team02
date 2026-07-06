@@ -1,9 +1,12 @@
 package com.team02.mopl.domain.follow.repository;
 
 import com.team02.mopl.domain.follow.entity.Follow;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface FollowRepository extends JpaRepository<Follow, UUID> {
 
@@ -19,4 +22,14 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
 
   // 특정 사용자의 팔로워 수 조회
   long countByFollowee_IdAndDeletedAtIsNull(UUID followeeId);
+
+  @Query(
+      """
+      select f.follower.id
+      from Follow f
+      where f.followee.id = :followeeId
+        and f.deletedAt is null
+        and f.follower.deletedAt is null
+      """)
+  List<UUID> findActiveFollowerIdsByFolloweeId(@Param("followeeId") UUID followeeId);
 }

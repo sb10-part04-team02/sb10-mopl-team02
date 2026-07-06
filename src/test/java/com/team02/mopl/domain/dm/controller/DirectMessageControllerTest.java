@@ -3,9 +3,11 @@ package com.team02.mopl.domain.dm.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,6 +16,7 @@ import com.team02.mopl.domain.dm.dto.ConversationSearchRequest;
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
 import com.team02.mopl.domain.dm.dto.DirectMessageSearchRequest;
 import com.team02.mopl.domain.dm.exception.ConversationForbiddenException;
+import com.team02.mopl.domain.dm.exception.DirectMessageNotFoundException;
 import com.team02.mopl.domain.dm.service.DirectMessageService;
 import com.team02.mopl.domain.user.dto.UserSummary;
 import com.team02.mopl.global.dto.CursorResponse;
@@ -185,5 +188,68 @@ class DirectMessageControllerTest {
                 .with(authentication(new TestingAuthenticationToken(userId, null))))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.exceptionName").value("ConversationForbiddenException"));
+  }
+
+  @Test
+  @DisplayName("DM 읽음 처리 성공 시 204를 반환한다")
+  void markDirectMessageAsRead_success_returns204() throws Exception {
+    UUID userId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+    UUID directMessageId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post(
+                    "/api/conversations/{conversationId}/direct-messages/{directMessageId}/read",
+                    conversationId,
+                    directMessageId)
+                .with(authentication(new TestingAuthenticationToken(userId, null))))
+        .andExpect(status().isNoContent());
+
+    verify(directMessageService).markAsRead(conversationId, directMessageId, userId);
+  }
+
+  @Test
+  @DisplayName("DM 읽음 처리 시 대화방 참여자가 아니면 403을 반환한다")
+  void markDirectMessageAsRead_notMember_returns403() throws Exception {
+    UUID userId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+    UUID directMessageId = UUID.randomUUID();
+
+    willThrow(new ConversationForbiddenException())
+        .given(directMessageService)
+        .markAsRead(conversationId, directMessageId, userId);
+
+    mockMvc
+        .perform(
+            post(
+                    "/api/conversations/{conversationId}/direct-messages/{directMessageId}/read",
+                    conversationId,
+                    directMessageId)
+                .with(authentication(new TestingAuthenticationToken(userId, null))))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.exceptionName").value("ConversationForbiddenException"));
+  }
+
+  @Test
+  @DisplayName("DM 읽음 처리 시 DM을 찾을 수 없으면 404를 반환한다")
+  void markDirectMessageAsRead_dmNotFound_returns404() throws Exception {
+    UUID userId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+    UUID directMessageId = UUID.randomUUID();
+
+    willThrow(new DirectMessageNotFoundException())
+        .given(directMessageService)
+        .markAsRead(conversationId, directMessageId, userId);
+
+    mockMvc
+        .perform(
+            post(
+                    "/api/conversations/{conversationId}/direct-messages/{directMessageId}/read",
+                    conversationId,
+                    directMessageId)
+                .with(authentication(new TestingAuthenticationToken(userId, null))))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.exceptionName").value("DirectMessageNotFoundException"));
   }
 }

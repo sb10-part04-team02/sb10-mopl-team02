@@ -14,7 +14,7 @@ public interface ReviewRepositoryCustom {
       UUID contentId,
       ReviewSortBy sortBy,
       SortDirection direction,
-      String cursor,
+      Comparable<?> cursor,
       UUID idAfter,
       int limit);
 }
