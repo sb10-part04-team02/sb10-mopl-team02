@@ -12,6 +12,7 @@ import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.support.RepositoryTestSupport;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
@@ -296,6 +297,58 @@ class PlaylistRepositoryTest extends RepositoryTestSupport {
 
     assertThat(result).extracting(Playlist::getId).containsExactly(high.getId());
     assertThat(result).doesNotContain(low);
+  }
+
+  @Test
+  @DisplayName("increaseSubscriberCount는 구독자 수만 1 증가시키고 updatedAt은 갱신하지 않는다")
+  void increaseSubscriberCount_incrementsCount_withoutTouchingUpdatedAt() {
+    Playlist playlist = playlistRepository.save(new Playlist(ownerId, "리스트", "설명"));
+    em.flush();
+    em.clear();
+    // DB에 저장된 값 기준으로 updatedAt을 확보 (인메모리 Instant와 DB 정밀도 차이 방지)
+    Instant updatedAtBefore =
+        playlistRepository.findById(playlist.getId()).orElseThrow().getUpdatedAt();
+
+    playlistRepository.increaseSubscriberCount(playlist.getId());
+    em.flush();
+    em.clear();
+
+    Playlist reloaded = playlistRepository.findById(playlist.getId()).orElseThrow();
+    assertThat(reloaded.getSubscriberCount()).isEqualTo(1L);
+    assertThat(reloaded.getUpdatedAt()).isEqualTo(updatedAtBefore);
+  }
+
+  @Test
+  @DisplayName("decreaseSubscriberCount는 구독자 수만 1 감소시키고 updatedAt은 갱신하지 않는다")
+  void decreaseSubscriberCount_decrementsCount_withoutTouchingUpdatedAt() {
+    Playlist playlist = savePlaylistWithSubscriberCount("리스트", 2L);
+    em.flush();
+    em.clear();
+    // DB에 저장된 값 기준으로 updatedAt을 확보 (인메모리 Instant와 DB 정밀도 차이 방지)
+    Instant updatedAtBefore =
+        playlistRepository.findById(playlist.getId()).orElseThrow().getUpdatedAt();
+
+    playlistRepository.decreaseSubscriberCount(playlist.getId());
+    em.flush();
+    em.clear();
+
+    Playlist reloaded = playlistRepository.findById(playlist.getId()).orElseThrow();
+    assertThat(reloaded.getSubscriberCount()).isEqualTo(1L);
+    assertThat(reloaded.getUpdatedAt()).isEqualTo(updatedAtBefore);
+  }
+
+  @Test
+  @DisplayName("decreaseSubscriberCount는 구독자 수가 0이면 음수로 내려가지 않는다")
+  void decreaseSubscriberCount_doesNotGoBelowZero() {
+    Playlist playlist = playlistRepository.save(new Playlist(ownerId, "리스트", "설명"));
+    em.flush();
+
+    playlistRepository.decreaseSubscriberCount(playlist.getId());
+    em.flush();
+    em.clear();
+
+    Playlist reloaded = playlistRepository.findById(playlist.getId()).orElseThrow();
+    assertThat(reloaded.getSubscriberCount()).isZero();
   }
 
   private Playlist savePlaylistWithSubscriberCount(String title, long subscriberCount) {
