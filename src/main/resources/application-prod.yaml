@@ -20,3 +20,11 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+
+app:
+  storage:
+    type: s3
+    s3:
+      bucket: ${AWS_S3_BUCKET}
+      region: ${AWS_S3_REGION}
+      base-url: ${AWS_S3_BASE_URL}

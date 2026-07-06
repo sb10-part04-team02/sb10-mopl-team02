@@ -78,8 +78,22 @@ dependencies {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 's3-live' // 실제 AWS S3 자격증명이 필요한 라이브 테스트는 기본 실행에서 제외
+    }
     finalizedBy jacocoTestReport
+}
+
+// 실제 AWS S3 버킷에 접속하는 라이브 테스트 전용 태스크. 수동으로만 실행:
+// ./gradlew liveS3Test
+tasks.register('liveS3Test', Test) {
+    description = 'Runs live tests against a real AWS S3 bucket (requires AWS credentials)'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 's3-live'
+    }
 }
 
 jacoco {
