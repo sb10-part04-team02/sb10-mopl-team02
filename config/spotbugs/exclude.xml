@@ -30,6 +30,11 @@
     <Match>
         <Class name="com.team02.mopl.global.websocket.StompChannelInterceptor"/>
     </Match>
+    <!-- 위와 동일: 도메인 websocket 패키지의 컴포넌트도 DI 협력 빈 저장이 설계 의도이므로 오탐 제외 -->
+    <Match>
+        <Class name="~com\.team02\.mopl\.domain\.(.*\.)?websocket\..*"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
     <!-- 위와 동일한 문제지만 Registry는 위쪽의 패키지들과 다른 성질의 그룹인것 같아 따로 추가함-->
     <Match>
       <Class name="~com\.team02\.mopl\.domain\.auth\.jwt\.(JwtRegistry|JwtAuthenticationProvider|handler\..*)"/>

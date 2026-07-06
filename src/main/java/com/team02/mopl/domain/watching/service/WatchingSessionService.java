@@ -6,9 +6,14 @@ import com.team02.mopl.domain.content.entity.Tag;
 import com.team02.mopl.domain.content.exception.ContentNotFoundException;
 import com.team02.mopl.domain.content.repository.ContentRepository;
 import com.team02.mopl.domain.content.repository.TagRepository;
+import com.team02.mopl.domain.user.entity.User;
+import com.team02.mopl.domain.user.exception.UserNotFoundException;
+import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.domain.watching.dto.WatchingSessionChange;
 import com.team02.mopl.domain.watching.dto.WatchingSessionDto;
 import com.team02.mopl.domain.watching.dto.WatchingSessionSearchRequest;
 import com.team02.mopl.domain.watching.entity.WatchingSession;
+import com.team02.mopl.domain.watching.enums.ChangeType;
 import com.team02.mopl.domain.watching.enums.WatchingSessionSortBy;
 import com.team02.mopl.domain.watching.mapper.WatchingSessionMapper;
 import com.team02.mopl.domain.watching.repository.WatchingSessionRepository;
@@ -20,6 +25,7 @@ import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +40,47 @@ public class WatchingSessionService {
   private final WatchingSessionRepository watchingSessionRepository;
   private final ContentRepository contentRepository;
   private final TagRepository tagRepository;
+  private final UserRepository userRepository;
   private final WatchingSessionMapper watchingSessionMapper;
+
+  // 시청 세션 참여: 세션을 생성하고 구독자들에게 전파할 JOIN 변경 정보를 반환한다.
+  @Transactional
+  public WatchingSessionChange join(UUID contentId, UUID userId) {
+    Content content =
+        contentRepository
+            .findByIdAndDeletedAtIsNull(contentId)
+            .orElseThrow(ContentNotFoundException::new);
+    User watcher =
+        userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
+
+    WatchingSession session =
+        watchingSessionRepository.save(new WatchingSession(content, watcher, Instant.now(), null));
+
+    return toChange(ChangeType.JOIN, session, content);
+  }
+
+  // 시청 세션 이탈: 세션을 종료하고 전파할 LEAVE 변경 정보를 반환한다. 이미 종료됐거나 없으면 empty.
+  @Transactional
+  public Optional<WatchingSessionChange> leave(UUID watchingSessionId) {
+    return watchingSessionRepository
+        .findById(watchingSessionId)
+        .filter(session -> session.getExitedAt() == null && !session.isDeleted())
+        .map(
+            session -> {
+              session.exit();
+              return toChange(ChangeType.LEAVE, session, session.getContent());
+            });
+  }
+
+  private WatchingSessionChange toChange(
+      ChangeType type, WatchingSession session, Content content) {
+    List<Tag> tags = tagRepository.findByContentIdAndDeletedAtIsNull(content.getId());
+    WatchingSessionDto dto =
+        watchingSessionMapper.toDto(session, watchingSessionMapper.toContentSummary(content, tags));
+    // JPQL 실행 전 auto-flush로 방금 생성/종료된 세션이 집계에 반영된다.
+    long watcherCount = watchingSessionRepository.countActiveByContentId(content.getId());
+    return new WatchingSessionChange(type, dto, watcherCount);
+  }
 
   // 특정 콘텐츠의 활성 시청 세션 목록 조회 (커서 페이지네이션 + 시청자 이름 필터)
   @Transactional(readOnly = true)
