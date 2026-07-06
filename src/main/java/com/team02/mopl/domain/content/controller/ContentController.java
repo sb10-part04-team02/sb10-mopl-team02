@@ -56,12 +56,6 @@ public class ContentController implements ContentApi {
     return ResponseEntity.ok(contentService.getContents(request));
   }
 
-  //  @Override
-  //  @GetMapping("/{contentId}/watching-sessions")
-  //  public ResponseEntity<CursorResponse<WatchingSessionDto>> getWatchingSessions(
-  //      return null;
-  //  }
-
   //  @PreAuthorize("hasRole('ADMIN')")
 
   @Override
