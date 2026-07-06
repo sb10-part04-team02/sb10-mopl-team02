@@ -3,15 +3,12 @@ package com.team02.mopl.domain.follow.service;
 import com.team02.mopl.domain.follow.dto.FollowDto;
 import com.team02.mopl.domain.follow.dto.FollowRequest;
 import com.team02.mopl.domain.follow.entity.Follow;
+import com.team02.mopl.domain.follow.event.FollowCreatedEvent;
 import com.team02.mopl.domain.follow.exception.CannotFollowSelfException;
 import com.team02.mopl.domain.follow.exception.FollowAlreadyExistsException;
 import com.team02.mopl.domain.follow.exception.FollowForbiddenException;
 import com.team02.mopl.domain.follow.exception.FollowNotFoundException;
 import com.team02.mopl.domain.follow.repository.FollowRepository;
-import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
-import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
-import com.team02.mopl.domain.notification.entity.enums.NotificationType;
-import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.exception.BusinessException;
@@ -19,6 +16,7 @@ import com.team02.mopl.global.exception.ErrorCode;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +30,7 @@ public class FollowService {
 
   private final FollowRepository followRepository;
   private final UserRepository userRepository;
-  private final NotificationService notificationService;
+  private final ApplicationEventPublisher eventPublisher;
 
   // 특정 사용자를 팔로우하고, 팔로우 대상에게 알림을 생성한다.
   @Transactional
@@ -53,13 +51,7 @@ public class FollowService {
       throw new FollowAlreadyExistsException();
     }
 
-    notificationService.createNotification(
-        new NotificationCreateCommand(
-            followeeId,
-            "새 팔로워 알림",
-            follower.getName() + "님이 팔로우했습니다.",
-            NotificationLevel.INFO,
-            NotificationType.USER_FOLLOWED));
+    eventPublisher.publishEvent(new FollowCreatedEvent(followerId, follower.getName(), followeeId));
 
     return FollowDto.from(follow);
   }

@@ -17,10 +17,13 @@ import com.team02.mopl.domain.dm.enums.DirectMessageSortBy;
 import com.team02.mopl.domain.dm.exception.ConversationAlreadyExistsException;
 import com.team02.mopl.domain.dm.exception.ConversationForbiddenException;
 import com.team02.mopl.domain.dm.exception.ConversationNotFoundException;
+import com.team02.mopl.domain.dm.exception.DirectMessageNotFoundException;
 import com.team02.mopl.domain.dm.exception.SelfConversationException;
 import com.team02.mopl.domain.dm.repository.ConversationMemberRepository;
 import com.team02.mopl.domain.dm.repository.ConversationRepository;
 import com.team02.mopl.domain.dm.repository.DirectMessageRepository;
+import com.team02.mopl.domain.dm.util.ConversationCursorConverter;
+import com.team02.mopl.domain.dm.util.DirectMessageCursorConverter;
 import com.team02.mopl.domain.user.dto.UserSummary;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -28,6 +31,7 @@ import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
+import com.team02.mopl.global.exception.ErrorCode;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -163,9 +167,16 @@ public class DirectMessageService {
     int limit = CursorPageRequest.normalizeLimit(request.limit());
     SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
 
+    if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
+      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+    }
+
+    Instant cursor =
+        ConversationCursorConverter.toSortKey(ConversationSortBy.CREATED_AT, request.cursor());
+
     List<Conversation> conversations =
         conversationRepository.findConversationsByCursor(
-            requesterId, direction, request.cursor(), request.idAfter(), limit + 1);
+            requesterId, direction, cursor, request.idAfter(), limit + 1);
 
     boolean hasNext = conversations.size() > limit;
     List<Conversation> page = hasNext ? conversations.subList(0, limit) : conversations;
@@ -202,9 +213,16 @@ public class DirectMessageService {
     int limit = CursorPageRequest.normalizeLimit(request.limit());
     SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
 
+    if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
+      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+    }
+
+    Instant cursor =
+        DirectMessageCursorConverter.toSortKey(DirectMessageSortBy.CREATED_AT, request.cursor());
+
     List<DirectMessage> messages =
         directMessageRepository.findDirectMessagesByCursor(
-            conversationId, direction, request.cursor(), request.idAfter(), limit + 1);
+            conversationId, direction, cursor, request.idAfter(), limit + 1);
 
     boolean hasNext = messages.size() > limit;
     List<DirectMessage> page = hasNext ? messages.subList(0, limit) : messages;
@@ -259,6 +277,25 @@ public class DirectMessageService {
     eventPublisher.publishEvent(new DmSentEvent(receiverUserId, saved.getId().toString(), dto));
 
     return dto;
+  }
+
+  @Transactional
+  public void markAsRead(UUID conversationId, UUID directMessageId, UUID requesterId) {
+    ConversationMember requesterMember =
+        conversationMemberRepository
+            .findByConversationIdAndUserId(conversationId, requesterId)
+            .orElseThrow(ConversationForbiddenException::new);
+
+    DirectMessage directMessage =
+        directMessageRepository
+            .findByIdAndConversationId(directMessageId, conversationId)
+            .orElseThrow(DirectMessageNotFoundException::new);
+
+    // 동시 요청 간 lost update를 막기 위해 조건부 UPDATE로 원자적으로 읽음 시점을 전진시킨다(뒤로 이동은 쿼리에서 차단).
+    // 벌크 UPDATE는 영속성 컨텍스트에 반영되지 않으므로, 이후 이 트랜잭션에서 requesterMember.getLastReadAt()을
+    // 다시 읽어야 한다면 @Modifying(clearAutomatically = true)가 필요하다. 현재는 이후 참조가 없어 불필요하다.
+    conversationMemberRepository.advanceLastReadAt(
+        requesterMember.getId(), directMessage.getCreatedAt());
   }
 
   private List<ConversationDto> buildConversationDtos(List<Conversation> page, UUID requesterId) {

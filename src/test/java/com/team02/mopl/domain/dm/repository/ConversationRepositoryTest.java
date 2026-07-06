@@ -1,12 +1,9 @@
 package com.team02.mopl.domain.dm.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.support.RepositoryTestSupport;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
@@ -77,7 +74,7 @@ class ConversationRepositoryTest extends RepositoryTestSupport {
 
     List<Conversation> result =
         conversationRepository.findConversationsByCursor(
-            userId, SortDirection.DESCENDING, conv3.getCreatedAt().toString(), conv3.getId(), 10);
+            userId, SortDirection.DESCENDING, conv3.getCreatedAt(), conv3.getId(), 10);
 
     assertThat(result)
         .extracting(Conversation::getId)
@@ -110,30 +107,6 @@ class ConversationRepositoryTest extends RepositoryTestSupport {
             userId, SortDirection.DESCENDING, null, null, 2);
 
     assertThat(result).hasSize(2);
-  }
-
-  @Test
-  @DisplayName("cursor만 있고 idAfter가 없으면 INVALID_REQUEST 예외가 발생한다")
-  void findConversationsByCursor_cursorWithoutIdAfter_throwsInvalidRequest() {
-    assertThatThrownBy(
-            () ->
-                conversationRepository.findConversationsByCursor(
-                    userId, SortDirection.DESCENDING, "2026-06-29T00:00:00Z", null, 10))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
-  }
-
-  @Test
-  @DisplayName("잘못된 cursor 형식이면 INVALID_REQUEST 예외가 발생한다")
-  void findConversationsByCursor_invalidCursor_throwsInvalidRequest() {
-    assertThatThrownBy(
-            () ->
-                conversationRepository.findConversationsByCursor(
-                    userId, SortDirection.DESCENDING, "not-a-date", UUID.randomUUID(), 10))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
   }
 
   @Test

@@ -63,4 +63,13 @@ public class DirectMessageController implements DirectMessageApi {
     return ResponseEntity.ok(
         directMessageService.getDirectMessages(conversationId, userId, request));
   }
+
+  @PostMapping("/{conversationId}/direct-messages/{directMessageId}/read")
+  public ResponseEntity<Void> markDirectMessageAsRead(
+      @AuthenticationPrincipal UUID userId,
+      @PathVariable UUID conversationId,
+      @PathVariable UUID directMessageId) {
+    directMessageService.markAsRead(conversationId, directMessageId, userId);
+    return ResponseEntity.noContent().build();
+  }
 }
