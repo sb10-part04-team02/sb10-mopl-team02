@@ -54,7 +54,7 @@ public class UserService {
           userRepository.saveAndFlush(
               new User(request.name(), request.email(), encryptedPassword, null, Role.USER, false));
     } catch (DataIntegrityViolationException e) {
-      throw new UserEmailDuplicateException();
+      throw new UserEmailDuplicateException(e);
     }
     UserDto userDto = userMapper.toDto(savedUser);
 
