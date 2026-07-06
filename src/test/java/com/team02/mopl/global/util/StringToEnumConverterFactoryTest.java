@@ -85,6 +85,15 @@ class StringToEnumConverterFactoryTest {
   }
 
   @Test
+  @DisplayName("Enum과 매칭되지 않는 값이 오면 400을 반환한다")
+  void fail_shouldReturn400OnWebLayer_whenValueIsInvalid() throws Exception {
+    // when & then
+    mockMvc
+        .perform(get("/test/convert").param("sortBy", "invalid value"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   @DisplayName("getValue함수가 없는 일반 Enum은 대소문자가 같지 않으면 예외를 던진다")
   void fail_shouldThrowException_whenEnumHasNoMatchingValue() {
     // given

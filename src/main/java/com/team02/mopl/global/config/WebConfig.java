@@ -1,9 +1,11 @@
 package com.team02.mopl.global.config;
 
+import com.team02.mopl.global.util.StringToEnumConverterFactory;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.format.FormatterRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -11,12 +13,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
+  private final StringToEnumConverterFactory stringToEnumConverterFactory;
   private final String basePath;
   private final String baseUrl;
 
   public WebConfig(
+      StringToEnumConverterFactory stringToEnumConverterFactory,
       @Value("${app.storage.local.base-path:storage}") String basePath,
       @Value("${app.storage.local.base-url:/files}") String baseUrl) {
+    this.stringToEnumConverterFactory = stringToEnumConverterFactory;
     this.basePath = basePath;
     this.baseUrl = baseUrl;
   }
@@ -30,5 +35,10 @@ public class WebConfig implements WebMvcConfigurer {
     }
     // 예: /files/** -> file:///.../storage/
     registry.addResourceHandler(baseUrl + "/**").addResourceLocations(location);
+  }
+
+  @Override
+  public void addFormatters(FormatterRegistry registry) {
+    registry.addConverterFactory(stringToEnumConverterFactory);
   }
 }
