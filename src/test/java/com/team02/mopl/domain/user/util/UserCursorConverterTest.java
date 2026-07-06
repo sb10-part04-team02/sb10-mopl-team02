@@ -30,6 +30,7 @@ class UserCursorConverterTest {
           Arguments.of(UserSortBy.NAME, String.class, "이름"),
           Arguments.of(UserSortBy.EMAIL, String.class, "example@gmail.com"),
           Arguments.of(UserSortBy.CREATED_AT, Instant.class, Instant.now().toString()),
+          Arguments.of(UserSortBy.IS_LOCKED, Boolean.class, "false"),
           Arguments.of(UserSortBy.IS_LOCKED, Boolean.class, "true"),
           Arguments.of(UserSortBy.ROLE, Role.class, Role.USER.name()));
     }
@@ -66,6 +67,7 @@ class UserCursorConverterTest {
     private static Stream<Arguments> provideInValidCursor() {
       return Stream.of(
           Arguments.of(UserSortBy.CREATED_AT, "invalid instant", "유효하지 않은 instant"),
+          Arguments.of(UserSortBy.IS_LOCKED, "invalid boolean", "유효하지 않은 isLocked"),
           Arguments.of(UserSortBy.ROLE, "invalid Role", "유효하지않은 Role값"));
     }
 

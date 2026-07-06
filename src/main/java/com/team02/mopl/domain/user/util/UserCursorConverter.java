@@ -20,7 +20,7 @@ public final class UserCursorConverter {
       return switch (sortBy) {
         case NAME, EMAIL -> cursor;
         case CREATED_AT -> Instant.parse(cursor);
-        case IS_LOCKED -> Boolean.parseBoolean(cursor);
+        case IS_LOCKED -> parseBooleanCursor(cursor);
         case ROLE -> Role.valueOf(cursor);
       };
     } catch (DateTimeParseException | IllegalArgumentException e) {
@@ -37,5 +37,12 @@ public final class UserCursorConverter {
       case IS_LOCKED -> Boolean.toString(last.isLocked());
       case ROLE -> last.getRole().name();
     };
+  }
+
+  private static Boolean parseBooleanCursor(String cursor) {
+    if (!"true".equalsIgnoreCase(cursor) && !"false".equalsIgnoreCase(cursor)) {
+      throw new IllegalArgumentException();
+    }
+    return Boolean.parseBoolean(cursor);
   }
 }
