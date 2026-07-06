@@ -1,10 +1,12 @@
 package com.team02.mopl.global.util;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.team02.mopl.domain.user.enums.UserSortBy;
+import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.support.TestSecurityConfiguration;
 import com.team02.mopl.support.TestWebMvcConfiguration;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -61,34 +64,58 @@ class StringToEnumConverterFactoryTest {
 
   @Test
   @DisplayName("공백 문자열이 들어오면 예외를 던진다")
-  void fail_shouldReturnThrowException_whenParamIsEmpty() throws Exception {
+  void fail_shouldReturnThrowException_whenParamIsEmpty() {
+    // given
+    StringToEnumConverterFactory factory = new StringToEnumConverterFactory();
+    Converter<String, UserSortBy> converter = factory.getConverter(UserSortBy.class);
+
     // when & then
-    mockMvc
-        .perform(get("/test/convert").param("sortBy", "       "))
-        // 파라미터 옵션 required=true로 설정시
-        // 컨버터 도달전에 내부적으로 MissingServletRequestParameterException를 진행함
-        // 방어적인 코드를 위해 required를 false로 설정하니 커스텀Exception 도달하는 것을 확인
-        // 그런데 spring에선 예외와 별개로 enum타입에 null 주입하는걸 확인했고
-        // 테스트를 위해 "NULL"을 반환하게 진행했음
-        .andExpect(content().string("NULL"));
+    assertThrows(BusinessException.class, () -> converter.convert("       "));
   }
 
   @Test
   @DisplayName("Enum과 매칭되지 않는 값이 오면 예외를 던진다")
-  void fail_shouldThrowException_whenValueIsInvalid() throws Exception {
+  void fail_shouldThrowException_whenValueIsInvalid() {
+    // given
+    StringToEnumConverterFactory factory = new StringToEnumConverterFactory();
+    Converter<String, UserSortBy> converter = factory.getConverter(UserSortBy.class);
+
     // when & then
-    mockMvc
-        .perform(get("/test/convert").param("sortBy", "invalid value"))
-        .andExpect(status().isBadRequest());
+    assertThrows(BusinessException.class, () -> converter.convert("invalid value"));
   }
 
   @Test
   @DisplayName("getValue함수가 없는 일반 Enum은 대소문자가 같지 않으면 예외를 던진다")
-  void fail_shouldThrowException_whenEnumHasNoMatchingValue() throws Exception {
+  void fail_shouldThrowException_whenEnumHasNoMatchingValue() {
+    // given
+    StringToEnumConverterFactory factory = new StringToEnumConverterFactory();
+    Converter<String, EnumWithoutGetValue> converter =
+        factory.getConverter(EnumWithoutGetValue.class);
+
     // when & then
-    mockMvc
-        .perform(get("/test/convert2").param("testRole", "user"))
-        .andExpect(status().isBadRequest()); // TestRole엔 ADMIN만 있음
+    assertThrows(BusinessException.class, () -> converter.convert("invalid value"));
+  }
+
+  @Test
+  @DisplayName("getValue 반환타입이 String이 아니면 예외를 던진다")
+  void fail_shouldThrowException_whenGetValueTypeIsNotString() {
+    // given
+    StringToEnumConverterFactory factory = new StringToEnumConverterFactory();
+    Converter<String, IntegerEnum> converter = factory.getConverter(IntegerEnum.class);
+
+    // when & then
+    assertThrows(BusinessException.class, () -> converter.convert("invalid value"));
+  }
+
+  @Test
+  @DisplayName("Reflection invoke함수에 문제가 생기면 예외를 던진다")
+  void fail_shouldThrowException_whenReflectionInvokeThrowsException() {
+    // given
+    StringToEnumConverterFactory factory = new StringToEnumConverterFactory();
+    Converter<String, BrokenEnum> converter = factory.getConverter(BrokenEnum.class);
+
+    // when & then
+    assertThrows(BusinessException.class, () -> converter.convert("invalid value"));
   }
 
   // 테스트용 컨트롤러
@@ -100,14 +127,25 @@ class StringToEnumConverterFactoryTest {
         @RequestParam(value = "sortBy", required = false) UserSortBy sortBy) {
       return ResponseEntity.ok(sortBy != null ? sortBy.name() : "NULL");
     }
+  }
 
-    @GetMapping("/test/convert2")
-    public ResponseEntity<String> testConvert2(@RequestParam(value = "testRole") TestRole role) {
-      return ResponseEntity.ok(role.name());
+  enum EnumWithoutGetValue {
+    TEST;
+  }
+
+  enum IntegerEnum {
+    NUMBER;
+
+    public int getValue() {
+      return 99;
     }
   }
 
-  enum TestRole {
-    ADMIN
+  enum BrokenEnum {
+    BROKEN_ENUM;
+
+    public String getValue() throws ReflectiveOperationException {
+      throw new ReflectiveOperationException();
+    }
   }
 }

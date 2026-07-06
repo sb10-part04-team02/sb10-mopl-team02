@@ -2,7 +2,6 @@ package com.team02.mopl.global.util;
 
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -20,9 +19,18 @@ public class StringToEnumConverterFactory implements ConverterFactory<String, En
 
   private static final class StringToEnumConverter<T extends Enum> implements Converter<String, T> {
     private final Class<T> enumType;
+    private final Method valueMethod; // method 캐싱용
 
     public StringToEnumConverter(Class<T> enumType) {
       this.enumType = enumType;
+
+      Method method = null;
+      try {
+        method = enumType.getMethod("getValue");
+      } catch (NoSuchMethodException e) {
+        // getValue가 없는 enum은 null로 유지
+      }
+      this.valueMethod = method;
     }
 
     @Override
@@ -38,17 +46,19 @@ public class StringToEnumConverterFactory implements ConverterFactory<String, En
         }
       }
 
-      try {
-        Method getValueMethod = enumType.getMethod("getValue");
-        for (T enumConstant : enumType.getEnumConstants()) {
-          String value = (String) getValueMethod.invoke(enumConstant);
-          // Enum getValue()함수 활용. 필드 내부의 값과 비교
-          if (value != null && value.equalsIgnoreCase(source)) {
-            return enumConstant;
+      // 캐싱된 메서드 있을때만 실행
+      if (valueMethod != null) {
+        try {
+          for (T enumConstant : enumType.getEnumConstants()) {
+            Object value = valueMethod.invoke(enumConstant);
+            // Enum getValue()함수 활용. 필드 내부의 값과 비교
+            if (value instanceof String stringValue && stringValue.equalsIgnoreCase(source)) {
+              return enumConstant;
+            }
           }
+        } catch (ReflectiveOperationException e) {
+          log.warn("getValue() 호출 중 예외 발생: enumType={}", enumType, e);
         }
-      } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-        // getValue() 메서드가 없는 일반 Enum은 통과
       }
 
       throw new BusinessException(ErrorCode.INVALID_ENUM_VALUE);
