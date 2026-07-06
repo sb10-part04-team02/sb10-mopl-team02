@@ -240,7 +240,7 @@ class WatchingSessionServiceTest {
   }
 
   @Test
-  @DisplayName("join은 시청 세션을 저장하고 JOIN 변경 정보와 시청자 수를 반환한다")
+  @DisplayName("join은 활성 세션이 없으면 새 시청 세션을 저장하고 JOIN 변경 정보와 시청자 수를 반환한다")
   void join_savesSessionAndReturnsJoinChange() {
     // given
     UUID contentId = UUID.randomUUID();
@@ -250,6 +250,8 @@ class WatchingSessionServiceTest {
     User watcher = mockUser(userId, "시청자", null);
     given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(watcher));
 
+    given(watchingSessionRepository.findByContent_IdAndUser_IdAndDeletedAtIsNull(contentId, userId))
+        .willReturn(Optional.empty());
     WatchingSession saved = mockSession(UUID.randomUUID(), Instant.now(), watcher);
     given(watchingSessionRepository.save(any(WatchingSession.class))).willReturn(saved);
     given(watchingSessionRepository.countActiveByContentId(contentId)).willReturn(3L);
@@ -266,6 +268,68 @@ class WatchingSessionServiceTest {
     assertThat(change.watchingSession()).isEqualTo(dto);
     assertThat(change.watcherCount()).isEqualTo(3L);
     verify(watchingSessionRepository).save(any(WatchingSession.class));
+  }
+
+  @Test
+  @DisplayName("join 시 활성 세션이 이미 있으면(중복 SUBSCRIBE) 새로 만들지 않고 재사용한다")
+  void join_activeSessionExists_reusesWithoutSaving() {
+    // given
+    UUID contentId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Content content = mockContent(contentId);
+    givenContent(contentId, content);
+    User watcher = mockUser(userId, "시청자", null);
+    given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(watcher));
+
+    WatchingSession existing = mockSession(UUID.randomUUID(), Instant.now(), watcher);
+    given(existing.getExitedAt()).willReturn(null);
+    given(watchingSessionRepository.findByContent_IdAndUser_IdAndDeletedAtIsNull(contentId, userId))
+        .willReturn(Optional.of(existing));
+    given(watchingSessionRepository.countActiveByContentId(contentId)).willReturn(1L);
+
+    WatchingSessionDto dto =
+        new WatchingSessionDto(existing.getId(), existing.getCreatedAt(), null, null);
+    given(watchingSessionMapper.toDto(eq(existing), any())).willReturn(dto);
+
+    // when
+    WatchingSessionChange change = watchingSessionService.join(contentId, userId);
+
+    // then
+    assertThat(change.type()).isEqualTo(ChangeType.JOIN);
+    assertThat(change.watchingSession()).isEqualTo(dto);
+    assertThat(change.watcherCount()).isEqualTo(1L);
+    verify(watchingSessionRepository, never()).save(any(WatchingSession.class));
+    verify(existing, never()).rejoin();
+  }
+
+  @Test
+  @DisplayName("join 시 종료됐지만 삭제되지 않은 세션이 있으면 재활성화한다")
+  void join_exitedUndeletedSessionExists_rejoins() {
+    // given
+    UUID contentId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Content content = mockContent(contentId);
+    givenContent(contentId, content);
+    User watcher = mockUser(userId, "시청자", null);
+    given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(watcher));
+
+    WatchingSession existing = mockSession(UUID.randomUUID(), Instant.now(), watcher);
+    given(existing.getExitedAt()).willReturn(Instant.now());
+    given(watchingSessionRepository.findByContent_IdAndUser_IdAndDeletedAtIsNull(contentId, userId))
+        .willReturn(Optional.of(existing));
+    given(watchingSessionRepository.countActiveByContentId(contentId)).willReturn(1L);
+
+    WatchingSessionDto dto =
+        new WatchingSessionDto(existing.getId(), existing.getCreatedAt(), null, null);
+    given(watchingSessionMapper.toDto(eq(existing), any())).willReturn(dto);
+
+    // when
+    WatchingSessionChange change = watchingSessionService.join(contentId, userId);
+
+    // then
+    assertThat(change.type()).isEqualTo(ChangeType.JOIN);
+    verify(existing).rejoin();
+    verify(watchingSessionRepository, never()).save(any(WatchingSession.class));
   }
 
   @Test
@@ -326,6 +390,8 @@ class WatchingSessionServiceTest {
     assertThat(change.get().watchingSession()).isEqualTo(dto);
     assertThat(change.get().watcherCount()).isEqualTo(0L);
     verify(session).exit();
+    // 부분 유니크 인덱스 자리를 비워 재시청이 가능해야 한다.
+    verify(session).delete();
   }
 
   @Test

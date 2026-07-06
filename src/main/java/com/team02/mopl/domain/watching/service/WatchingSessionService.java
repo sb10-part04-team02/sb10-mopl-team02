@@ -53,8 +53,22 @@ public class WatchingSessionService {
     User watcher =
         userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
 
+    // 유저·콘텐츠당 삭제되지 않은 세션은 1건만 허용(부분 유니크 인덱스)되므로,
+    // 중복 SUBSCRIBE(중복 탭, 재연결)로 세션이 이미 있으면 새로 만들지 않고 재사용한다.
     WatchingSession session =
-        watchingSessionRepository.save(new WatchingSession(content, watcher, Instant.now(), null));
+        watchingSessionRepository
+            .findByContent_IdAndUser_IdAndDeletedAtIsNull(contentId, userId)
+            .map(
+                existing -> {
+                  if (existing.getExitedAt() != null) {
+                    existing.rejoin(); // 종료됐지만 삭제되지 않은 과거 데이터 방어
+                  }
+                  return existing;
+                })
+            .orElseGet(
+                () ->
+                    watchingSessionRepository.save(
+                        new WatchingSession(content, watcher, Instant.now(), null)));
 
     return toChange(ChangeType.JOIN, session, content);
   }
@@ -72,6 +86,8 @@ public class WatchingSessionService {
                 throw new BusinessException(ErrorCode.FORBIDDEN);
               }
               session.exit();
+              // 부분 유니크 인덱스(deleted_at IS NULL) 자리를 비워 재시청 시 새 세션을 만들 수 있게 한다.
+              session.delete();
               return toChange(ChangeType.LEAVE, session, session.getContent());
             });
   }
