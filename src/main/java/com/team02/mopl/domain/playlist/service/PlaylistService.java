@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -224,7 +225,11 @@ public class PlaylistService {
       throw new PlaylistContentAlreadyExistsException();
     }
 
-    playlistContentRepository.save(new PlaylistContent(playlist, content.getId()));
+    try {
+      playlistContentRepository.saveAndFlush(new PlaylistContent(playlist, content.getId()));
+    } catch (DataIntegrityViolationException e) {
+      throw new PlaylistContentAlreadyExistsException();
+    }
 
     // TODO: 구독 중인 플레이리스트에 콘텐츠가 추가되면 구독자에게 알림을 보내야 한다
     //  (NotificationType.PLAYLIST_CONTENT_ADDED). create()처럼 커밋 이후 이벤트 리스너에서

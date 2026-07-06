@@ -56,6 +56,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 // TODO: JWT 인증 연결 후 PlaylistController @WebMvcTest 추가
@@ -730,7 +731,7 @@ class PlaylistServiceTest {
 
       // then
       ArgumentCaptor<PlaylistContent> captor = ArgumentCaptor.forClass(PlaylistContent.class);
-      then(playlistContentRepository).should().save(captor.capture());
+      then(playlistContentRepository).should().saveAndFlush(captor.capture());
       assertThat(captor.getValue().getPlaylist()).isEqualTo(playlist);
       assertThat(captor.getValue().getContentId()).isEqualTo(contentId);
     }
@@ -742,7 +743,7 @@ class PlaylistServiceTest {
 
       assertThatThrownBy(() -> playlistService.addContent(playlistId, ownerId, contentId))
           .isInstanceOf(PlaylistNotFoundException.class);
-      then(playlistContentRepository).should(never()).save(any());
+      then(playlistContentRepository).should(never()).saveAndFlush(any());
     }
 
     @Test
@@ -755,7 +756,7 @@ class PlaylistServiceTest {
 
       assertThatThrownBy(() -> playlistService.addContent(playlistId, otherUserId, contentId))
           .isInstanceOf(PlaylistForbiddenException.class);
-      then(playlistContentRepository).should(never()).save(any());
+      then(playlistContentRepository).should(never()).saveAndFlush(any());
     }
 
     @Test
@@ -770,7 +771,7 @@ class PlaylistServiceTest {
           .isInstanceOfSatisfying(
               BusinessException.class,
               e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CONTENT_NOT_FOUND));
-      then(playlistContentRepository).should(never()).save(any());
+      then(playlistContentRepository).should(never()).saveAndFlush(any());
     }
 
     @Test
@@ -788,7 +789,26 @@ class PlaylistServiceTest {
 
       assertThatThrownBy(() -> playlistService.addContent(playlistId, ownerId, contentId))
           .isInstanceOf(PlaylistContentAlreadyExistsException.class);
-      then(playlistContentRepository).should(never()).save(any());
+      then(playlistContentRepository).should(never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("동시 추가로 유니크 제약을 위반하면 PLAYLIST_CONTENT_ALREADY_EXISTS 예외로 변환한다")
+    void fail_whenConcurrentInsertViolatesUniqueConstraint() {
+      Playlist playlist = new Playlist(ownerId, "제목", "설명");
+      Content content = new Content(ContentType.MOVIE, "영화", "설명", "http://img");
+      ReflectionTestUtils.setField(content, "id", contentId);
+      given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
+          .willReturn(Optional.of(playlist));
+      given(contentRepository.findByIdAndDeletedAtIsNull(contentId))
+          .willReturn(Optional.of(content));
+      given(playlistContentRepository.existsByPlaylistIdAndContentId(playlistId, contentId))
+          .willReturn(false);
+      given(playlistContentRepository.saveAndFlush(any()))
+          .willThrow(new DataIntegrityViolationException("unique violation"));
+
+      assertThatThrownBy(() -> playlistService.addContent(playlistId, ownerId, contentId))
+          .isInstanceOf(PlaylistContentAlreadyExistsException.class);
     }
   }
 
