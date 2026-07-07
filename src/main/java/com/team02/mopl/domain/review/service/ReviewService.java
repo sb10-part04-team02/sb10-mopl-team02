@@ -11,6 +11,9 @@ import com.team02.mopl.domain.review.exception.ReviewAlreadyExistsException;
 import com.team02.mopl.domain.review.mapper.ReviewMapper;
 import com.team02.mopl.domain.review.repository.ReviewRepository;
 import com.team02.mopl.domain.review.util.ReviewCursorConverter;
+import com.team02.mopl.domain.user.dto.UserSummary;
+import com.team02.mopl.domain.user.entity.User;
+import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
@@ -18,7 +21,9 @@ import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.global.util.OwnershipValidator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -34,6 +39,7 @@ public class ReviewService {
   private final ReviewRepository reviewRepository;
   private final ReviewMapper reviewMapper;
   private final ContentRatingService contentRatingService;
+  private final UserRepository userRepository;
 
   // 리뷰 목록 조회 (커서 페이지네이션)
   // contentId로 특정 콘텐츠 리뷰 필터링, createdAt/rating 정렬, 논리 삭제 제외
@@ -57,7 +63,7 @@ public class ReviewService {
     boolean hasNext = reviews.size() > limit;
     List<Review> page = hasNext ? reviews.subList(0, limit) : reviews;
 
-    List<ReviewDto> data = page.stream().map(reviewMapper::toDto).toList();
+    List<ReviewDto> data = toDtos(page);
     long totalCount = reviewRepository.countActive(request.contentId());
 
     String nextCursor = null;
@@ -92,7 +98,7 @@ public class ReviewService {
       throw new ReviewAlreadyExistsException();
     }
     contentRatingService.refreshAggregate(request.contentId());
-    ReviewDto reviewDto = reviewMapper.toDto(savedReview);
+    ReviewDto reviewDto = reviewMapper.toDto(savedReview, toAuthorSummary(authorId));
 
     log.info("리뷰 생성 성공: reviewId={}, authorId={}", reviewDto.id(), authorId);
     return reviewDto;
@@ -112,7 +118,7 @@ public class ReviewService {
     review.update(request.text(), request.rating());
     reviewRepository.flush();
     contentRatingService.refreshAggregate(review.getContentId());
-    ReviewDto reviewDto = reviewMapper.toDto(review);
+    ReviewDto reviewDto = reviewMapper.toDto(review, toAuthorSummary(review.getAuthorId()));
 
     log.info("리뷰 수정 성공: reviewId={}, requesterId={}", reviewId, requesterId);
     return reviewDto;
@@ -134,5 +140,34 @@ public class ReviewService {
     contentRatingService.refreshAggregate(review.getContentId());
 
     log.info("리뷰 삭제 성공: reviewId={}, requesterId={}", reviewId, requesterId);
+  }
+
+  // 목록용: 페이지의 작성자를 일괄 조회해 author까지 조립 (N+1 방지)
+  private List<ReviewDto> toDtos(List<Review> reviews) {
+    if (reviews.isEmpty()) {
+      return List.of();
+    }
+    List<UUID> authorIds = reviews.stream().map(Review::getAuthorId).distinct().toList();
+    Map<UUID, UserSummary> authorById =
+        userRepository.findAllById(authorIds).stream()
+            .filter(user -> !user.isDeleted())
+            .collect(Collectors.toMap(User::getId, reviewMapper::toUserSummary));
+
+    return reviews.stream()
+        .map(
+            review ->
+                reviewMapper.toDto(
+                    review,
+                    authorById.getOrDefault(
+                        review.getAuthorId(), new UserSummary(review.getAuthorId(), null, null))))
+        .toList();
+  }
+
+  // 작성자 요약. 작성자가 논리 삭제되어 없으면 id만 담은 요약으로 대체
+  private UserSummary toAuthorSummary(UUID authorId) {
+    return userRepository
+        .findByIdAndDeletedAtIsNull(authorId)
+        .map(reviewMapper::toUserSummary)
+        .orElseGet(() -> new UserSummary(authorId, null, null));
   }
 }
