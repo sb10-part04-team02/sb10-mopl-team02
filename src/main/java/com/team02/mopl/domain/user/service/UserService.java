@@ -2,6 +2,7 @@ package com.team02.mopl.domain.user.service;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
@@ -168,6 +169,9 @@ public class UserService {
 
     log.info("유저 권한변경 로직 완료: userId={}, role=[{} -> {}]", findUser.getId(), oldRole, newRole);
   }
+
+  @Transactional
+  public void updateLock(UUID userId, UserLockUpdateRequest request) {}
 
   private void validateOwner(UUID requesterId, UUID userId) {
     if (!userId.equals(requesterId)) {
