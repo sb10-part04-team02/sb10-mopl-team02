@@ -12,6 +12,7 @@ import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.dto.UserSummary;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +22,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class DmEventListenerTest {
@@ -67,5 +70,16 @@ class DmEventListenerTest {
     assertThat(command.notificationType()).isEqualTo(NotificationType.DIRECT_MESSAGE_RECEIVED);
 
     verify(sseEventService).send(eq(receiverId), eq("direct-messages"), eq(eventId), eq(dto));
+  }
+
+  @Test
+  @DisplayName("DM 전송 이벤트 리스너는 알림 저장을 새 트랜잭션에서 처리한다")
+  void onDmSent_hasRequiresNewTransaction() throws Exception {
+    Method method = DmEventListener.class.getMethod("onDmSent", DmSentEvent.class);
+
+    Transactional transactional = method.getAnnotation(Transactional.class);
+
+    assertThat(transactional).isNotNull();
+    assertThat(transactional.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
   }
 }
