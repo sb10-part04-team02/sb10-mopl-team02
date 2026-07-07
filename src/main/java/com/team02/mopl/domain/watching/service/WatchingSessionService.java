@@ -54,17 +54,11 @@ public class WatchingSessionService {
         userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
 
     // 유저·콘텐츠당 삭제되지 않은 세션은 1건만 허용(부분 유니크 인덱스)되므로,
-    // 중복 SUBSCRIBE(중복 탭, 재연결)로 세션이 이미 있으면 새로 만들지 않고 재사용한다.
+    // 중복 SUBSCRIBE(중복 탭, 재연결)로 활성 세션이 이미 있으면 새로 만들지 않고 재사용한다.
+    // leave가 종료와 소프트 삭제를 함께 수행하므로 삭제되지 않은 세션은 항상 활성 상태다.
     WatchingSession session =
         watchingSessionRepository
             .findByContent_IdAndUser_IdAndDeletedAtIsNull(contentId, userId)
-            .map(
-                existing -> {
-                  if (existing.getExitedAt() != null) {
-                    existing.rejoin(); // 종료됐지만 삭제되지 않은 과거 데이터 방어
-                  }
-                  return existing;
-                })
             .orElseGet(
                 () ->
                     watchingSessionRepository.save(

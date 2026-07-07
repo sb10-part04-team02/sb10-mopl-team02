@@ -282,7 +282,6 @@ class WatchingSessionServiceTest {
     given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(watcher));
 
     WatchingSession existing = mockSession(UUID.randomUUID(), Instant.now(), watcher);
-    given(existing.getExitedAt()).willReturn(null);
     given(watchingSessionRepository.findByContent_IdAndUser_IdAndDeletedAtIsNull(contentId, userId))
         .willReturn(Optional.of(existing));
     given(watchingSessionRepository.countActiveByContentId(contentId)).willReturn(1L);
@@ -298,37 +297,6 @@ class WatchingSessionServiceTest {
     assertThat(change.type()).isEqualTo(ChangeType.JOIN);
     assertThat(change.watchingSession()).isEqualTo(dto);
     assertThat(change.watcherCount()).isEqualTo(1L);
-    verify(watchingSessionRepository, never()).save(any(WatchingSession.class));
-    verify(existing, never()).rejoin();
-  }
-
-  @Test
-  @DisplayName("join 시 종료됐지만 삭제되지 않은 세션이 있으면 재활성화한다")
-  void join_exitedUndeletedSessionExists_rejoins() {
-    // given
-    UUID contentId = UUID.randomUUID();
-    UUID userId = UUID.randomUUID();
-    Content content = mockContent(contentId);
-    givenContent(contentId, content);
-    User watcher = mockUser(userId, "시청자", null);
-    given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(watcher));
-
-    WatchingSession existing = mockSession(UUID.randomUUID(), Instant.now(), watcher);
-    given(existing.getExitedAt()).willReturn(Instant.now());
-    given(watchingSessionRepository.findByContent_IdAndUser_IdAndDeletedAtIsNull(contentId, userId))
-        .willReturn(Optional.of(existing));
-    given(watchingSessionRepository.countActiveByContentId(contentId)).willReturn(1L);
-
-    WatchingSessionDto dto =
-        new WatchingSessionDto(existing.getId(), existing.getCreatedAt(), null, null);
-    given(watchingSessionMapper.toDto(eq(existing), any())).willReturn(dto);
-
-    // when
-    WatchingSessionChange change = watchingSessionService.join(contentId, userId);
-
-    // then
-    assertThat(change.type()).isEqualTo(ChangeType.JOIN);
-    verify(existing).rejoin();
     verify(watchingSessionRepository, never()).save(any(WatchingSession.class));
   }
 

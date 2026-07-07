@@ -48,10 +48,4 @@ public class WatchingSession extends BaseMutableEntity {
     }
     this.exitedAt = Instant.now();
   }
-
-  // 종료됐지만 삭제되지 않은 세션을 재활성화한다.
-  public void rejoin() {
-    this.joinedAt = Instant.now();
-    this.exitedAt = null;
-  }
 }
