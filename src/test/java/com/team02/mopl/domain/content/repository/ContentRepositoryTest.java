@@ -1,8 +1,10 @@
 package com.team02.mopl.domain.content.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.team02.mopl.domain.content.entity.Content;
+import com.team02.mopl.domain.content.enums.ContentSource;
 import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.review.entity.Review;
 import com.team02.mopl.domain.review.repository.ReviewRepository;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class ContentRepositoryTest extends RepositoryTestSupport {
 
@@ -67,6 +70,65 @@ class ContentRepositoryTest extends RepositoryTestSupport {
     int updated = contentRepository.refreshRatingAggregate(UUID.randomUUID());
 
     assertThat(updated).isEqualTo(0);
+  }
+
+  @Test
+  @DisplayName("findBySourceAndExternalId는 source와 externalId가 일치하는 콘텐츠를 조회한다")
+  void findBySourceAndExternalId_returnsMatchingContent() {
+    Content external =
+        Content.createExternal(
+            ContentSource.TMDB, "12345", ContentType.MOVIE, "외부 영화", "설명", "http://img");
+    em.persist(external);
+    em.flush();
+
+    Content found =
+        contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "12345").orElseThrow();
+
+    assertThat(found.getId()).isEqualTo(external.getId());
+    assertThat(found.getSource()).isEqualTo(ContentSource.TMDB);
+    assertThat(found.getExternalId()).isEqualTo("12345");
+  }
+
+  @Test
+  @DisplayName("findBySourceAndExternalId는 소프트 삭제된 콘텐츠도 조회한다")
+  void findBySourceAndExternalId_includesSoftDeletedContent() {
+    Content external =
+        Content.createExternal(
+            ContentSource.TMDB, "12345", ContentType.MOVIE, "외부 영화", "설명", "http://img");
+    em.persist(external);
+    em.flush();
+    external.delete();
+    em.flush();
+
+    Content found =
+        contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "12345").orElseThrow();
+
+    assertThat(found.isDeleted()).isTrue();
+  }
+
+  @Test
+  @DisplayName("동일한 (source, externalId) 쌍은 유니크 인덱스가 중복 저장을 차단한다")
+  void save_whenDuplicateSourceAndExternalId_throwsDataIntegrityViolation() {
+    contentRepository.saveAndFlush(
+        Content.createExternal(
+            ContentSource.TMDB, "12345", ContentType.MOVIE, "외부 영화", "설명", "http://img"));
+
+    Content duplicate =
+        Content.createExternal(
+            ContentSource.TMDB, "12345", ContentType.MOVIE, "중복 영화", "설명", "http://img");
+
+    assertThatThrownBy(() -> contentRepository.saveAndFlush(duplicate))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  @DisplayName("수동 생성 콘텐츠(source/externalId 모두 NULL)는 여러 건 저장할 수 있다")
+  void save_whenSourceAndExternalIdAreNull_allowsMultipleRows() {
+    // setUp에서 이미 수동 생성 콘텐츠 1건이 저장돼 있다
+    em.persist(new Content(ContentType.MOVIE, "수동 영화 2", "설명", "http://img"));
+    em.flush();
+
+    assertThat(contentRepository.count()).isEqualTo(2);
   }
 
   private UUID insertUser() {

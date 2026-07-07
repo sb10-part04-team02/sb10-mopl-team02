@@ -22,8 +22,12 @@ CREATE TABLE contents
     thumbnail_url  TEXT             NOT NULL,
     average_rating DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     review_count   INT              NOT NULL DEFAULT 0,
+    source         VARCHAR(20) NULL,
+    external_id    VARCHAR(100) NULL,
 
-    CONSTRAINT chk_contents_content_type CHECK (content_type IN ('MOVIE', 'TV_SERIES', 'SPORT'))
+    CONSTRAINT chk_contents_content_type CHECK (content_type IN ('MOVIE', 'TV_SERIES', 'SPORT')),
+    CONSTRAINT chk_contents_source CHECK (source IN ('TMDB')),
+    CONSTRAINT chk_contents_source_external_id_pair CHECK ((source IS NULL) = (external_id IS NULL))
 );
 
 CREATE TABLE conversations
@@ -242,6 +246,12 @@ CREATE UNIQUE INDEX uk_playlist_contents_content_playlist
 CREATE UNIQUE INDEX uk_watching_sessions_content_user
     ON watching_sessions (content_id, user_id) WHERE deleted_at IS NULL;
 
+-- 외부 수집 중복 방지 키. 의도적으로 deleted_at 부분 인덱스를 쓰지 않음:
+-- 소프트 삭제된 수집 콘텐츠도 UK 자리를 점유해야 재수집이 삭제 행을 중복 생성하지 못함.
+-- 수동 생성 콘텐츠는 source/external_id 모두 NULL이라 (NULLS DISTINCT) 다건 허용.
+CREATE UNIQUE INDEX uk_contents_source_external_id
+    ON contents (source, external_id);
+
 --==================================================================================================
 -- 리뷰 목록 커서 조회용 복합 인덱스 (활성 행만: deleted_at IS NULL 부분 인덱스)
 --==================================================================================================
@@ -260,3 +270,10 @@ CREATE INDEX ix_reviews_content_rating_id
 
 CREATE INDEX ix_direct_messages_conversation_created_id
     ON direct_messages (conversation_id, created_at DESC, id DESC);
+
+--==================================================================================================
+-- 콘텐츠별 활성 시청 세션 커서 조회용 복합 인덱스 (활성 세션만: exited_at IS NULL AND deleted_at IS NULL 부분 인덱스)
+--==================================================================================================
+
+CREATE INDEX ix_watching_sessions_content_created_id
+    ON watching_sessions (content_id, created_at, id) WHERE exited_at IS NULL AND deleted_at IS NULL;
