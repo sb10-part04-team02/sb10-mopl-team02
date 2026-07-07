@@ -14,6 +14,7 @@ import static org.mockito.Mockito.never;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
@@ -738,6 +739,40 @@ class UserServiceTest {
       assertThat(actual).isEqualTo(expect);
       assertThat(user.getProfileImageUrl()).isEqualTo("https://example.com/new-profile.png");
       then(fileStorage).should().delete("https://example.com/old-profile.png");
+    }
+  }
+
+  @Nested
+  class UpdateRole {
+
+    @Test
+    @DisplayName("권한변경요청이 들어오면 권한을 변경한다")
+    void success_shouldChangeRole_whenRoleUpdateRequestIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+      User user = new User("이름", "example@gmail.com", "password", null, Role.USER, false);
+      given(userRepository.findByIdAndDeletedAtIsNull(eq(userId))).willReturn(Optional.of(user));
+
+      UserRoleUpdateRequest request = new UserRoleUpdateRequest(Role.ADMIN);
+
+      // when
+      userService.updateRole(userId, request);
+
+      // then
+      assertThat(user.getRole()).isEqualTo(Role.ADMIN);
+    }
+
+    @Test
+    @DisplayName("유저가 존재하지 않으면 예외를 던진다")
+    void fail_shouldThrowException_whenUserNotFound() {
+      // given
+      given(userRepository.findByIdAndDeletedAtIsNull(any(UUID.class)))
+          .willReturn(Optional.empty());
+
+      // when & then
+      assertThrows(
+          UserNotFoundException.class,
+          () -> userService.updateRole(UUID.randomUUID(), mock(UserRoleUpdateRequest.class)));
     }
   }
 }

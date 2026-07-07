@@ -147,8 +147,17 @@ public class UserService {
   }
 
   @Transactional
-  public UserDto updateRole(UUID userId, UserRoleUpdateRequest request) {
-    return null;
+  public void updateRole(UUID userId, UserRoleUpdateRequest request) {
+    log.debug("유저 권한변경 시작: userId={}", userId);
+    User findUser =
+        userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
+
+    Role newRole = request.role();
+    Role oldRole = findUser.updateRole(newRole);
+
+    // TODO: 권한변경 이벤트 발행
+
+    log.info("유저 권한변경 로직 완료: userId={}, role=[{} -> {}]", findUser.getId(), oldRole, newRole);
   }
 
   private void validateOwner(UUID requesterId, UUID userId) {
