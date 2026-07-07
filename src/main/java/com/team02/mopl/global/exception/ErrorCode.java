@@ -15,6 +15,7 @@ public enum ErrorCode {
   CONFLICT(HttpStatus.BAD_REQUEST, "COMMON_400", "이미 존재하거나 충돌이 발생한 리소스입니다."),
   INVALID_CURSOR(HttpStatus.BAD_REQUEST, "COMMON_400", "유효하지 않은 커서 값입니다."),
   INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500", "서버 내부 오류가 발생했습니다."),
+  INVALID_ENUM_VALUE(HttpStatus.BAD_REQUEST, "COMMON_400", "잘못된 enum 값입니다."),
 
   // Auth
   INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401", "만료되었거나 유효하지 않은 토큰입니다."),
