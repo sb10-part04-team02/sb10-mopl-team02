@@ -2,6 +2,7 @@ package com.team02.mopl.domain.user.controller;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.global.dto.CursorResponse;
@@ -122,4 +123,27 @@ public interface UserApi {
       @Parameter(description = "사용자 ID") @PathVariable UUID userId,
       @RequestPart("request") @Valid UserUpdateRequest request,
       @RequestPart(value = "image", required = false) MultipartFile image);
+
+  @Operation(summary = "[어드민] 권한 수정")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "권한 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<Void> updateRole(
+      @PathVariable UUID userId, @RequestBody @Valid UserRoleUpdateRequest request);
 }

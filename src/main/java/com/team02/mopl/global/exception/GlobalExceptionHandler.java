@@ -1,10 +1,12 @@
 package com.team02.mopl.global.exception;
 
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -66,6 +68,25 @@ public class GlobalExceptionHandler {
             Map.of("reason", e.getMethod() + " 메서드는 이 엔드포인트에서 지원되지 않습니다."));
 
     return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
+  }
+
+  // @RequestBody의 JsonBody 변환 실패시 나오는 예외
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
+      HttpMessageNotReadableException e) {
+
+    String exceptionName = "InvalidRequestException";
+    String message = "요청 본문(JSON) 변환에 실패하였습니다.";
+    Map<String, String> details = Map.of("reason", "JSON 형식이 올바르지 않거나 본문이 비어있습니다.");
+
+    if (e.getCause() instanceof InvalidFormatException invalidFormatEx) {
+      String invalidValue = String.valueOf(invalidFormatEx.getValue());
+      String type = invalidFormatEx.getTargetType().getSimpleName().toLowerCase();
+      details = Map.of(type, invalidValue);
+    }
+
+    ErrorResponse response = new ErrorResponse(exceptionName, message, details);
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
   }
 
   // 예상하지 못한 서버 내부 오류 처리

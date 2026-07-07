@@ -2,11 +2,13 @@ package com.team02.mopl.domain.user.service;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
+import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
@@ -24,6 +26,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -41,6 +44,8 @@ public class UserService {
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
   private final FileStorage fileStorage;
+  private final ApplicationEventPublisher eventPublisher;
+
   // 이미지 검증용
   private static final long MAX_PROFILE_IMAGE_SIZE = 5 * 1024 * 1024;
   private static final List<String> ALLOWED_PROFILE_IMAGE_CONTENT_TYPES =
@@ -143,6 +148,25 @@ public class UserService {
     deleteOldProfileImageIfReplaced(oldProfileImageUrl, profileImageUrl);
 
     return userDto;
+  }
+
+  @Transactional
+  public void updateRole(UUID userId, UserRoleUpdateRequest request) {
+    log.debug("유저 권한변경 시작: userId={}", userId);
+    User findUser =
+        userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
+
+    Role newRole = request.role();
+    if (newRole == findUser.getRole()) {
+      // 멱득성 보장
+      log.info("기존 권한과 동일하여 변경을 스킵합니다. userId={} role={}", userId, newRole);
+      return;
+    }
+
+    Role oldRole = findUser.updateRole(newRole);
+    eventPublisher.publishEvent(new RoleUpdatedEvent(userId, oldRole, newRole));
+
+    log.info("유저 권한변경 로직 완료: userId={}, role=[{} -> {}]", findUser.getId(), oldRole, newRole);
   }
 
   private void validateOwner(UUID requesterId, UUID userId) {

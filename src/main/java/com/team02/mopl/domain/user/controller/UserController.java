@@ -2,6 +2,7 @@ package com.team02.mopl.domain.user.controller;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.service.UserService;
@@ -61,5 +62,14 @@ public class UserController implements UserApi {
       @RequestPart("request") @Valid UserUpdateRequest request,
       @RequestPart(value = "image", required = false) MultipartFile image) {
     return ResponseEntity.ok(userService.updateProfile(requesterId, userId, request, image));
+  }
+
+  @Override
+  @PreAuthorize("hasRole('ADMIN')")
+  @PatchMapping("/{userId}/role")
+  public ResponseEntity<Void> updateRole(
+      @PathVariable UUID userId, @RequestBody @Valid UserRoleUpdateRequest request) {
+    userService.updateRole(userId, request);
+    return ResponseEntity.noContent().build();
   }
 }
