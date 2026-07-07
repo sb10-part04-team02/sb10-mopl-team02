@@ -16,7 +16,7 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 
-@Tag(name = "Content", description = "콘텐츠 관리")
+@Tag(name = "콘텐츠 관리")
 public interface ContentApi {
 
   // [어드민] 콘텐츠 생성 - /api/contents
@@ -81,7 +81,7 @@ public interface ContentApi {
   ResponseEntity<CursorResponse<ContentDto>> getContents(ContentSearchRequest request);
 
   // [어드민] 콘텐츠 수정 - /api/contents/{contentId}
-  @Operation(summary = "콘텐츠 수정", description = "콘텐츠를 수정합니다. 썸네일은 선택. (ADMIN 전용)")
+  @Operation(summary = "[어드민] 콘텐츠 수정", description = "콘텐츠를 수정합니다. 썸네일은 선택. (ADMIN 전용)")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "수정 성공"),
     @ApiResponse(

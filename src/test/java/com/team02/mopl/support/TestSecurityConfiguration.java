@@ -22,6 +22,12 @@ public class TestSecurityConfiguration {
                     .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.PATCH, "/api/users/{userId}/role")
                     .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.POST, "/api/contents")
+                    .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.PATCH, "/api/contents/{contentId}")
+                    .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.DELETE, "/api/contents/{contentId}")
+                    .hasRole("ADMIN")
 
                     // 위의 어드민 권한용API 제외하고 전부 허용
                     .anyRequest()
