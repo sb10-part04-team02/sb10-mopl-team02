@@ -102,7 +102,7 @@ class ReviewServiceTest {
       assertThat(response.nextCursor()).isNull();
       assertThat(response.nextIdAfter()).isNull();
       assertThat(response.totalCount()).isEqualTo(2L);
-      assertThat(response.sortBy()).isEqualTo("CREATED_AT");
+      assertThat(response.sortBy()).isEqualTo("createdAt");
       assertThat(response.sortDirection()).isEqualTo("DESCENDING");
     }
 
@@ -211,7 +211,7 @@ class ReviewServiceTest {
 
       // then
       assertThat(response.data()).hasSize(1);
-      assertThat(response.sortBy()).isEqualTo("RATING");
+      assertThat(response.sortBy()).isEqualTo("rating");
       then(reviewRepository)
           .should()
           .findReviewsByCursor(
