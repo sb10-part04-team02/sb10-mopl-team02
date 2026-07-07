@@ -2,6 +2,7 @@ package com.team02.mopl.global.init;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -33,9 +34,7 @@ public class InitAdmin implements ApplicationRunner {
     // TODO: 기본구현 후 분산기능 도입 시 분산기능 추가
     try {
       UserCreateRequest request = new UserCreateRequest(adminName, adminEmail, adminPassword);
-      UserDto adminDto = userService.createUser(request);
-
-      // TODO: 권한변경 기능 추가되면 추가예정
+      UserDto adminDto = userService.createUser(request, Role.ADMIN);
 
       log.info("어드민 계정 생성: adminId={}", adminDto.id());
     } catch (UserEmailDuplicateException e) {
