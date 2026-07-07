@@ -171,7 +171,22 @@ public class UserService {
   }
 
   @Transactional
-  public void updateLock(UUID userId, UserLockUpdateRequest request) {}
+  public void updateLock(UUID userId, UserLockUpdateRequest request) {
+    log.debug("유저 계정잠금변경 시작: userId={}", userId);
+    User findUser =
+        userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
+
+    boolean newLocked = request.locked();
+    if (newLocked == findUser.isLocked()) {
+      // 멱득성 보장
+      log.info("유저의 기존 계정잠금과 동일하여 변경을 스킵합니다. userId={} role={}", userId, newLocked);
+      return;
+    }
+
+    boolean oldLocked = findUser.updateLock(request.locked());
+    log.info(
+        "유저 계정잠금변경 로직 완료: userId={}, isLocked=[{} -> {}]", findUser.getId(), oldLocked, newLocked);
+  }
 
   private void validateOwner(UUID requesterId, UUID userId) {
     if (!userId.equals(requesterId)) {

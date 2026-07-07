@@ -3,6 +3,7 @@ package com.team02.mopl.domain.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -12,9 +13,11 @@ import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
@@ -783,7 +786,7 @@ class UserServiceTest {
 
     @Test
     @DisplayName("동일권한변경 요청이 들어오면 조기반환한다")
-    void success_shouldReturnAlready_whenSameRoleIsProvided() {
+    void success_shouldReturnEarly_whenSameRoleIsProvided() {
       // given
       UUID userId = UUID.randomUUID();
       Role adminRole = Role.ADMIN;
@@ -812,6 +815,62 @@ class UserServiceTest {
           UserNotFoundException.class,
           () -> userService.updateRole(UUID.randomUUID(), mock(UserRoleUpdateRequest.class)));
       then(eventPublisher).should(never()).publishEvent(any(RoleUpdatedEvent.class));
+    }
+  }
+
+  @Nested
+  class UpdateLock {
+
+    @Test
+    @DisplayName("계정잠금변경요청이 들어오면 잠금상태를 변경한다")
+    void success_shouldChangeLockeStatus_whenLockUpdateRequestIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+      User user = new User("이름", "example@gmail.com", "password", null, Role.USER, false);
+      given(userRepository.findByIdAndDeletedAtIsNull(eq(userId))).willReturn(Optional.of(user));
+
+      UserLockUpdateRequest request = new UserLockUpdateRequest(true);
+
+      // when
+      userService.updateLock(userId, request);
+
+      // then
+      assertThat(user.isLocked()).isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("동일잠금변경 요청이 들어오면 조기반환한다")
+    void success_shouldReturnEarly_whenSameLockIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+      boolean userLock = false;
+      User user = new User("이름", "example@gmail.com", "password", null, Role.USER, userLock);
+
+      // entity 메소드 실행여부 확인하기 위해 spy로 wrapping
+      User spyUser = spy(user);
+      given(userRepository.findByIdAndDeletedAtIsNull(eq(userId))).willReturn(Optional.of(spyUser));
+
+      // 동일한 Lock 변경요청
+      UserLockUpdateRequest request = new UserLockUpdateRequest(userLock);
+
+      // when
+      userService.updateLock(userId, request);
+
+      // then
+      then(spyUser).should(never()).updateLock(anyBoolean());
+    }
+
+    @Test
+    @DisplayName("유저가 존재하지 않으면 예외를 던진다")
+    void fail_shouldThrowException_whenUserNotFound() {
+      // given
+      given(userRepository.findByIdAndDeletedAtIsNull(any(UUID.class)))
+          .willReturn(Optional.empty());
+
+      // when & then
+      assertThrows(
+          UserNotFoundException.class,
+          () -> userService.updateLock(UUID.randomUUID(), mock(UserLockUpdateRequest.class)));
     }
   }
 }
