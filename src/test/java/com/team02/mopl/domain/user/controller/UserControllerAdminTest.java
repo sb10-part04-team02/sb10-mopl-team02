@@ -4,10 +4,13 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
@@ -31,6 +34,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -42,10 +46,11 @@ import org.springframework.util.MultiValueMap;
 @WebMvcTest(UserController.class)
 @Import({TestSecurityConfiguration.class, GlobalExceptionHandler.class})
 @WithMockUser(roles = "ADMIN")
-public class UserControllerSecurityTest {
+public class UserControllerAdminTest {
 
   @MockitoBean private UserService userService;
   @Autowired private MockMvc mockMvc;
+  @Autowired private ObjectMapper objectMapper;
 
   @Nested
   class GetUsers {
@@ -115,11 +120,11 @@ public class UserControllerSecurityTest {
     static Stream<Arguments> provideUserSearchRequestParams() {
       return Stream.of(
           // roleEqual, isLocked, idAfter, sortDirection, sortBy, description
-          Arguments.of("UsEr", null, null, null, null, "roleEqual invalid"),
+          Arguments.of("Us_Er", null, null, null, null, "roleEqual invalid"),
           Arguments.of(null, "f", null, null, null, "isLocked invalid"),
           Arguments.of(null, null, "123", null, null, "idAfter invalid"),
           Arguments.of(null, null, null, "Mixed", null, "sortDirection invalid"),
-          Arguments.of(null, null, null, null, "NaMe", "sortBy invalid"));
+          Arguments.of(null, null, null, null, "Na_Me", "sortBy invalid"));
     }
 
     @ParameterizedTest
@@ -162,6 +167,58 @@ public class UserControllerSecurityTest {
           new UserDto(UUID.randomUUID(), Instant.now(), email, "이름", null, Role.USER, false);
       List<UserDto> users = List.of(userDto);
       return new CursorResponse<>(users, null, null, false, users.size(), "name", "ASCENDING");
+    }
+  }
+
+  @Nested
+  class UpdateRole {
+
+    @Test
+    @DisplayName("권한변경을 성공적으로 수행한다면 204를 반환한다")
+    void success_shouldReturn204_whenRoleIsUpdatedSuccessfully() throws Exception {
+      // given
+      UUID userId = UUID.randomUUID();
+      String content = objectMapper.writeValueAsString(new UserRoleUpdateRequest(Role.ADMIN));
+
+      // when & then
+      mockMvc
+          .perform(createUserRoleUpdateRequest(userId, content))
+          .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("잘못된 Role이 들어온다면 400을 반환한다")
+    void fail_shouldReturn400_whenRoleIsInvalid() throws Exception {
+      // given
+      UUID userId = UUID.randomUUID();
+      String invalidContent = "{\"role\": \"INVALID_ROLE\"}";
+
+      // when & then
+      mockMvc
+          .perform(createUserRoleUpdateRequest(userId, invalidContent))
+          .andDo(print())
+          .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    @DisplayName("권한이 없으면 403을 반환한다")
+    void fail_shouldReturn403Forbidden_whenUserHasNoPermission() throws Exception {
+      // given
+      UUID userId = UUID.randomUUID();
+      String content = objectMapper.writeValueAsString(new UserRoleUpdateRequest(Role.ADMIN));
+
+      // when & then
+      mockMvc
+          .perform(createUserRoleUpdateRequest(userId, content))
+          .andExpect(status().isForbidden());
+    }
+
+    private MockHttpServletRequestBuilder createUserRoleUpdateRequest(UUID userId, String content) {
+
+      return MockMvcRequestBuilders.patch("/api/users/{userId}/role", userId)
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(content);
     }
   }
 }

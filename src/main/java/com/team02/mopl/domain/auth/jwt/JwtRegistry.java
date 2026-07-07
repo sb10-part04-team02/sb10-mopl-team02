@@ -101,4 +101,11 @@ public class JwtRegistry {
     OK,
     COMPROMISED
   }
+
+  public void deleteAllRefreshToken(UUID userId) {
+    String key = userKey(userId);
+
+    // RefreshToken 전체삭제
+    redisTemplate.delete(key);
+  }
 }

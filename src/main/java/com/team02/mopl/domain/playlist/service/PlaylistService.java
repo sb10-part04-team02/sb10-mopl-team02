@@ -12,6 +12,7 @@ import com.team02.mopl.domain.playlist.dto.PlaylistUpdateRequest;
 import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.entity.PlaylistContent;
 import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
+import com.team02.mopl.domain.playlist.event.PlaylistContentAddedEvent;
 import com.team02.mopl.domain.playlist.event.PlaylistCreatedEvent;
 import com.team02.mopl.domain.playlist.exception.PlaylistContentAlreadyExistsException;
 import com.team02.mopl.domain.playlist.exception.PlaylistContentNotFoundException;
@@ -121,11 +122,9 @@ public class PlaylistService {
       nextIdAfter = last.getId();
     }
 
-    // TODO: 응답 sortBy를 sortBy.name()(UPDATED_AT/SUBSCRIBE_COUNT)로 내리고 있으나 명세 정렬 값은
-    //  updatedAt|subscribeCount 이다. 기존 content/review 도메인도 sortBy.name()을 그대로 쓰고 있어
-    //  일관성을 위해 현재 형태를 유지한다. 추후 명세 값 매핑 방식을 팀 차원에서 일괄 정리 필요.
+    // 응답 sortBy는 명세 정렬 값(updatedAt|subscribeCount)과 일치하도록 getValue()로 내린다.
     return new CursorResponse<>(
-        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.name(), direction.name());
+        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.getValue(), direction.name());
   }
 
   @Transactional
@@ -142,8 +141,9 @@ public class PlaylistService {
         new PlaylistCreatedEvent(
             owner.getId(), owner.getName(), saved.getTitle(), saved.getDescription()));
 
-    // 방금 생성한 본인 플레이리스트이므로 subscribedByMe는 false
-    PlaylistDto playlistDto = playlistMapper.toDto(saved, false);
+    // 방금 생성한 본인 플레이리스트이므로 subscribedByMe는 false, 콘텐츠는 아직 없음
+    PlaylistDto playlistDto =
+        playlistMapper.toDto(saved, playlistMapper.toUserSummary(owner), List.of(), false);
 
     log.info("플레이리스트 생성 성공: playlistId={}, ownerId={}", playlistDto.id(), ownerId);
     return playlistDto;
@@ -165,7 +165,9 @@ public class PlaylistService {
     playlist.update(request.title(), request.description());
     playlistRepository.flush();
     // 소유자 본인의 플레이리스트이므로 subscribedByMe는 false
-    PlaylistDto playlistDto = playlistMapper.toDto(playlist, false);
+    UserSummary owner = toOwnerSummary(playlist.getOwnerId());
+    List<ContentSummary> contents = toContentSummaries(playlist.getId());
+    PlaylistDto playlistDto = playlistMapper.toDto(playlist, owner, contents, false);
 
     log.info("플레이리스트 수정 성공: playlistId={}, requesterId={}", playlistId, requesterId);
     return playlistDto;
@@ -231,9 +233,11 @@ public class PlaylistService {
       throw new PlaylistContentAlreadyExistsException();
     }
 
-    // TODO: 구독 중인 플레이리스트에 콘텐츠가 추가되면 구독자에게 알림을 보내야 한다
-    //  (NotificationType.PLAYLIST_CONTENT_ADDED). create()처럼 커밋 이후 이벤트 리스너에서
-    //  처리하도록 별도 이슈에서 연동한다.
+    // 콘텐츠 추가 알림은 커밋 이후 리스너에서 처리해, 알림 실패가 콘텐츠 추가를 롤백하지 않도록 분리한다.
+    eventPublisher.publishEvent(
+        new PlaylistContentAddedEvent(
+            playlist.getId(), playlist.getTitle(), content.getId(), content.getTitle()));
+
     log.info(
         "플레이리스트 콘텐츠 추가 성공: playlistId={}, requesterId={}, contentId={}",
         playlistId,

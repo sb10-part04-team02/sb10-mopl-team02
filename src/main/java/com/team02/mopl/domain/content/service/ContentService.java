@@ -148,7 +148,7 @@ public class ContentService {
     }
 
     return new CursorResponse<>(
-        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.name(), direction.name());
+        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.getValue(), direction.name());
   }
 
   // [어드민] 콘텐츠 수정

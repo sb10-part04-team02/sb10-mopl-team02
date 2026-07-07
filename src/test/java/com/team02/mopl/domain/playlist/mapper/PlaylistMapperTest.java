@@ -23,31 +23,7 @@ class PlaylistMapperTest {
   private final PlaylistMapper playlistMapper = new PlaylistMapper();
 
   @Test
-  @DisplayName("Playlist 엔티티를 PlaylistDto로 변환하면 기본 필드가 매핑되고 owner는 ownerId 스텁, contents는 빈 리스트가 된다")
-  void toDto_mapsFieldsAndStubsOwnerAndContents() {
-    UUID ownerId = UUID.randomUUID();
-    UUID playlistId = UUID.randomUUID();
-    Instant updatedAt = Instant.parse("2026-06-29T00:00:00Z");
-    Playlist playlist = new Playlist(ownerId, "내 플리", "설명");
-    ReflectionTestUtils.setField(playlist, "id", playlistId);
-    ReflectionTestUtils.setField(playlist, "updatedAt", updatedAt);
-
-    PlaylistDto dto = playlistMapper.toDto(playlist, true);
-
-    assertThat(dto.id()).isEqualTo(playlistId);
-    assertThat(dto.updatedAt()).isEqualTo(updatedAt);
-    assertThat(dto.title()).isEqualTo("내 플리");
-    assertThat(dto.description()).isEqualTo("설명");
-    assertThat(dto.subscriberCount()).isEqualTo(0L);
-    assertThat(dto.subscribedByMe()).isTrue();
-    assertThat(dto.owner().userId()).isEqualTo(ownerId);
-    assertThat(dto.owner().name()).isNull();
-    assertThat(dto.owner().profileImageUrl()).isNull();
-    assertThat(dto.contents()).isEmpty();
-  }
-
-  @Test
-  @DisplayName("조회 전용 toDto는 전달받은 owner·contents·subscribedByMe를 그대로 조립한다")
+  @DisplayName("toDto는 전달받은 owner·contents·subscribedByMe를 그대로 조립하고 기본 필드를 매핑한다")
   void toDto_assemblesGivenOwnerAndContents() {
     UUID ownerId = UUID.randomUUID();
     UUID playlistId = UUID.randomUUID();
@@ -71,6 +47,10 @@ class PlaylistMapperTest {
     PlaylistDto dto = playlistMapper.toDto(playlist, owner, List.of(content), true);
 
     assertThat(dto.id()).isEqualTo(playlistId);
+    assertThat(dto.updatedAt()).isEqualTo(updatedAt);
+    assertThat(dto.title()).isEqualTo("내 플리");
+    assertThat(dto.description()).isEqualTo("설명");
+    assertThat(dto.subscriberCount()).isEqualTo(0L);
     assertThat(dto.owner()).isEqualTo(owner);
     assertThat(dto.contents()).containsExactly(content);
     assertThat(dto.subscribedByMe()).isTrue();

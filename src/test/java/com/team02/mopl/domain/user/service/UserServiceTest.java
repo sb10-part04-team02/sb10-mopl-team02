@@ -8,17 +8,20 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
+import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
@@ -48,6 +51,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -60,6 +64,8 @@ class UserServiceTest {
   @Mock UserRepository userRepository;
 
   @Mock UserMapper userMapper;
+
+  @Mock ApplicationEventPublisher eventPublisher;
 
   @Mock FileStorage fileStorage;
 
@@ -84,7 +90,9 @@ class UserServiceTest {
       given(userRepository.existsByEmailAndDeletedAtIsNull(anyString())).willReturn(true);
 
       // when & then
-      assertThrows(UserEmailDuplicateException.class, () -> userService.createUser(request));
+      assertThrows(
+          UserEmailDuplicateException.class,
+          () -> userService.createUser(request, any(Role.class)));
     }
 
     @Test
@@ -97,7 +105,8 @@ class UserServiceTest {
           .willThrow(new DataIntegrityViolationException("Duplicate Email"));
 
       // when & then
-      assertThrows(UserEmailDuplicateException.class, () -> userService.createUser(request));
+      assertThrows(
+          UserEmailDuplicateException.class, () -> userService.createUser(request, Role.USER));
     }
 
     @Test
@@ -105,15 +114,16 @@ class UserServiceTest {
     void success_shouldReturnUserDto_whenRequestIsValid() {
       // given
       UserCreateRequest request = new UserCreateRequest(name, email, password);
-      User mockUser = new User(name, email, "encryptedPassword", null, Role.USER, false);
+      Role userRole = Role.USER;
+      User mockUser = new User(name, email, "encryptedPassword", null, userRole, false);
       UserDto expect =
-          new UserDto(UUID.randomUUID(), Instant.now(), email, name, null, Role.USER, false);
+          new UserDto(UUID.randomUUID(), Instant.now(), email, name, null, userRole, false);
       given(userRepository.existsByEmailAndDeletedAtIsNull(anyString())).willReturn(false);
       given(userRepository.saveAndFlush(any(User.class))).willReturn(mockUser);
       given(userMapper.toDto(any(User.class))).willReturn(expect);
 
       // when
-      UserDto actual = userService.createUser(request);
+      UserDto actual = userService.createUser(request, userRole);
 
       // then
       assertThat(actual).isEqualTo(expect);
@@ -132,16 +142,17 @@ class UserServiceTest {
     void success_shouldReturnUserDto_whenEmailIsShort() {
       // given
       String shortEmail = "ab@gmail.com";
+      Role userRole = Role.USER;
       UserCreateRequest request = new UserCreateRequest(name, shortEmail, password);
-      User mockUser = new User(name, shortEmail, "encryptedPassword", null, Role.USER, false);
+      User mockUser = new User(name, shortEmail, "encryptedPassword", null, userRole, false);
       UserDto expect =
-          new UserDto(UUID.randomUUID(), Instant.now(), shortEmail, name, null, Role.USER, false);
+          new UserDto(UUID.randomUUID(), Instant.now(), shortEmail, name, null, userRole, false);
       given(userRepository.existsByEmailAndDeletedAtIsNull(anyString())).willReturn(false);
       given(userRepository.saveAndFlush(any(User.class))).willReturn(mockUser);
       given(userMapper.toDto(any(User.class))).willReturn(expect);
 
       // when
-      UserDto actual = userService.createUser(request);
+      UserDto actual = userService.createUser(request, userRole);
 
       // then
       assertThat(actual).isEqualTo(expect);
@@ -738,6 +749,74 @@ class UserServiceTest {
       assertThat(actual).isEqualTo(expect);
       assertThat(user.getProfileImageUrl()).isEqualTo("https://example.com/new-profile.png");
       then(fileStorage).should().delete("https://example.com/old-profile.png");
+    }
+  }
+
+  @Nested
+  class UpdateRole {
+
+    @Test
+    @DisplayName("권한변경요청이 들어오면 권한을 변경한다")
+    void success_shouldChangeRole_whenRoleUpdateRequestIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+      User user = new User("이름", "example@gmail.com", "password", null, Role.USER, false);
+      given(userRepository.findByIdAndDeletedAtIsNull(eq(userId))).willReturn(Optional.of(user));
+      willDoNothing().given(eventPublisher).publishEvent(any(RoleUpdatedEvent.class));
+
+      UserRoleUpdateRequest request = new UserRoleUpdateRequest(Role.ADMIN);
+
+      // when
+      userService.updateRole(userId, request);
+
+      // then
+      assertThat(user.getRole()).isEqualTo(Role.ADMIN);
+
+      ArgumentCaptor<RoleUpdatedEvent> eventCaptor =
+          ArgumentCaptor.forClass(RoleUpdatedEvent.class);
+      then(eventPublisher).should().publishEvent(eventCaptor.capture());
+
+      RoleUpdatedEvent event = eventCaptor.getValue();
+      assertThat(event)
+          .satisfies(
+              e -> {
+                assertThat(e.userId()).isEqualTo(userId);
+                assertThat(e.oldRole()).isEqualTo(Role.USER);
+                assertThat(e.newRole()).isEqualTo(Role.ADMIN);
+              });
+    }
+
+    @Test
+    @DisplayName("동일권한변경 요청이 들어오면 조기반환한다")
+    void success_shouldReturnAlready_whenSameRoleIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+      Role adminRole = Role.ADMIN;
+      User user = new User("이름", "example@gmail.com", "password", null, adminRole, false);
+      given(userRepository.findByIdAndDeletedAtIsNull(eq(userId))).willReturn(Optional.of(user));
+
+      // 동일한 ADMIN 권한 변경요청
+      UserRoleUpdateRequest request = new UserRoleUpdateRequest(adminRole);
+
+      // when
+      userService.updateRole(userId, request);
+
+      // then
+      then(eventPublisher).should(never()).publishEvent(any(RoleUpdatedEvent.class));
+    }
+
+    @Test
+    @DisplayName("유저가 존재하지 않으면 예외를 던진다")
+    void fail_shouldThrowException_whenUserNotFound() {
+      // given
+      given(userRepository.findByIdAndDeletedAtIsNull(any(UUID.class)))
+          .willReturn(Optional.empty());
+
+      // when & then
+      assertThrows(
+          UserNotFoundException.class,
+          () -> userService.updateRole(UUID.randomUUID(), mock(UserRoleUpdateRequest.class)));
+      then(eventPublisher).should(never()).publishEvent(any(RoleUpdatedEvent.class));
     }
   }
 }

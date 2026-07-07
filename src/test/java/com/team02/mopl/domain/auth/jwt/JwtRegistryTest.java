@@ -259,4 +259,20 @@ class JwtRegistryTest {
       assertThat(actual).isEqualTo(RotationResult.OK);
     }
   }
+
+  @Nested
+  class DeleteAllRefreshToken {
+    @Test
+    @DisplayName("리프레시 토큰을 전체 삭제한다")
+    void success_shouldDeleteAllRefreshToken_whenUserIdIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+
+      // when
+      jwtRegistry.deleteAllRefreshToken(userId);
+
+      // then
+      then(redisTemplate).should(times(1)).delete(anyString());
+    }
+  }
 }

@@ -104,7 +104,7 @@ class UserControllerNormalTest {
     void fail_shouldReturn409_whenEmailIsDuplicate() throws Exception {
       // given
       UserCreateRequest request = new UserCreateRequest(name, email, password);
-      given(userService.createUser(any(UserCreateRequest.class)))
+      given(userService.createUser(any(UserCreateRequest.class), any(Role.class)))
           .willThrow(new UserEmailDuplicateException());
 
       // when & then
@@ -127,7 +127,8 @@ class UserControllerNormalTest {
       UserCreateRequest request = new UserCreateRequest(name, email, "12345678");
       UserDto expect =
           new UserDto(UUID.randomUUID(), Instant.now(), email, name, null, Role.USER, false);
-      given(userService.createUser(any(UserCreateRequest.class))).willReturn(expect);
+      given(userService.createUser(any(UserCreateRequest.class), any(Role.class)))
+          .willReturn(expect);
 
       // when & then
       mockMvc

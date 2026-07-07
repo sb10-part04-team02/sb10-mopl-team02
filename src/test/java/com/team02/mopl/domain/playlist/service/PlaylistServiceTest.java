@@ -23,6 +23,7 @@ import com.team02.mopl.domain.playlist.dto.PlaylistUpdateRequest;
 import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.entity.PlaylistContent;
 import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
+import com.team02.mopl.domain.playlist.event.PlaylistContentAddedEvent;
 import com.team02.mopl.domain.playlist.event.PlaylistCreatedEvent;
 import com.team02.mopl.domain.playlist.exception.PlaylistContentAlreadyExistsException;
 import com.team02.mopl.domain.playlist.exception.PlaylistContentNotFoundException;
@@ -111,7 +112,7 @@ class PlaylistServiceTest {
       // 플레이리스트 생성 전 owner가 존재하는지 확인
       given(userRepository.findByIdAndDeletedAtIsNull(ownerId)).willReturn(Optional.of(owner));
       given(playlistRepository.save(any(Playlist.class))).willReturn(saved);
-      given(playlistMapper.toDto(any(Playlist.class), eq(false))).willReturn(expect);
+      given(playlistMapper.toDto(any(Playlist.class), any(), any(), eq(false))).willReturn(expect);
 
       // when
       PlaylistDto actual = playlistService.create(ownerId, request);
@@ -119,7 +120,7 @@ class PlaylistServiceTest {
       // then
       assertThat(actual).isEqualTo(expect);
       then(playlistRepository).should().save(playlistCaptor.capture());
-      then(playlistMapper).should().toDto(any(Playlist.class), eq(false));
+      then(playlistMapper).should().toDto(any(Playlist.class), any(), any(), eq(false));
 
       Playlist captured = playlistCaptor.getValue();
       assertThat(captured.getOwnerId()).isEqualTo(ownerId);
@@ -149,7 +150,7 @@ class PlaylistServiceTest {
 
       given(userRepository.findByIdAndDeletedAtIsNull(ownerId)).willReturn(Optional.of(owner));
       given(playlistRepository.save(any(Playlist.class))).willReturn(saved);
-      given(playlistMapper.toDto(any(Playlist.class), eq(false))).willReturn(expect);
+      given(playlistMapper.toDto(any(Playlist.class), any(), any(), eq(false))).willReturn(expect);
 
       playlistService.create(ownerId, request);
 
@@ -196,7 +197,7 @@ class PlaylistServiceTest {
               List.of());
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
-      given(playlistMapper.toDto(playlist, false)).willReturn(expect);
+      given(playlistMapper.toDto(eq(playlist), any(), any(), eq(false))).willReturn(expect);
 
       // when
       PlaylistDto actual = playlistService.update(playlistId, ownerId, request);
@@ -205,7 +206,7 @@ class PlaylistServiceTest {
       assertThat(actual).isEqualTo(expect);
       assertThat(playlist.getTitle()).isEqualTo("새 제목");
       assertThat(playlist.getDescription()).isEqualTo("새 설명");
-      then(playlistMapper).should().toDto(playlist, false);
+      then(playlistMapper).should().toDto(eq(playlist), any(), any(), eq(false));
     }
 
     @Test
@@ -216,7 +217,7 @@ class PlaylistServiceTest {
       PlaylistUpdateRequest request = new PlaylistUpdateRequest("새 제목", "새 설명");
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
-      given(playlistMapper.toDto(playlist, false)).willReturn(null);
+      given(playlistMapper.toDto(eq(playlist), any(), any(), eq(false))).willReturn(null);
 
       // when
       playlistService.update(playlistId, ownerId, request);
@@ -225,7 +226,7 @@ class PlaylistServiceTest {
       // flush로 @PreUpdate(updatedAt 갱신)를 유발한 뒤 매핑해야 응답에 최신 값이 담긴다
       InOrder inOrder = inOrder(playlistRepository, playlistMapper);
       inOrder.verify(playlistRepository).flush();
-      inOrder.verify(playlistMapper).toDto(playlist, false);
+      inOrder.verify(playlistMapper).toDto(eq(playlist), any(), any(), eq(false));
     }
 
     @Test
@@ -236,7 +237,7 @@ class PlaylistServiceTest {
       PlaylistUpdateRequest request = new PlaylistUpdateRequest("새 제목", null);
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
-      given(playlistMapper.toDto(playlist, false)).willReturn(null);
+      given(playlistMapper.toDto(eq(playlist), any(), any(), eq(false))).willReturn(null);
 
       // when
       playlistService.update(playlistId, ownerId, request);
@@ -254,7 +255,7 @@ class PlaylistServiceTest {
       PlaylistUpdateRequest request = new PlaylistUpdateRequest("", "   ");
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
-      given(playlistMapper.toDto(playlist, false)).willReturn(null);
+      given(playlistMapper.toDto(eq(playlist), any(), any(), eq(false))).willReturn(null);
 
       // when
       playlistService.update(playlistId, ownerId, request);
@@ -274,7 +275,7 @@ class PlaylistServiceTest {
       // when & then
       assertThatThrownBy(() -> playlistService.update(playlistId, ownerId, request))
           .isInstanceOf(PlaylistNotFoundException.class);
-      then(playlistMapper).should(never()).toDto(any(Playlist.class), eq(false));
+      then(playlistMapper).should(never()).toDto(any(Playlist.class), any(), any(), eq(false));
     }
 
     @Test
@@ -291,7 +292,7 @@ class PlaylistServiceTest {
       assertThatThrownBy(() -> playlistService.update(playlistId, otherUserId, request))
           .isInstanceOf(PlaylistForbiddenException.class);
       assertThat(playlist.getTitle()).isEqualTo("기존 제목");
-      then(playlistMapper).should(never()).toDto(any(Playlist.class), eq(false));
+      then(playlistMapper).should(never()).toDto(any(Playlist.class), any(), any(), eq(false));
     }
   }
 
@@ -409,7 +410,7 @@ class PlaylistServiceTest {
       assertThat(response.data()).hasSize(1);
       assertThat(response.nextIdAfter()).isEqualTo(first.getId());
       assertThat(response.nextCursor()).isEqualTo("2026-06-29T00:00:00Z");
-      assertThat(response.sortBy()).isEqualTo(PlaylistSortBy.UPDATED_AT.name());
+      assertThat(response.sortBy()).isEqualTo(PlaylistSortBy.UPDATED_AT.getValue());
     }
 
     @Test
@@ -491,7 +492,7 @@ class PlaylistServiceTest {
       assertThat(response.hasNext()).isTrue();
       assertThat(response.nextCursor()).isEqualTo("42");
       assertThat(response.nextIdAfter()).isEqualTo(first.getId());
-      assertThat(response.sortBy()).isEqualTo(PlaylistSortBy.SUBSCRIBE_COUNT.name());
+      assertThat(response.sortBy()).isEqualTo(PlaylistSortBy.SUBSCRIBE_COUNT.getValue());
     }
 
     @Test
@@ -713,12 +714,15 @@ class PlaylistServiceTest {
     private final UUID contentId = UUID.randomUUID();
 
     @Test
-    @DisplayName("소유자가 요청하면 콘텐츠를 플레이리스트에 추가한다")
+    @DisplayName("소유자가 요청하면 콘텐츠를 플레이리스트에 추가하고 콘텐츠 추가 이벤트를 발행한다")
     void success_whenRequesterIsOwner() {
       // given
       Playlist playlist = new Playlist(ownerId, "제목", "설명");
+      ReflectionTestUtils.setField(playlist, "id", playlistId);
+
       Content content = new Content(ContentType.MOVIE, "영화", "설명", "http://img");
       ReflectionTestUtils.setField(content, "id", contentId);
+
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
       given(contentRepository.findByIdAndDeletedAtIsNull(contentId))
@@ -730,39 +734,60 @@ class PlaylistServiceTest {
       playlistService.addContent(playlistId, ownerId, contentId);
 
       // then
-      ArgumentCaptor<PlaylistContent> captor = ArgumentCaptor.forClass(PlaylistContent.class);
-      then(playlistContentRepository).should().saveAndFlush(captor.capture());
-      assertThat(captor.getValue().getPlaylist()).isEqualTo(playlist);
-      assertThat(captor.getValue().getContentId()).isEqualTo(contentId);
+      ArgumentCaptor<PlaylistContent> contentCaptor =
+          ArgumentCaptor.forClass(PlaylistContent.class);
+
+      then(playlistContentRepository).should().saveAndFlush(contentCaptor.capture());
+
+      PlaylistContent savedPlaylistContent = contentCaptor.getValue();
+      assertThat(savedPlaylistContent.getPlaylist()).isEqualTo(playlist);
+      assertThat(savedPlaylistContent.getContentId()).isEqualTo(contentId);
+
+      ArgumentCaptor<PlaylistContentAddedEvent> eventCaptor =
+          ArgumentCaptor.forClass(PlaylistContentAddedEvent.class);
+
+      then(eventPublisher).should().publishEvent(eventCaptor.capture());
+
+      PlaylistContentAddedEvent event = eventCaptor.getValue();
+      assertThat(event.playlistId()).isEqualTo(playlistId);
+      assertThat(event.playlistTitle()).isEqualTo("제목");
+      assertThat(event.contentId()).isEqualTo(contentId);
+      assertThat(event.contentTitle()).isEqualTo("영화");
     }
 
     @Test
-    @DisplayName("플레이리스트가 없으면 PLAYLIST_NOT_FOUND 예외를 던지고 저장하지 않는다")
+    @DisplayName("플레이리스트가 없으면 PLAYLIST_NOT_FOUND 예외가 발생하고 저장하지 않는다")
     void fail_whenPlaylistNotFound() {
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId)).willReturn(Optional.empty());
 
       assertThatThrownBy(() -> playlistService.addContent(playlistId, ownerId, contentId))
           .isInstanceOf(PlaylistNotFoundException.class);
+
       then(playlistContentRepository).should(never()).saveAndFlush(any());
+      then(eventPublisher).should(never()).publishEvent(any());
     }
 
     @Test
-    @DisplayName("요청자가 소유자가 아니면 FORBIDDEN 예외를 던지고 저장하지 않는다")
+    @DisplayName("요청자가 소유자가 아니면 FORBIDDEN 예외가 발생하고 저장하지 않는다")
     void fail_whenRequesterIsNotOwner() {
       Playlist playlist = new Playlist(ownerId, "제목", "설명");
       UUID otherUserId = UUID.randomUUID();
+
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
 
       assertThatThrownBy(() -> playlistService.addContent(playlistId, otherUserId, contentId))
           .isInstanceOf(PlaylistForbiddenException.class);
+
       then(playlistContentRepository).should(never()).saveAndFlush(any());
+      then(eventPublisher).should(never()).publishEvent(any());
     }
 
     @Test
-    @DisplayName("콘텐츠가 없으면 CONTENT_NOT_FOUND 예외를 던지고 저장하지 않는다")
+    @DisplayName("콘텐츠가 없으면 CONTENT_NOT_FOUND 예외가 발생하고 저장하지 않는다")
     void fail_whenContentNotFound() {
       Playlist playlist = new Playlist(ownerId, "제목", "설명");
+
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
       given(contentRepository.findByIdAndDeletedAtIsNull(contentId)).willReturn(Optional.empty());
@@ -771,15 +796,19 @@ class PlaylistServiceTest {
           .isInstanceOfSatisfying(
               BusinessException.class,
               e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CONTENT_NOT_FOUND));
+
       then(playlistContentRepository).should(never()).saveAndFlush(any());
+      then(eventPublisher).should(never()).publishEvent(any());
     }
 
     @Test
-    @DisplayName("이미 추가된 콘텐츠면 PLAYLIST_CONTENT_ALREADY_EXISTS 예외를 던지고 저장하지 않는다")
+    @DisplayName("이미 추가된 콘텐츠면 PLAYLIST_CONTENT_ALREADY_EXISTS 예외가 발생하고 저장하지 않는다")
     void fail_whenAlreadyExists() {
       Playlist playlist = new Playlist(ownerId, "제목", "설명");
+
       Content content = new Content(ContentType.MOVIE, "영화", "설명", "http://img");
       ReflectionTestUtils.setField(content, "id", contentId);
+
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
       given(contentRepository.findByIdAndDeletedAtIsNull(contentId))
@@ -789,15 +818,19 @@ class PlaylistServiceTest {
 
       assertThatThrownBy(() -> playlistService.addContent(playlistId, ownerId, contentId))
           .isInstanceOf(PlaylistContentAlreadyExistsException.class);
+
       then(playlistContentRepository).should(never()).saveAndFlush(any());
+      then(eventPublisher).should(never()).publishEvent(any());
     }
 
     @Test
     @DisplayName("동시 추가로 유니크 제약을 위반하면 PLAYLIST_CONTENT_ALREADY_EXISTS 예외로 변환한다")
     void fail_whenConcurrentInsertViolatesUniqueConstraint() {
       Playlist playlist = new Playlist(ownerId, "제목", "설명");
+
       Content content = new Content(ContentType.MOVIE, "영화", "설명", "http://img");
       ReflectionTestUtils.setField(content, "id", contentId);
+
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
       given(contentRepository.findByIdAndDeletedAtIsNull(contentId))
@@ -809,6 +842,8 @@ class PlaylistServiceTest {
 
       assertThatThrownBy(() -> playlistService.addContent(playlistId, ownerId, contentId))
           .isInstanceOf(PlaylistContentAlreadyExistsException.class);
+
+      then(eventPublisher).should(never()).publishEvent(any());
     }
   }
 

@@ -215,6 +215,28 @@ class WatchingSessionRepositoryTest extends RepositoryTestSupport {
     assertThat(count).isEqualTo(1L);
   }
 
+  @Test
+  @DisplayName("이탈(종료+소프트 삭제)한 세션이 있어도 같은 유저·콘텐츠로 새 세션을 저장할 수 있다")
+  void insert_afterExitAndSoftDelete_allowsRewatch() {
+    // given: 이탈 처리된 세션(leave는 exited_at과 deleted_at을 함께 설정한다)
+    insertSession(
+        contentId,
+        userId,
+        Instant.parse("2026-06-29T01:00:00Z"),
+        Instant.parse("2026-06-29T02:00:00Z"),
+        Instant.parse("2026-06-29T02:00:00Z"));
+
+    // when: 같은 (콘텐츠, 유저)로 재시청 세션 저장 - 부분 유니크 인덱스에 걸리지 않아야 한다
+    UUID rewatch = insertSession(contentId, userId, Instant.parse("2026-06-29T03:00:00Z"));
+
+    // then
+    assertThat(watchingSessionRepository.countActiveByContentId(contentId)).isEqualTo(1L);
+    assertThat(
+            watchingSessionRepository.findByContent_IdAndUser_IdAndDeletedAtIsNull(
+                contentId, userId))
+        .hasValueSatisfying(session -> assertThat(session.getId()).isEqualTo(rewatch));
+  }
+
   private UUID insertUser(String name) {
     UUID id = UUID.randomUUID();
     em.createNativeQuery(
