@@ -28,6 +28,7 @@ class TmdbPropertiesTest {
         () -> new TmdbProperties("", baseUrl, imageBaseUrl, language, 3, timeout, timeout));
   }
 
+  // 실패 케이스 데이터
   private Stream<Arguments> provideInvalidProperties() {
     return Stream.of(
         Arguments.of(null, imageBaseUrl, language, 3, timeout, timeout, "baseUrl 누락"),

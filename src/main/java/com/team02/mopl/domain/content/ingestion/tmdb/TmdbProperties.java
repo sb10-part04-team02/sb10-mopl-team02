@@ -3,12 +3,9 @@ package com.team02.mopl.domain.content.ingestion.tmdb;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/**
- * TMDB API 연동 설정.
- *
- * <p>accessToken(v4 Read Access Token)은 미설정 팀원의 부팅을 막지 않도록 blank를 허용한다. 미설정 상태로 수집을 실행하면 TMDB가 401을
- * 응답해 TmdbApiException이 발생한다.
- */
+// TMDB API 연동 설정
+// - accessToken(v4 Read Access Token)은 미설정 팀원의 부팅을 막지 않도록 blank를 허용
+// - 미설정 상태로 수집을 실행하면 TMDB가 401을 응답해 TmdbApiException이 발생
 @ConfigurationProperties(prefix = "app.tmdb")
 public record TmdbProperties(
     String accessToken,

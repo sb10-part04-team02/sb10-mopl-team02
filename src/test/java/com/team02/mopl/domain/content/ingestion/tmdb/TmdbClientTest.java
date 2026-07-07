@@ -54,6 +54,7 @@ class TmdbClientTest {
   @Test
   @DisplayName("fetchPopularMovies는 Bearer 토큰과 language/page 파라미터로 호출하고 응답을 DTO로 역직렬화한다")
   void fetchPopularMovies_deserializesResponse() {
+    // given
     server
         .expect(requestTo(Matchers.startsWith(BASE_URL + "/movie/popular")))
         .andExpect(method(HttpMethod.GET))
@@ -80,8 +81,10 @@ class TmdbClientTest {
                 """,
                 MediaType.APPLICATION_JSON));
 
+    // when
     TmdbPageResponse<TmdbMovieDto> response = tmdbClient.fetchPopularMovies(1);
 
+    // then
     assertThat(response.page()).isEqualTo(1);
     assertThat(response.totalPages()).isEqualTo(100);
     TmdbMovieDto movie = response.results().get(0);
@@ -95,6 +98,7 @@ class TmdbClientTest {
   @Test
   @DisplayName("fetchPopularTv는 name 필드를 가진 드라마 응답을 DTO로 역직렬화한다")
   void fetchPopularTv_deserializesResponse() {
+    // given
     server
         .expect(requestTo(Matchers.startsWith(BASE_URL + "/tv/popular")))
         .andExpect(queryParam("page", "2"))
@@ -111,8 +115,10 @@ class TmdbClientTest {
                 """,
                 MediaType.APPLICATION_JSON));
 
+    // when
     TmdbPageResponse<TmdbTvDto> response = tmdbClient.fetchPopularTv(2);
 
+    // then
     TmdbTvDto tv = response.results().get(0);
     assertThat(tv.id()).isEqualTo(1399L);
     assertThat(tv.name()).isEqualTo("왕좌의 게임");
@@ -123,6 +129,7 @@ class TmdbClientTest {
   @Test
   @DisplayName("fetchMovieGenres는 장르 목록을 id-이름 Map으로 변환한다")
   void fetchMovieGenres_returnsIdToNameMap() {
+    // given
     server
         .expect(requestTo(Matchers.startsWith(BASE_URL + "/genre/movie/list")))
         .andExpect(queryParam("language", "ko-KR"))
@@ -133,18 +140,22 @@ class TmdbClientTest {
                 """,
                 MediaType.APPLICATION_JSON));
 
+    // when
     Map<Integer, String> genres = tmdbClient.fetchMovieGenres();
 
+    // then
     assertThat(genres).containsExactlyInAnyOrderEntriesOf(Map.of(28, "액션", 35, "코미디"));
   }
 
   @Test
   @DisplayName("401 응답이면 상태 코드를 details에 담은 TmdbApiException을 던진다")
   void fetchPopularMovies_whenUnauthorized_throwsTmdbApiException() {
+    // given
     server
         .expect(requestTo(Matchers.startsWith(BASE_URL + "/movie/popular")))
         .andRespond(withUnauthorizedRequest());
 
+    // when & then
     assertThatThrownBy(() -> tmdbClient.fetchPopularMovies(1))
         .isInstanceOf(TmdbApiException.class)
         .satisfies(
@@ -155,20 +166,24 @@ class TmdbClientTest {
   @Test
   @DisplayName("5xx 응답이면 TmdbApiException을 던진다")
   void fetchTvGenres_whenServerError_throwsTmdbApiException() {
+    // given
     server
         .expect(requestTo(Matchers.startsWith(BASE_URL + "/genre/tv/list")))
         .andRespond(withServerError());
 
+    // when & then
     assertThatThrownBy(() -> tmdbClient.fetchTvGenres()).isInstanceOf(TmdbApiException.class);
   }
 
   @Test
   @DisplayName("타임아웃 등 IO 오류는 TmdbApiException으로 래핑한다")
   void fetchPopularMovies_whenIoError_wrapsInTmdbApiException() {
+    // given
     server
         .expect(requestTo(Matchers.startsWith(BASE_URL + "/movie/popular")))
         .andRespond(withException(new SocketTimeoutException("read timed out")));
 
+    // when & then
     assertThatThrownBy(() -> tmdbClient.fetchPopularMovies(1))
         .isInstanceOf(TmdbApiException.class)
         .hasRootCauseInstanceOf(SocketTimeoutException.class);
