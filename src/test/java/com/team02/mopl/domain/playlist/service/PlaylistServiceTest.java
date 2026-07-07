@@ -112,7 +112,7 @@ class PlaylistServiceTest {
       // 플레이리스트 생성 전 owner가 존재하는지 확인
       given(userRepository.findByIdAndDeletedAtIsNull(ownerId)).willReturn(Optional.of(owner));
       given(playlistRepository.save(any(Playlist.class))).willReturn(saved);
-      given(playlistMapper.toDto(any(Playlist.class), eq(false))).willReturn(expect);
+      given(playlistMapper.toDto(any(Playlist.class), any(), any(), eq(false))).willReturn(expect);
 
       // when
       PlaylistDto actual = playlistService.create(ownerId, request);
@@ -120,7 +120,7 @@ class PlaylistServiceTest {
       // then
       assertThat(actual).isEqualTo(expect);
       then(playlistRepository).should().save(playlistCaptor.capture());
-      then(playlistMapper).should().toDto(any(Playlist.class), eq(false));
+      then(playlistMapper).should().toDto(any(Playlist.class), any(), any(), eq(false));
 
       Playlist captured = playlistCaptor.getValue();
       assertThat(captured.getOwnerId()).isEqualTo(ownerId);
@@ -150,7 +150,7 @@ class PlaylistServiceTest {
 
       given(userRepository.findByIdAndDeletedAtIsNull(ownerId)).willReturn(Optional.of(owner));
       given(playlistRepository.save(any(Playlist.class))).willReturn(saved);
-      given(playlistMapper.toDto(any(Playlist.class), eq(false))).willReturn(expect);
+      given(playlistMapper.toDto(any(Playlist.class), any(), any(), eq(false))).willReturn(expect);
 
       playlistService.create(ownerId, request);
 
@@ -197,7 +197,7 @@ class PlaylistServiceTest {
               List.of());
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
-      given(playlistMapper.toDto(playlist, false)).willReturn(expect);
+      given(playlistMapper.toDto(eq(playlist), any(), any(), eq(false))).willReturn(expect);
 
       // when
       PlaylistDto actual = playlistService.update(playlistId, ownerId, request);
@@ -206,7 +206,7 @@ class PlaylistServiceTest {
       assertThat(actual).isEqualTo(expect);
       assertThat(playlist.getTitle()).isEqualTo("새 제목");
       assertThat(playlist.getDescription()).isEqualTo("새 설명");
-      then(playlistMapper).should().toDto(playlist, false);
+      then(playlistMapper).should().toDto(eq(playlist), any(), any(), eq(false));
     }
 
     @Test
@@ -217,7 +217,7 @@ class PlaylistServiceTest {
       PlaylistUpdateRequest request = new PlaylistUpdateRequest("새 제목", "새 설명");
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
-      given(playlistMapper.toDto(playlist, false)).willReturn(null);
+      given(playlistMapper.toDto(eq(playlist), any(), any(), eq(false))).willReturn(null);
 
       // when
       playlistService.update(playlistId, ownerId, request);
@@ -226,7 +226,7 @@ class PlaylistServiceTest {
       // flush로 @PreUpdate(updatedAt 갱신)를 유발한 뒤 매핑해야 응답에 최신 값이 담긴다
       InOrder inOrder = inOrder(playlistRepository, playlistMapper);
       inOrder.verify(playlistRepository).flush();
-      inOrder.verify(playlistMapper).toDto(playlist, false);
+      inOrder.verify(playlistMapper).toDto(eq(playlist), any(), any(), eq(false));
     }
 
     @Test
@@ -237,7 +237,7 @@ class PlaylistServiceTest {
       PlaylistUpdateRequest request = new PlaylistUpdateRequest("새 제목", null);
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
-      given(playlistMapper.toDto(playlist, false)).willReturn(null);
+      given(playlistMapper.toDto(eq(playlist), any(), any(), eq(false))).willReturn(null);
 
       // when
       playlistService.update(playlistId, ownerId, request);
@@ -255,7 +255,7 @@ class PlaylistServiceTest {
       PlaylistUpdateRequest request = new PlaylistUpdateRequest("", "   ");
       given(playlistRepository.findByIdAndDeletedAtIsNull(playlistId))
           .willReturn(Optional.of(playlist));
-      given(playlistMapper.toDto(playlist, false)).willReturn(null);
+      given(playlistMapper.toDto(eq(playlist), any(), any(), eq(false))).willReturn(null);
 
       // when
       playlistService.update(playlistId, ownerId, request);
@@ -275,7 +275,7 @@ class PlaylistServiceTest {
       // when & then
       assertThatThrownBy(() -> playlistService.update(playlistId, ownerId, request))
           .isInstanceOf(PlaylistNotFoundException.class);
-      then(playlistMapper).should(never()).toDto(any(Playlist.class), eq(false));
+      then(playlistMapper).should(never()).toDto(any(Playlist.class), any(), any(), eq(false));
     }
 
     @Test
@@ -292,7 +292,7 @@ class PlaylistServiceTest {
       assertThatThrownBy(() -> playlistService.update(playlistId, otherUserId, request))
           .isInstanceOf(PlaylistForbiddenException.class);
       assertThat(playlist.getTitle()).isEqualTo("기존 제목");
-      then(playlistMapper).should(never()).toDto(any(Playlist.class), eq(false));
+      then(playlistMapper).should(never()).toDto(any(Playlist.class), any(), any(), eq(false));
     }
   }
 
