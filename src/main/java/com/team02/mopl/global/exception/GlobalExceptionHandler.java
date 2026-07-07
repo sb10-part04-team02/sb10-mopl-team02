@@ -5,6 +5,7 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestCookieException;
@@ -40,10 +41,9 @@ public class GlobalExceptionHandler {
     return ResponseEntity.badRequest().body(response);
   }
 
-  // @Valid 검증 실패 시 발생하는 예외 처리
-  @ExceptionHandler(MethodArgumentNotValidException.class)
-  public ResponseEntity<ErrorResponse> handleValidationException(
-      MethodArgumentNotValidException e) {
+  // @Valid 검증 실패 시 발생하는 예외 처리(BindException이 MethodArgumentNotValidException을 상속)
+  @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
+  public ResponseEntity<ErrorResponse> handleValidationException(BindException e) {
     Map<String, String> details = new LinkedHashMap<>();
 
     e.getBindingResult()

@@ -119,11 +119,11 @@ public class UserControllerAdminTest {
     static Stream<Arguments> provideUserSearchRequestParams() {
       return Stream.of(
           // roleEqual, isLocked, idAfter, sortDirection, sortBy, description
-          Arguments.of("UsEr", null, null, null, null, "roleEqual invalid"),
+          Arguments.of("Us_Er", null, null, null, null, "roleEqual invalid"),
           Arguments.of(null, "f", null, null, null, "isLocked invalid"),
           Arguments.of(null, null, "123", null, null, "idAfter invalid"),
           Arguments.of(null, null, null, "Mixed", null, "sortDirection invalid"),
-          Arguments.of(null, null, null, null, "NaMe", "sortBy invalid"));
+          Arguments.of(null, null, null, null, "Na_Me", "sortBy invalid"));
     }
 
     @ParameterizedTest

@@ -1,9 +1,11 @@
 package com.team02.mopl.global.config;
 
+import com.team02.mopl.global.util.StringToEnumConverterFactory;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.format.FormatterRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -30,5 +32,11 @@ public class WebConfig implements WebMvcConfigurer {
     }
     // 예: /files/** -> file:///.../storage/
     registry.addResourceHandler(baseUrl + "/**").addResourceLocations(location);
+  }
+
+  @Override
+  public void addFormatters(FormatterRegistry registry) {
+    // Enum Converter 추가
+    registry.addConverterFactory(new StringToEnumConverterFactory());
   }
 }

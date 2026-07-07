@@ -32,4 +32,10 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
       @Param("userId") UUID userId, @Param("playlistIds") List<UUID> playlistIds);
 
   List<Subscription> findByPlaylist_IdAndDeletedAtIsNull(UUID playlistId);
+
+  // 특정 플레이리스트를 구독 중인 활성 사용자 id만 골라 반환 (콘텐츠 추가 알림 대상 조회)
+  @Query(
+      "SELECT s.userId FROM Subscription s "
+          + "WHERE s.playlist.id = :playlistId AND s.deletedAt IS NULL")
+  List<UUID> findActiveSubscriberIdsByPlaylistId(@Param("playlistId") UUID playlistId);
 }
