@@ -84,7 +84,9 @@ class UserServiceTest {
       given(userRepository.existsByEmailAndDeletedAtIsNull(anyString())).willReturn(true);
 
       // when & then
-      assertThrows(UserEmailDuplicateException.class, () -> userService.createUser(request));
+      assertThrows(
+          UserEmailDuplicateException.class,
+          () -> userService.createUser(request, any(Role.class)));
     }
 
     @Test
@@ -97,7 +99,8 @@ class UserServiceTest {
           .willThrow(new DataIntegrityViolationException("Duplicate Email"));
 
       // when & then
-      assertThrows(UserEmailDuplicateException.class, () -> userService.createUser(request));
+      assertThrows(
+          UserEmailDuplicateException.class, () -> userService.createUser(request, Role.USER));
     }
 
     @Test
@@ -105,15 +108,16 @@ class UserServiceTest {
     void success_shouldReturnUserDto_whenRequestIsValid() {
       // given
       UserCreateRequest request = new UserCreateRequest(name, email, password);
-      User mockUser = new User(name, email, "encryptedPassword", null, Role.USER, false);
+      Role userRole = Role.USER;
+      User mockUser = new User(name, email, "encryptedPassword", null, userRole, false);
       UserDto expect =
-          new UserDto(UUID.randomUUID(), Instant.now(), email, name, null, Role.USER, false);
+          new UserDto(UUID.randomUUID(), Instant.now(), email, name, null, userRole, false);
       given(userRepository.existsByEmailAndDeletedAtIsNull(anyString())).willReturn(false);
       given(userRepository.saveAndFlush(any(User.class))).willReturn(mockUser);
       given(userMapper.toDto(any(User.class))).willReturn(expect);
 
       // when
-      UserDto actual = userService.createUser(request);
+      UserDto actual = userService.createUser(request, userRole);
 
       // then
       assertThat(actual).isEqualTo(expect);
@@ -132,16 +136,17 @@ class UserServiceTest {
     void success_shouldReturnUserDto_whenEmailIsShort() {
       // given
       String shortEmail = "ab@gmail.com";
+      Role userRole = Role.USER;
       UserCreateRequest request = new UserCreateRequest(name, shortEmail, password);
-      User mockUser = new User(name, shortEmail, "encryptedPassword", null, Role.USER, false);
+      User mockUser = new User(name, shortEmail, "encryptedPassword", null, userRole, false);
       UserDto expect =
-          new UserDto(UUID.randomUUID(), Instant.now(), shortEmail, name, null, Role.USER, false);
+          new UserDto(UUID.randomUUID(), Instant.now(), shortEmail, name, null, userRole, false);
       given(userRepository.existsByEmailAndDeletedAtIsNull(anyString())).willReturn(false);
       given(userRepository.saveAndFlush(any(User.class))).willReturn(mockUser);
       given(userMapper.toDto(any(User.class))).willReturn(expect);
 
       // when
-      UserDto actual = userService.createUser(request);
+      UserDto actual = userService.createUser(request, userRole);
 
       // then
       assertThat(actual).isEqualTo(expect);

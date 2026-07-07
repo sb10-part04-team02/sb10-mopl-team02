@@ -47,7 +47,7 @@ public class UserService {
       List.of("image/jpeg", "image/png", "image/webp");
 
   @Transactional
-  public UserDto createUser(UserCreateRequest request) {
+  public UserDto createUser(UserCreateRequest request, Role role) {
     log.debug("유저 생성 시작: email={}", maskValidEmail(request.email()));
 
     if (userRepository.existsByEmailAndDeletedAtIsNull(request.email())) {
@@ -60,7 +60,7 @@ public class UserService {
     try {
       savedUser =
           userRepository.saveAndFlush(
-              new User(request.name(), request.email(), encryptedPassword, null, Role.USER, false));
+              new User(request.name(), request.email(), encryptedPassword, null, role, false));
     } catch (DataIntegrityViolationException e) {
       throw new UserEmailDuplicateException(e);
     }
