@@ -157,8 +157,13 @@ public class UserService {
         userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
 
     Role newRole = request.role();
-    Role oldRole = findUser.updateRole(newRole);
+    if (newRole == findUser.getRole()) {
+      // 멱득성 보장
+      log.info("기존 권한과 동일하여 변경을 스킵합니다. userId={} role={}", userId, newRole);
+      return;
+    }
 
+    Role oldRole = findUser.updateRole(newRole);
     eventPublisher.publishEvent(new RoleUpdatedEvent(userId, oldRole, newRole));
 
     log.info("유저 권한변경 로직 완료: userId={}, role=[{} -> {}]", findUser.getId(), oldRole, newRole);

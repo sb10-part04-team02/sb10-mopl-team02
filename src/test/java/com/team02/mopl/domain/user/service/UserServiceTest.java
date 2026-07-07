@@ -766,7 +766,38 @@ class UserServiceTest {
 
       // then
       assertThat(user.getRole()).isEqualTo(Role.ADMIN);
-      then(eventPublisher).should().publishEvent(any(RoleUpdatedEvent.class));
+
+      ArgumentCaptor<RoleUpdatedEvent> eventCaptor =
+          ArgumentCaptor.forClass(RoleUpdatedEvent.class);
+      then(eventPublisher).should().publishEvent(eventCaptor.capture());
+
+      RoleUpdatedEvent event = eventCaptor.getValue();
+      assertThat(event)
+          .satisfies(
+              e -> {
+                assertThat(e.userId()).isEqualTo(userId);
+                assertThat(e.oldRole()).isEqualTo(Role.USER);
+                assertThat(e.newRole()).isEqualTo(Role.ADMIN);
+              });
+    }
+
+    @Test
+    @DisplayName("동일권한변경 요청이 들어오면 조기반환한다")
+    void success_shouldReturnAlready_whenSameRoleIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+      Role adminRole = Role.ADMIN;
+      User user = new User("이름", "example@gmail.com", "password", null, adminRole, false);
+      given(userRepository.findByIdAndDeletedAtIsNull(eq(userId))).willReturn(Optional.of(user));
+
+      // 동일한 ADMIN 권한 변경요청
+      UserRoleUpdateRequest request = new UserRoleUpdateRequest(adminRole);
+
+      // when
+      userService.updateRole(userId, request);
+
+      // then
+      then(eventPublisher).should(never()).publishEvent(any(RoleUpdatedEvent.class));
     }
 
     @Test

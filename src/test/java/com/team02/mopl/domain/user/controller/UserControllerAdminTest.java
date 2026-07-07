@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -183,6 +184,20 @@ public class UserControllerAdminTest {
       mockMvc
           .perform(createUserRoleUpdateRequest(userId, content))
           .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("잘못된 Role이 들어온다면 400을 반환한다")
+    void fail_shouldReturn400_whenRoleIsInvalid() throws Exception {
+      // given
+      UUID userId = UUID.randomUUID();
+      String invalidContent = "{\"role\": \"INVALID_ROLE\"}";
+
+      // when & then
+      mockMvc
+          .perform(createUserRoleUpdateRequest(userId, invalidContent))
+          .andDo(print())
+          .andExpect(status().isBadRequest());
     }
 
     @Test
