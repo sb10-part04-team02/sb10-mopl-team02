@@ -35,9 +35,12 @@ class ContentUpsertServiceTest extends RepositoryTestSupport {
   @Test
   @DisplayName("upsert는 존재하지 않는 (source, externalId)면 콘텐츠와 태그를 새로 저장한다")
   void upsert_whenNotExists_insertsContentWithTags() {
+    // given - 존재하지 않는 (source, externalId)
+    // when
     UpsertResult result = contentUpsertService.upsert(tmdbData("100", List.of("액션", "코미디")));
 
-    assertThat(result).isEqualTo(UpsertResult.INSERTED);
+    // then
+    assertThat(result).isEqualTo(UpsertResult.INSERTED); // INSERTED
     Content saved =
         contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "100").orElseThrow();
     assertThat(saved.getContentType()).isEqualTo(ContentType.MOVIE);
@@ -50,11 +53,14 @@ class ContentUpsertServiceTest extends RepositoryTestSupport {
   @Test
   @DisplayName("upsert는 동일 데이터로 재실행해도 행이 늘어나지 않는다 (멱등성)")
   void upsert_whenRerunWithSameData_isIdempotent() {
+    // given
     ExternalContentData data = tmdbData("100", List.of("액션"));
-
     contentUpsertService.upsert(data);
+
+    // when
     UpsertResult second = contentUpsertService.upsert(data);
 
+    // then
     assertThat(second).isEqualTo(UpsertResult.UPDATED);
     assertThat(contentRepository.count()).isEqualTo(1);
     Content content =
@@ -65,6 +71,7 @@ class ContentUpsertServiceTest extends RepositoryTestSupport {
   @Test
   @DisplayName("upsert는 기존 콘텐츠의 제목/설명/썸네일을 갱신하되 리뷰 집계 값은 건드리지 않는다")
   void upsert_whenExists_updatesFieldsButPreservesRatingAggregate() {
+    // given
     contentUpsertService.upsert(tmdbData("100", List.of()));
     Content content =
         contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "100").orElseThrow();
@@ -74,6 +81,7 @@ class ContentUpsertServiceTest extends RepositoryTestSupport {
         .executeUpdate();
     em.clear();
 
+    // when
     UpsertResult result =
         contentUpsertService.upsert(
             new ExternalContentData(
@@ -87,6 +95,7 @@ class ContentUpsertServiceTest extends RepositoryTestSupport {
     em.flush();
     em.clear();
 
+    // then
     assertThat(result).isEqualTo(UpsertResult.UPDATED);
     Content updated =
         contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "100").orElseThrow();
@@ -100,8 +109,10 @@ class ContentUpsertServiceTest extends RepositoryTestSupport {
   @Test
   @DisplayName("upsert는 빈 제목/설명/썸네일이 오면 기존 값을 덮지 않는다 (부분 갱신)")
   void upsert_whenBlankFields_keepsExistingValues() {
+    // given
     contentUpsertService.upsert(tmdbData("100", List.of()));
 
+    // when
     UpsertResult result =
         contentUpsertService.upsert(
             new ExternalContentData(
@@ -109,6 +120,7 @@ class ContentUpsertServiceTest extends RepositoryTestSupport {
     em.flush();
     em.clear();
 
+    // then
     assertThat(result).isEqualTo(UpsertResult.UPDATED);
     Content content =
         contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "100").orElseThrow();
@@ -118,12 +130,15 @@ class ContentUpsertServiceTest extends RepositoryTestSupport {
   }
 
   @Test
-  @DisplayName("upsert는 기존 태그를 지우지 않고 새 태그만 추가한다 (merge-add)")
+  @DisplayName("upsert는 기존 태그를 지우지 않고 새 태그만 추가한다 (mergeAddTags)")
   void upsert_mergesNewTagsWithoutRemovingExisting() {
+    // given
     contentUpsertService.upsert(tmdbData("100", List.of("액션")));
 
+    // when
     contentUpsertService.upsert(tmdbData("100", List.of("코미디")));
 
+    // then
     Content content =
         contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "100").orElseThrow();
     assertThat(tagRepository.findByContentIdAndDeletedAtIsNull(content.getId()))
@@ -134,14 +149,17 @@ class ContentUpsertServiceTest extends RepositoryTestSupport {
   @Test
   @DisplayName("upsert는 소프트 삭제된 콘텐츠를 되살리지 않고 건너뛴다")
   void upsert_whenSoftDeleted_skipsWithoutRestoring() {
+    // given
     contentUpsertService.upsert(tmdbData("100", List.of()));
     Content content =
         contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "100").orElseThrow();
     content.delete();
     em.flush();
 
+    // when
     UpsertResult result = contentUpsertService.upsert(tmdbData("100", List.of()));
 
+    // then
     assertThat(result).isEqualTo(UpsertResult.SKIPPED);
     Content after =
         contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "100").orElseThrow();

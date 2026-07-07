@@ -3,7 +3,7 @@ package com.team02.mopl.domain.content.ingestion.exception;
 import com.team02.mopl.global.exception.ErrorCode;
 import java.net.URI;
 
-/** TMDB API 호출 실패 예외. 에러 응답 상태 코드와 요청 URI를 details로 보존한다. */
+// TMDB API 호출 실패 예외. 에러 응답 상태 코드와 요청 URI를 details로 보존
 public class TmdbApiException extends ExternalApiException {
 
   public TmdbApiException(int statusCode, URI uri) {
