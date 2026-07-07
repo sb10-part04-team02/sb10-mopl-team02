@@ -8,6 +8,7 @@ import static org.mockito.Mockito.times;
 import com.team02.mopl.domain.auth.jwt.JwtRegistry;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
+import com.team02.mopl.domain.user.event.UserLockedEvent;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -53,6 +54,39 @@ class UserEventListenerTest {
 
       // when & then
       assertDoesNotThrow(() -> eventListener.onUserRoleUpdated(event));
+      then(jwtRegistry).should(times(1)).deleteAllRefreshToken(userId);
+    }
+  }
+
+  @Nested
+  class OnUserLocked {
+
+    @Test
+    @DisplayName("유저잠금 이벤트가 오면 유저의 모든 리프레시 토큰을 삭제한다")
+    void success_shouldRemoveAllRefreshTokens_whenUserLockedEventIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+      UserLockedEvent event = new UserLockedEvent(userId);
+
+      // when
+      eventListener.onUserLocked(event);
+
+      // then
+      then(jwtRegistry).should(times(1)).deleteAllRefreshToken(userId);
+    }
+
+    @Test
+    @DisplayName("레디스에 문제가 생기면 예외를 던지지만 catch로 방어한다")
+    void fail_shouldDefenceException_whenRedisIsDown() {
+      // given
+      UUID userId = UUID.randomUUID();
+      UserLockedEvent event = new UserLockedEvent(userId);
+      willThrow(RedisConnectionFailureException.class)
+          .given(jwtRegistry)
+          .deleteAllRefreshToken(userId);
+
+      // when & then
+      assertDoesNotThrow(() -> eventListener.onUserLocked(event));
       then(jwtRegistry).should(times(1)).deleteAllRefreshToken(userId);
     }
   }
