@@ -12,6 +12,7 @@ import com.team02.mopl.domain.playlist.dto.PlaylistUpdateRequest;
 import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.entity.PlaylistContent;
 import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
+import com.team02.mopl.domain.playlist.event.PlaylistContentAddedEvent;
 import com.team02.mopl.domain.playlist.event.PlaylistCreatedEvent;
 import com.team02.mopl.domain.playlist.exception.PlaylistContentAlreadyExistsException;
 import com.team02.mopl.domain.playlist.exception.PlaylistContentNotFoundException;
@@ -231,9 +232,11 @@ public class PlaylistService {
       throw new PlaylistContentAlreadyExistsException();
     }
 
-    // TODO: 구독 중인 플레이리스트에 콘텐츠가 추가되면 구독자에게 알림을 보내야 한다
-    //  (NotificationType.PLAYLIST_CONTENT_ADDED). create()처럼 커밋 이후 이벤트 리스너에서
-    //  처리하도록 별도 이슈에서 연동한다.
+    // 콘텐츠 추가 알림은 커밋 이후 리스너에서 처리해, 알림 실패가 콘텐츠 추가를 롤백하지 않도록 분리한다.
+    eventPublisher.publishEvent(
+        new PlaylistContentAddedEvent(
+            playlist.getId(), playlist.getTitle(), content.getId(), content.getTitle()));
+
     log.info(
         "플레이리스트 콘텐츠 추가 성공: playlistId={}, requesterId={}, contentId={}",
         playlistId,
