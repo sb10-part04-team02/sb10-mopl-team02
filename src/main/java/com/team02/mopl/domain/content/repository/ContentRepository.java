@@ -20,7 +20,7 @@ public interface ContentRepository extends JpaRepository<Content, UUID>, Content
   // SELECT c.* FROM contents c WHERE c.id IN (?, ?, ...) AND c.deleted_at IS NULL;
   List<Content> findByIdInAndDeletedAtIsNull(List<UUID> ids);
 
-  // 외부 수집 중복 방지 키 조회. 삭제 행 재수집 정책 분기를 위해 deleted_at 필터를 걸지 않는다
+  // 외부 수집 중복 방지 키 조회. 삭제 행 재수집 정책을 위해 deleted_at 필터를 걸지 않는다
   // SELECT c.* FROM contents c WHERE c.source = ? AND c.external_id = ?;
   Optional<Content> findBySourceAndExternalId(ContentSource source, String externalId);
 
