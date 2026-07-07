@@ -408,6 +408,36 @@ class ReviewServiceTest {
       assertThat(captured.getText()).isEqualTo(text);
       assertThat(captured.getRating()).isEqualTo(rating);
     }
+
+    @Test
+    @DisplayName("작성자를 단건 조회해 toDto에 실제 author 요약을 전달한다")
+    void fillsAuthorSummary_onCreate() {
+      // given
+      ReviewCreateRequest request = new ReviewCreateRequest(contentId, text, rating);
+      Review savedReview = new Review(authorId, contentId, text, rating);
+      User author = new User("홍길동", "hong@test.com", "pw", "http://img/author", Role.USER, false);
+      ReflectionTestUtils.setField(author, "id", authorId);
+      UserSummary authorSummary = new UserSummary(authorId, "홍길동", "http://img/author");
+
+      given(
+              reviewRepository.existsByAuthorIdAndContentIdAndDeletedAtIsNull(
+                  eq(authorId), eq(contentId)))
+          .willReturn(false);
+      given(reviewRepository.saveAndFlush(any(Review.class))).willReturn(savedReview);
+      given(userRepository.findByIdAndDeletedAtIsNull(eq(authorId)))
+          .willReturn(Optional.of(author));
+      given(reviewMapper.toUserSummary(author)).willReturn(authorSummary);
+      given(reviewMapper.toDto(any(Review.class), any()))
+          .willReturn(new ReviewDto(UUID.randomUUID(), contentId, authorSummary, text, rating));
+
+      // when
+      reviewService.createReview(authorId, request);
+
+      // then
+      ArgumentCaptor<UserSummary> authorCaptor = ArgumentCaptor.forClass(UserSummary.class);
+      then(reviewMapper).should().toDto(any(Review.class), authorCaptor.capture());
+      assertThat(authorCaptor.getValue()).isEqualTo(authorSummary);
+    }
   }
 
   @Nested
@@ -491,6 +521,32 @@ class ReviewServiceTest {
       // then
       assertThat(review.getText()).isEqualTo("원본");
       assertThat(review.getRating()).isEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("리뷰 작성자를 단건 조회해 toDto에 실제 author 요약을 전달한다")
+    void fillsAuthorSummary_onUpdate() {
+      // given
+      ReviewUpdateRequest request = new ReviewUpdateRequest("수정된 내용", 2.0);
+      Review review = new Review(authorId, contentId, "원본", 4.5);
+      User author = new User("홍길동", "hong@test.com", "pw", "http://img/author", Role.USER, false);
+      ReflectionTestUtils.setField(author, "id", authorId);
+      UserSummary authorSummary = new UserSummary(authorId, "홍길동", "http://img/author");
+
+      given(reviewRepository.findByIdAndDeletedAtIsNull(eq(reviewId)))
+          .willReturn(Optional.of(review));
+      given(userRepository.findByIdAndDeletedAtIsNull(eq(authorId)))
+          .willReturn(Optional.of(author));
+      given(reviewMapper.toUserSummary(author)).willReturn(authorSummary);
+      given(reviewMapper.toDto(any(Review.class), any())).willReturn(null);
+
+      // when
+      reviewService.updateReview(reviewId, authorId, request);
+
+      // then
+      ArgumentCaptor<UserSummary> authorCaptor = ArgumentCaptor.forClass(UserSummary.class);
+      then(reviewMapper).should().toDto(any(Review.class), authorCaptor.capture());
+      assertThat(authorCaptor.getValue()).isEqualTo(authorSummary);
     }
   }
 
