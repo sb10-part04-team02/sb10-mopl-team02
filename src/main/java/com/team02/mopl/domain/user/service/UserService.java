@@ -2,6 +2,7 @@ package com.team02.mopl.domain.user.service;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
@@ -143,6 +144,11 @@ public class UserService {
     deleteOldProfileImageIfReplaced(oldProfileImageUrl, profileImageUrl);
 
     return userDto;
+  }
+
+  @Transactional
+  public UserDto updateRole(UUID userId, UserRoleUpdateRequest request) {
+    return null;
   }
 
   private void validateOwner(UUID requesterId, UUID userId) {
