@@ -143,8 +143,9 @@ public class PlaylistService {
         new PlaylistCreatedEvent(
             owner.getId(), owner.getName(), saved.getTitle(), saved.getDescription()));
 
-    // 방금 생성한 본인 플레이리스트이므로 subscribedByMe는 false
-    PlaylistDto playlistDto = playlistMapper.toDto(saved, false);
+    // 방금 생성한 본인 플레이리스트이므로 subscribedByMe는 false, 콘텐츠는 아직 없음
+    PlaylistDto playlistDto =
+        playlistMapper.toDto(saved, playlistMapper.toUserSummary(owner), List.of(), false);
 
     log.info("플레이리스트 생성 성공: playlistId={}, ownerId={}", playlistDto.id(), ownerId);
     return playlistDto;
@@ -166,7 +167,9 @@ public class PlaylistService {
     playlist.update(request.title(), request.description());
     playlistRepository.flush();
     // 소유자 본인의 플레이리스트이므로 subscribedByMe는 false
-    PlaylistDto playlistDto = playlistMapper.toDto(playlist, false);
+    UserSummary owner = toOwnerSummary(playlist.getOwnerId());
+    List<ContentSummary> contents = toContentSummaries(playlist.getId());
+    PlaylistDto playlistDto = playlistMapper.toDto(playlist, owner, contents, false);
 
     log.info("플레이리스트 수정 성공: playlistId={}, requesterId={}", playlistId, requesterId);
     return playlistDto;
