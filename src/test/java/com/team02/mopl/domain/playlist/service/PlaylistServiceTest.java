@@ -410,7 +410,7 @@ class PlaylistServiceTest {
       assertThat(response.data()).hasSize(1);
       assertThat(response.nextIdAfter()).isEqualTo(first.getId());
       assertThat(response.nextCursor()).isEqualTo("2026-06-29T00:00:00Z");
-      assertThat(response.sortBy()).isEqualTo(PlaylistSortBy.UPDATED_AT.name());
+      assertThat(response.sortBy()).isEqualTo(PlaylistSortBy.UPDATED_AT.getValue());
     }
 
     @Test
@@ -492,7 +492,7 @@ class PlaylistServiceTest {
       assertThat(response.hasNext()).isTrue();
       assertThat(response.nextCursor()).isEqualTo("42");
       assertThat(response.nextIdAfter()).isEqualTo(first.getId());
-      assertThat(response.sortBy()).isEqualTo(PlaylistSortBy.SUBSCRIBE_COUNT.name());
+      assertThat(response.sortBy()).isEqualTo(PlaylistSortBy.SUBSCRIBE_COUNT.getValue());
     }
 
     @Test

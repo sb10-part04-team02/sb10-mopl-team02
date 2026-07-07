@@ -122,11 +122,9 @@ public class PlaylistService {
       nextIdAfter = last.getId();
     }
 
-    // TODO: 응답 sortBy를 sortBy.name()(UPDATED_AT/SUBSCRIBE_COUNT)로 내리고 있으나 명세 정렬 값은
-    //  updatedAt|subscribeCount 이다. 기존 content/review 도메인도 sortBy.name()을 그대로 쓰고 있어
-    //  일관성을 위해 현재 형태를 유지한다. 추후 명세 값 매핑 방식을 팀 차원에서 일괄 정리 필요.
+    // 응답 sortBy는 명세 정렬 값(updatedAt|subscribeCount)과 일치하도록 getValue()로 내린다.
     return new CursorResponse<>(
-        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.name(), direction.name());
+        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.getValue(), direction.name());
   }
 
   @Transactional
