@@ -1,0 +1,41 @@
+package com.team02.mopl.domain.user.service;
+
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.times;
+
+import com.team02.mopl.domain.auth.jwt.JwtRegistry;
+import com.team02.mopl.domain.user.entity.enums.Role;
+import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class UserEventListenerTest {
+
+  @Mock private JwtRegistry jwtRegistry;
+  @InjectMocks private UserEventListener eventListener;
+
+  @Nested
+  class OnUserRoleUpdated {
+
+    @Test
+    @DisplayName("권한변경 이벤트가 오면 유저의 모든 리프레시 토큰을 삭제한다")
+    void success_shouldRemoveAllRefreshTokens_whenRoleUpdatedEventIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+      RoleUpdatedEvent event = new RoleUpdatedEvent(userId, Role.USER, Role.ADMIN);
+
+      // when
+      eventListener.onUserRoleUpdated(event);
+
+      // then
+      then(jwtRegistry).should(times(1)).deleteAllRefreshToken(userId);
+    }
+  }
+}

@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -20,6 +21,7 @@ import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
+import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
@@ -49,6 +51,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -61,6 +64,8 @@ class UserServiceTest {
   @Mock UserRepository userRepository;
 
   @Mock UserMapper userMapper;
+
+  @Mock ApplicationEventPublisher eventPublisher;
 
   @Mock FileStorage fileStorage;
 
@@ -752,6 +757,7 @@ class UserServiceTest {
       UUID userId = UUID.randomUUID();
       User user = new User("이름", "example@gmail.com", "password", null, Role.USER, false);
       given(userRepository.findByIdAndDeletedAtIsNull(eq(userId))).willReturn(Optional.of(user));
+      willDoNothing().given(eventPublisher).publishEvent(any(RoleUpdatedEvent.class));
 
       UserRoleUpdateRequest request = new UserRoleUpdateRequest(Role.ADMIN);
 
@@ -760,6 +766,7 @@ class UserServiceTest {
 
       // then
       assertThat(user.getRole()).isEqualTo(Role.ADMIN);
+      then(eventPublisher).should().publishEvent(any(RoleUpdatedEvent.class));
     }
 
     @Test
@@ -773,6 +780,7 @@ class UserServiceTest {
       assertThrows(
           UserNotFoundException.class,
           () -> userService.updateRole(UUID.randomUUID(), mock(UserRoleUpdateRequest.class)));
+      then(eventPublisher).should(never()).publishEvent(any(RoleUpdatedEvent.class));
     }
   }
 }

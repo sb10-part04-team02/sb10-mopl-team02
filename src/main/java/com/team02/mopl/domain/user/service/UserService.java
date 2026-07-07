@@ -8,6 +8,7 @@ import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
+import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,8 @@ public class UserService {
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
   private final FileStorage fileStorage;
+  private final ApplicationEventPublisher eventPublisher;
+
   // 이미지 검증용
   private static final long MAX_PROFILE_IMAGE_SIZE = 5 * 1024 * 1024;
   private static final List<String> ALLOWED_PROFILE_IMAGE_CONTENT_TYPES =
@@ -155,7 +159,7 @@ public class UserService {
     Role newRole = request.role();
     Role oldRole = findUser.updateRole(newRole);
 
-    // TODO: 권한변경 이벤트 발행
+    eventPublisher.publishEvent(new RoleUpdatedEvent(userId, oldRole, newRole));
 
     log.info("유저 권한변경 로직 완료: userId={}, role=[{} -> {}]", findUser.getId(), oldRole, newRole);
   }
