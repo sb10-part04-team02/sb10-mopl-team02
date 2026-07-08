@@ -5,12 +5,14 @@ import com.team02.mopl.domain.content.ingestion.sportsdb.dto.SportsDbEventDto;
 import com.team02.mopl.domain.content.ingestion.sportsdb.dto.SportsDbEventsResponse;
 import java.util.List;
 import java.util.function.Supplier;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 // SportsDB HTTP 호출 캡슐화. 에러 응답은 RestClient 상태 핸들러가, IO 오류는 이 클래스가 SportsDbApiException으로 변환
+@Slf4j
 @Component
 public class SportsDbClient {
 
@@ -56,10 +58,22 @@ public class SportsDbClient {
         if (attempt >= MAX_ATTEMPTS) {
           throw new SportsDbApiException(e);
         }
+        // 재시도 전 기록. 예외 메시지에는 API 키가 포함된 URI가 담길 수 있어 클래스명만 남긴다
+        log.warn(
+            "SportsDB 호출 실패로 재시도합니다. attempt={}/{}, cause={}",
+            attempt,
+            MAX_ATTEMPTS,
+            e.getClass().getSimpleName());
       } catch (SportsDbApiException e) { // 상태 핸들러가 던진 4xx/5xx
         if (!e.isRetryable() || attempt >= MAX_ATTEMPTS) {
           throw e;
         }
+        // details는 statusCode만 담겨 키가 새지 않으므로 그대로 남긴다
+        log.warn(
+            "SportsDB 호출 실패로 재시도합니다. attempt={}/{}, details={}",
+            attempt,
+            MAX_ATTEMPTS,
+            e.getDetails());
       }
       backoff(attempt++);
     }
