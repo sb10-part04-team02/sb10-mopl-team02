@@ -37,8 +37,11 @@ abstract class AbstractTmdbMapper<T> implements ExternalContentMapper<T> {
     this.defaultThumbnailUrl = defaultThumbnailUrl;
   }
 
+  // externalIdPrefix: TMDB의 movie id와 tv id는 서로 독립된 시퀀스라 같은 숫자가 다른 작품을 가리킬 수 있음
+  // (source, external_id) 유니크 키가 충돌하지 않도록 "movie:"/"tv:" prefix로 분리
   protected Optional<ExternalContentData> mapFields(
       long id,
+      String externalIdPrefix,
       ContentType contentType,
       String title,
       String overview,
@@ -56,7 +59,7 @@ abstract class AbstractTmdbMapper<T> implements ExternalContentMapper<T> {
     return Optional.of(
         new ExternalContentData(
             ContentSource.TMDB,
-            String.valueOf(id),
+            externalIdPrefix + id,
             contentType,
             truncate(title.strip(), TITLE_MAX_LENGTH),
             mapDescription(overview),

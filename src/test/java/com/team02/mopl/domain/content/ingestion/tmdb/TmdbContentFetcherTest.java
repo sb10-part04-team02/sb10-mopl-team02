@@ -72,7 +72,9 @@ class TmdbContentFetcherTest {
 
     // then - 영화 2건 + 드라마 1건 = 총 3건 수집 되어야 함
     assertThat(results).hasSize(3);
-    assertThat(results).extracting(ExternalContentData::externalId).containsExactly("1", "2", "3");
+    assertThat(results)
+        .extracting(ExternalContentData::externalId)
+        .containsExactly("movie:1", "movie:2", "tv:3");
     then(tmdbClient).should().fetchPopularMovies(1);
     then(tmdbClient).should().fetchPopularMovies(2);
     then(tmdbClient).should().fetchPopularTv(1);
@@ -97,7 +99,7 @@ class TmdbContentFetcherTest {
     List<ExternalContentData> results = fetcher.fetch();
 
     // then
-    assertThat(results).extracting(ExternalContentData::externalId).containsExactly("1");
+    assertThat(results).extracting(ExternalContentData::externalId).containsExactly("movie:1");
   }
 
   @Test
@@ -117,7 +119,34 @@ class TmdbContentFetcherTest {
     List<ExternalContentData> results = fetcher.fetch();
 
     // then - 실패한 영화 1페이지는 건너뛰고, 성공한 2, 3만 수집
-    assertThat(results).extracting(ExternalContentData::externalId).containsExactly("2", "3");
+    assertThat(results)
+        .extracting(ExternalContentData::externalId)
+        .containsExactly("movie:2", "tv:3");
+  }
+
+  @Test
+  @DisplayName("장르 조회가 실패해도 해당 섹션은 태그 없이 수집을 계속한다")
+  void fetch_whenGenreFetchFails_continuesWithoutTags() {
+    // given - 영화 장르 조회만 실패, TV 장르는 정상
+    given(tmdbClient.fetchMovieGenres())
+        .willThrow(new TmdbApiException(new RuntimeException("일시 오류")));
+    given(tmdbClient.fetchTvGenres()).willReturn(Map.of(10765, "SF"));
+    given(tmdbClient.fetchPopularMovies(1))
+        .willReturn(moviePage(new TmdbMovieDto(1, "영화1", "줄거리", "/p1.jpg", List.of(28))));
+    given(tmdbClient.fetchPopularMovies(2)).willReturn(moviePage());
+    given(tmdbClient.fetchPopularTv(1))
+        .willReturn(tvPage(new TmdbTvDto(3, "드라마1", "줄거리", "/p3.jpg", List.of(10765))));
+    given(tmdbClient.fetchPopularTv(2)).willReturn(tvPage());
+
+    // when
+    List<ExternalContentData> results = fetcher.fetch();
+
+    // then - 영화는 태그 없이 수집되고, TV 수집은 영향받지 않는다
+    assertThat(results)
+        .extracting(ExternalContentData::externalId)
+        .containsExactly("movie:1", "tv:3");
+    assertThat(results.get(0).tags()).isEmpty();
+    assertThat(results.get(1).tags()).containsExactly("SF");
   }
 
   @Test

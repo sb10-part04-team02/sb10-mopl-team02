@@ -8,6 +8,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withUnauthorizedRequest;
 
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -197,6 +199,30 @@ class TmdbClientTest {
     server
         .expect(requestTo(Matchers.startsWith(BASE_URL + "/movie/popular")))
         .andRespond(withServerError());
+    server
+        .expect(requestTo(Matchers.startsWith(BASE_URL + "/movie/popular")))
+        .andRespond(
+            withSuccess(
+                """
+                {"page": 1, "results": [{"id": 550, "title": "파이트 클럽", "genre_ids": []}], "total_pages": 1}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    // when
+    TmdbPageResponse<TmdbMovieDto> response = tmdbClient.fetchPopularMovies(1);
+
+    // then
+    assertThat(response.results().get(0).id()).isEqualTo(550L);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("429(rate limit) 이후 정상 응답이 오면 재시도로 복구해 결과를 반환한다")
+  void fetchPopularMovies_whenRateLimited_retriesAndSucceeds() {
+    // given: 첫 호출은 429, 재시도 호출은 성공
+    server
+        .expect(requestTo(Matchers.startsWith(BASE_URL + "/movie/popular")))
+        .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
     server
         .expect(requestTo(Matchers.startsWith(BASE_URL + "/movie/popular")))
         .andRespond(

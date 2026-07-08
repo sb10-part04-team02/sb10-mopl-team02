@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.content.ingestion.tmdb;
 
 import com.team02.mopl.domain.content.ingestion.exception.TmdbApiException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
@@ -10,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.web.client.RestClient;
 
+@Slf4j
 @Configuration
 @EnableConfigurationProperties(TmdbProperties.class)
 public class TmdbClientConfig {
@@ -36,7 +38,10 @@ public class TmdbClientConfig {
         .defaultStatusHandler( // 예외처리
             HttpStatusCode::isError,
             (request, response) -> {
-              throw new TmdbApiException(response.getStatusCode().value(), request.getURI());
+              int statusCode = response.getStatusCode().value();
+              // 요청 URI는 클라이언트 응답(details)에 노출하지 않고 로그로만 남긴다
+              log.warn("TMDB API 오류 응답: status={}, uri={}", statusCode, request.getURI());
+              throw new TmdbApiException(statusCode);
             });
   }
 }
