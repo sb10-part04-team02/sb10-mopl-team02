@@ -3,13 +3,16 @@ package com.team02.mopl.domain.content.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.team02.mopl.domain.content.dto.ContentSearchCondition;
 import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.enums.ContentSource;
 import com.team02.mopl.domain.content.enums.ContentType;
+import com.team02.mopl.domain.content.enums.SortBy;
 import com.team02.mopl.domain.review.entity.Review;
 import com.team02.mopl.domain.review.repository.ReviewRepository;
 import com.team02.mopl.support.RepositoryTestSupport;
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -139,6 +142,25 @@ class ContentRepositoryTest extends RepositoryTestSupport {
 
     // when & then
     assertThat(contentRepository.count()).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("search는 소프트 삭제된 콘텐츠를 결과에서 제외한다")
+  void search_excludesSoftDeletedContent() {
+    // given - setUp의 활성 콘텐츠 1건 + 소프트 삭제된 콘텐츠 1건
+    Content deleted = new Content(ContentType.MOVIE, "삭제된 영화", "설명", "http://img");
+    em.persist(deleted);
+    em.flush();
+    deleted.delete();
+    em.flush();
+
+    // when
+    List<Content> results =
+        contentRepository.search(
+            new ContentSearchCondition(null, null, null, SortBy.CREATED_AT, true, null, null, 10));
+
+    // then - deletedAt.isNull() 조건으로 삭제된 콘텐츠는 걸러진다
+    assertThat(results).extracting(Content::getId).containsExactly(contentId);
   }
 
   private UUID insertUser() {
