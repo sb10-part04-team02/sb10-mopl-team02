@@ -7,8 +7,8 @@ on:
     types: [ created ]
 
 concurrency:
-  group: claude-review-${{ github.event.issue.number || github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: claude-review-${{ github.event.comment.id }}
+  cancel-in-progress: false
 
 jobs:
   claude-review:
