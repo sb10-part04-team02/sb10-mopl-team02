@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.entity.enums.Role;
@@ -217,6 +218,56 @@ public class UserControllerAdminTest {
     private MockHttpServletRequestBuilder createUserRoleUpdateRequest(UUID userId, String content) {
 
       return MockMvcRequestBuilders.patch("/api/users/{userId}/role", userId)
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(content);
+    }
+  }
+
+  @Nested
+  class UpdateLock {
+
+    @Test
+    @DisplayName("계정잠금을 성공적으로 수행하면 204를 반환한다")
+    void success_shouldReturn204_whenLockIsUpdatedSuccessfully() throws Exception {
+      // given
+      UUID userId = UUID.randomUUID();
+      String content = objectMapper.writeValueAsString(new UserLockUpdateRequest(true));
+
+      // when & then
+      mockMvc
+          .perform(createUserLockUpdateRequest(userId, content))
+          .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("잘못된 타입이 들어온다면 400 반환한다")
+    void fail_shouldReturn400_whenTypeIsInvalid() throws Exception {
+      // given
+      UUID userId = UUID.randomUUID();
+      String invalidContent = "{\"locked\": \"INVALID_BOOLEAN\"}";
+
+      // when & then
+      mockMvc
+          .perform(createUserLockUpdateRequest(userId, invalidContent))
+          .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    @DisplayName("권한이 없으면 403을 반환한다")
+    void fail_shouldReturn403Forbidden_whenUserHasNoPermission() throws Exception {
+      // given
+      UUID userId = UUID.randomUUID();
+      String content = objectMapper.writeValueAsString(new UserLockUpdateRequest(true));
+
+      // when & then
+      mockMvc
+          .perform(createUserLockUpdateRequest(userId, content))
+          .andExpect(status().isForbidden());
+    }
+
+    private MockHttpServletRequestBuilder createUserLockUpdateRequest(UUID userId, String content) {
+      return MockMvcRequestBuilders.patch("/api/users/{userId}/locked", userId)
           .contentType(MediaType.APPLICATION_JSON)
           .content(content);
     }

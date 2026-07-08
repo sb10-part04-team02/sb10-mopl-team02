@@ -2,6 +2,7 @@ package com.team02.mopl.domain.user.service;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
@@ -9,6 +10,7 @@ import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
+import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
@@ -167,6 +169,25 @@ public class UserService {
     eventPublisher.publishEvent(new RoleUpdatedEvent(userId, oldRole, newRole));
 
     log.info("유저 권한변경 로직 완료: userId={}, role=[{} -> {}]", findUser.getId(), oldRole, newRole);
+  }
+
+  @Transactional
+  public void updateLock(UUID userId, UserLockUpdateRequest request) {
+    log.debug("유저 계정잠금변경 시작: userId={}", userId);
+    User findUser =
+        userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
+
+    boolean newLocked = request.locked();
+    if (newLocked == findUser.isLocked()) {
+      // 멱득성 보장
+      log.info("유저의 기존 계정잠금과 동일하여 변경을 스킵합니다. userId={} isLocked={}", userId, newLocked);
+      return;
+    }
+
+    boolean oldLocked = findUser.updateLock(request.locked());
+    eventPublisher.publishEvent(new UserLockUpdatedEvent(userId, newLocked));
+    log.info(
+        "유저 계정잠금변경 로직 완료: userId={}, isLocked=[{} -> {}]", findUser.getId(), oldLocked, newLocked);
   }
 
   private void validateOwner(UUID requesterId, UUID userId) {

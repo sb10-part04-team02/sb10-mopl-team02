@@ -44,3 +44,4 @@ app:
       refresh-prefix: "jwt:refresh:"
       max-account-count: 1
       blacklist-prefix: "jwt:blacklist:"
+      user-lock-prefix: "jwt:userlock:"
