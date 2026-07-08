@@ -1,13 +1,13 @@
 package com.team02.mopl.domain.auth.controller;
 
 import com.team02.mopl.domain.auth.dto.JwtDto;
+import com.team02.mopl.domain.auth.dto.ResetPasswordRequest;
 import com.team02.mopl.domain.auth.dto.SignInRequest;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import com.team02.mopl.global.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.RequestBody;
 
 @Tag(name = "인증 관리")
 public interface AuthApi {
@@ -33,7 +34,7 @@ public interface AuthApi {
       summary = "로그인",
       description = "SecurityFilterChain에서 처리합니다.",
       requestBody =
-          @RequestBody(
+          @io.swagger.v3.oas.annotations.parameters.RequestBody(
               required = true,
               content =
                   @io.swagger.v3.oas.annotations.media.Content(
@@ -101,4 +102,22 @@ public interface AuthApi {
   ResponseEntity<JwtDto> refresh(
       @CookieValue(name = JwtUtils.REFRESH_TOKEN_COOKIE_NAME) String refreshToken,
       HttpServletResponse response);
+
+  @Operation(summary = "비밀번호 초기화", description = "임시 비밀번호로 초기화 후 이메일로 전송합니다.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<Void> resetPassword(@RequestBody @Valid ResetPasswordRequest request);
 }

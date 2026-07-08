@@ -86,6 +86,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/refresh")
                     .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/auth/reset-password")
+                    .permitAll()
                     .requestMatchers(nonApiMatcher)
                     .permitAll() // swagger, api-docs 대응
 

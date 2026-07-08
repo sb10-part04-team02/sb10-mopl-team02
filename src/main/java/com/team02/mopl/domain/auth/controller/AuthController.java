@@ -1,11 +1,13 @@
 package com.team02.mopl.domain.auth.controller;
 
 import com.team02.mopl.domain.auth.dto.JwtDto;
+import com.team02.mopl.domain.auth.dto.ResetPasswordRequest;
 import com.team02.mopl.domain.auth.dto.SignInRequest;
 import com.team02.mopl.domain.auth.exception.AuthException;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import com.team02.mopl.domain.auth.service.AuthService;
 import com.team02.mopl.domain.auth.service.AuthService.TokenResult;
+import com.team02.mopl.domain.auth.service.MailService;
 import com.team02.mopl.global.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -18,6 +20,7 @@ import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController implements AuthApi {
 
   private final AuthService authService;
+  private final MailService mailService;
   private final JwtUtils jwtUtils;
 
   @GetMapping("/csrf-token")
@@ -58,5 +62,11 @@ public class AuthController implements AuthApi {
     response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
     return ResponseEntity.status(HttpStatus.OK).body(tokens.jwtDto());
+  }
+
+  @PostMapping("/reset-password")
+  public ResponseEntity<Void> resetPassword(@RequestBody @Valid ResetPasswordRequest request) {
+    mailService.sendResetPasswordEmail(request);
+    return ResponseEntity.status(HttpStatus.OK).build();
   }
 }
