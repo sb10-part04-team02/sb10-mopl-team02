@@ -143,11 +143,11 @@ services:
       # 프로젝트의 Nginx 설정 파일을 컨테이너 설정으로 마운트한다.
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      # app-1/app-2가 시작된 이후 Nginx를 시작한다.
+      # app-1/app-2가 healthCheck 통과를 기다린 뒤, Nginx를 시작한다.
       app-1:
-        condition: service_started
+        condition: service_healthy
       app-2:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   # 분산 환경 전용 PostgreSQL 데이터 볼륨
