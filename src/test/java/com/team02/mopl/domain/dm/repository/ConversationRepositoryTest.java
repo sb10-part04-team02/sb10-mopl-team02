@@ -38,7 +38,7 @@ class ConversationRepositoryTest extends RepositoryTestSupport {
 
     List<Conversation> result =
         conversationRepository.findConversationsByCursor(
-            userId, SortDirection.DESCENDING, null, null, 10);
+            userId, null, SortDirection.DESCENDING, null, null, 10);
 
     assertThat(result)
         .extracting(Conversation::getId)
@@ -55,7 +55,7 @@ class ConversationRepositoryTest extends RepositoryTestSupport {
 
     List<Conversation> result =
         conversationRepository.findConversationsByCursor(
-            userId, SortDirection.ASCENDING, null, null, 10);
+            userId, null, SortDirection.ASCENDING, null, null, 10);
 
     assertThat(result)
         .extracting(Conversation::getId)
@@ -74,7 +74,7 @@ class ConversationRepositoryTest extends RepositoryTestSupport {
 
     List<Conversation> result =
         conversationRepository.findConversationsByCursor(
-            userId, SortDirection.DESCENDING, conv3.getCreatedAt(), conv3.getId(), 10);
+            userId, null, SortDirection.DESCENDING, conv3.getCreatedAt(), conv3.getId(), 10);
 
     assertThat(result)
         .extracting(Conversation::getId)
@@ -90,7 +90,7 @@ class ConversationRepositoryTest extends RepositoryTestSupport {
 
     List<Conversation> result =
         conversationRepository.findConversationsByCursor(
-            userId, SortDirection.DESCENDING, null, null, 10);
+            userId, null, SortDirection.DESCENDING, null, null, 10);
 
     assertThat(result).hasSize(1);
   }
@@ -104,9 +104,52 @@ class ConversationRepositoryTest extends RepositoryTestSupport {
 
     List<Conversation> result =
         conversationRepository.findConversationsByCursor(
-            userId, SortDirection.DESCENDING, null, null, 2);
+            userId, null, SortDirection.DESCENDING, null, null, 2);
 
     assertThat(result).hasSize(2);
+  }
+
+  @Test
+  @DisplayName("keyword가 있으면 상대방 이름에 부분일치하는 대화만 반환한다")
+  void findConversationsByCursor_withKeyword_filtersByCounterpartName() {
+    UUID kimId = insertUser("kim@test.com", "김철수");
+    UUID leeId = insertUser("lee@test.com", "이영희");
+    Conversation convWithKim =
+        saveConversationWithMembers(userId, kimId, Instant.parse("2026-06-29T01:00:00Z"));
+    saveConversationWithMembers(userId, leeId, Instant.parse("2026-06-29T02:00:00Z"));
+
+    List<Conversation> result =
+        conversationRepository.findConversationsByCursor(
+            userId, "철수", SortDirection.DESCENDING, null, null, 10);
+
+    assertThat(result).extracting(Conversation::getId).containsExactly(convWithKim.getId());
+  }
+
+  @Test
+  @DisplayName("keyword가 자신의 이름에만 일치하면 대화를 반환하지 않는다")
+  void findConversationsByCursor_keywordMatchingOwnNameOnly_returnsEmpty() {
+    UUID kimId = insertUser("kim@test.com", "김철수");
+    saveConversationWithMembers(userId, kimId, Instant.parse("2026-06-29T01:00:00Z"));
+
+    // 요청자(userId)의 이름은 "테스트유저" — 자신의 이름 검색은 상대방 이름과 일치하지 않으므로 제외된다
+    List<Conversation> result =
+        conversationRepository.findConversationsByCursor(
+            userId, "테스트유저", SortDirection.DESCENDING, null, null, 10);
+
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  @DisplayName("keyword가 있으면 상대방 이름에 부분일치하는 활성 대화 수만 센다")
+  void countByMemberUserId_withKeyword_countsMatchingOnly() {
+    UUID kimId = insertUser("kim@test.com", "김철수");
+    UUID leeId = insertUser("lee@test.com", "이영희");
+    saveConversationWithMembers(userId, kimId, Instant.parse("2026-06-29T01:00:00Z"));
+    saveConversationWithMembers(userId, leeId, Instant.parse("2026-06-29T02:00:00Z"));
+
+    long count = conversationRepository.countByMemberUserId(userId, "철수");
+
+    assertThat(count).isEqualTo(1L);
   }
 
   @Test
@@ -118,18 +161,22 @@ class ConversationRepositoryTest extends RepositoryTestSupport {
     UUID thirdUserId = insertUser("third@test.com");
     saveConversationWithMembers(otherUserId, thirdUserId, Instant.parse("2026-06-29T03:00:00Z"));
 
-    long count = conversationRepository.countByMemberUserId(userId);
+    long count = conversationRepository.countByMemberUserId(userId, null);
 
     assertThat(count).isEqualTo(2L);
   }
 
   private UUID insertUser(String email) {
+    return insertUser(email, "테스트유저");
+  }
+
+  private UUID insertUser(String email, String name) {
     UUID id = UUID.randomUUID();
     em.createNativeQuery(
             "INSERT INTO users (id, updated_at, name, email, role) "
                 + "VALUES (:id, now(), :name, :email, 'USER')")
         .setParameter("id", id)
-        .setParameter("name", "테스트유저")
+        .setParameter("name", name)
         .setParameter("email", email)
         .executeUpdate();
     em.flush();

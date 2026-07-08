@@ -7,6 +7,7 @@ import jakarta.validation.constraints.AssertTrue;
 import java.util.UUID;
 
 public record ConversationSearchRequest(
+    String keywordLike,
     String cursor,
     UUID idAfter,
     Integer limit,
