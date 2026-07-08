@@ -9,5 +9,12 @@ import java.util.UUID;
 public interface ConversationRepositoryCustom {
 
   List<Conversation> findConversationsByCursor(
-      UUID userId, SortDirection direction, Instant cursor, UUID idAfter, int limit);
+      UUID userId,
+      String keyword,
+      SortDirection direction,
+      Instant cursor,
+      UUID idAfter,
+      int limit);
+
+  long countByMemberUserId(UUID userId, String keyword);
 }
