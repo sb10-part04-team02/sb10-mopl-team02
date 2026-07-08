@@ -82,7 +82,7 @@ class DirectMessageServiceTest {
     assertThat(result.with().userId()).isEqualTo(withUserId);
     assertThat(result.with().name()).isEqualTo("상대방");
     assertThat(result.with().profileImageUrl()).isEqualTo("https://img.example.com/profile.png");
-    assertThat(result.lastMessage()).isNull();
+    assertThat(result.lastestMessage()).isNull();
     assertThat(result.hasUnread()).isFalse();
 
     verify(conversationRepository).save(any(Conversation.class));
@@ -226,7 +226,7 @@ class DirectMessageServiceTest {
   }
 
   @Test
-  @DisplayName("마지막 메시지가 없으면 lastMessage=null, hasUnread=false로 반환한다")
+  @DisplayName("마지막 메시지가 없으면 lastestMessage=null, hasUnread=false로 반환한다")
   void findConversationWith_noLastMessage_returnsNullLastMessageAndFalseHasUnread() {
     UUID requesterId = UUID.randomUUID();
     UUID withUserId = UUID.randomUUID();
@@ -246,7 +246,7 @@ class DirectMessageServiceTest {
 
     ConversationDto result = directMessageService.findConversationWith(requesterId, withUserId);
 
-    assertThat(result.lastMessage()).isNull();
+    assertThat(result.lastestMessage()).isNull();
     assertThat(result.hasUnread()).isFalse();
   }
 
@@ -275,8 +275,8 @@ class DirectMessageServiceTest {
     ConversationDto result = directMessageService.findConversationWith(requesterId, withUserId);
 
     assertThat(result.hasUnread()).isTrue();
-    assertThat(result.lastMessage()).isNotNull();
-    assertThat(result.lastMessage().content()).isEqualTo("안녕하세요");
+    assertThat(result.lastestMessage()).isNotNull();
+    assertThat(result.lastestMessage().content()).isEqualTo("안녕하세요");
   }
 
   @Test
@@ -395,8 +395,8 @@ class DirectMessageServiceTest {
     assertThat(result.id()).isEqualTo(conversationId);
     assertThat(result.with().userId()).isEqualTo(withUserId);
     assertThat(result.hasUnread()).isTrue();
-    assertThat(result.lastMessage()).isNotNull();
-    assertThat(result.lastMessage().content()).isEqualTo("안녕하세요");
+    assertThat(result.lastestMessage()).isNotNull();
+    assertThat(result.lastestMessage().content()).isEqualTo("안녕하세요");
   }
 
   @Test
@@ -428,7 +428,7 @@ class DirectMessageServiceTest {
   }
 
   @Test
-  @DisplayName("마지막 메시지가 없으면 lastMessage=null, hasUnread=false로 반환한다")
+  @DisplayName("마지막 메시지가 없으면 lastestMessage=null, hasUnread=false로 반환한다")
   void findConversation_noLastMessage_returnsNullLastMessageAndFalseHasUnread() {
     UUID conversationId = UUID.randomUUID();
     UUID requesterId = UUID.randomUUID();
@@ -449,7 +449,7 @@ class DirectMessageServiceTest {
 
     ConversationDto result = directMessageService.findConversation(conversationId, requesterId);
 
-    assertThat(result.lastMessage()).isNull();
+    assertThat(result.lastestMessage()).isNull();
     assertThat(result.hasUnread()).isFalse();
   }
 
@@ -475,9 +475,9 @@ class DirectMessageServiceTest {
 
     given(
             conversationRepository.findConversationsByCursor(
-                requesterId, SortDirection.DESCENDING, null, null, 21))
+                requesterId, null, SortDirection.DESCENDING, null, null, 21))
         .willReturn(List.of(conv));
-    given(conversationRepository.countByMemberUserId(requesterId)).willReturn(1L);
+    given(conversationRepository.countByMemberUserId(requesterId, null)).willReturn(1L);
     given(
             conversationMemberRepository.findWithUserMembersForConversations(
                 List.of(conversationId), requesterId))
@@ -492,7 +492,7 @@ class DirectMessageServiceTest {
 
     CursorResponse<ConversationDto> result =
         directMessageService.getConversations(
-            requesterId, new ConversationSearchRequest(null, null, null, null, null));
+            requesterId, new ConversationSearchRequest(null, null, null, null, null, null));
 
     assertThat(result.data()).hasSize(1);
     assertThat(result.data().get(0).id()).isEqualTo(conversationId);
@@ -530,9 +530,9 @@ class DirectMessageServiceTest {
 
     given(
             conversationRepository.findConversationsByCursor(
-                requesterId, SortDirection.DESCENDING, null, null, 2))
+                requesterId, null, SortDirection.DESCENDING, null, null, 2))
         .willReturn(List.of(conv1, conv2));
-    given(conversationRepository.countByMemberUserId(requesterId)).willReturn(3L);
+    given(conversationRepository.countByMemberUserId(requesterId, null)).willReturn(3L);
     given(
             conversationMemberRepository.findWithUserMembersForConversations(
                 List.of(convId1), requesterId))
@@ -547,7 +547,7 @@ class DirectMessageServiceTest {
 
     CursorResponse<ConversationDto> result =
         directMessageService.getConversations(
-            requesterId, new ConversationSearchRequest(null, null, 1, null, null));
+            requesterId, new ConversationSearchRequest(null, null, null, 1, null, null));
 
     assertThat(result.data()).hasSize(1);
     assertThat(result.hasNext()).isTrue();
@@ -578,9 +578,9 @@ class DirectMessageServiceTest {
 
     given(
             conversationRepository.findConversationsByCursor(
-                requesterId, SortDirection.DESCENDING, null, null, 21))
+                requesterId, null, SortDirection.DESCENDING, null, null, 21))
         .willReturn(List.of(conv));
-    given(conversationRepository.countByMemberUserId(requesterId)).willReturn(1L);
+    given(conversationRepository.countByMemberUserId(requesterId, null)).willReturn(1L);
     given(
             conversationMemberRepository.findWithUserMembersForConversations(
                 List.of(conversationId), requesterId))
@@ -595,11 +595,11 @@ class DirectMessageServiceTest {
 
     CursorResponse<ConversationDto> result =
         directMessageService.getConversations(
-            requesterId, new ConversationSearchRequest(null, null, null, null, null));
+            requesterId, new ConversationSearchRequest(null, null, null, null, null, null));
 
     assertThat(result.data().get(0).hasUnread()).isTrue();
-    assertThat(result.data().get(0).lastMessage()).isNotNull();
-    assertThat(result.data().get(0).lastMessage().content()).isEqualTo("안녕하세요");
+    assertThat(result.data().get(0).lastestMessage()).isNotNull();
+    assertThat(result.data().get(0).lastestMessage().content()).isEqualTo("안녕하세요");
   }
 
   @Test
@@ -612,20 +612,43 @@ class DirectMessageServiceTest {
 
     given(
             conversationRepository.findConversationsByCursor(
-                requesterId, SortDirection.ASCENDING, cursorInstant, idAfter, 6))
+                requesterId, null, SortDirection.ASCENDING, cursorInstant, idAfter, 6))
         .willReturn(List.of());
-    given(conversationRepository.countByMemberUserId(requesterId)).willReturn(0L);
+    given(conversationRepository.countByMemberUserId(requesterId, null)).willReturn(0L);
 
     CursorResponse<ConversationDto> result =
         directMessageService.getConversations(
             requesterId,
             new ConversationSearchRequest(
-                cursor, idAfter, 5, SortDirection.ASCENDING, ConversationSortBy.CREATED_AT));
+                null, cursor, idAfter, 5, SortDirection.ASCENDING, ConversationSortBy.CREATED_AT));
 
     verify(conversationRepository)
-        .findConversationsByCursor(requesterId, SortDirection.ASCENDING, cursorInstant, idAfter, 6);
+        .findConversationsByCursor(
+            requesterId, null, SortDirection.ASCENDING, cursorInstant, idAfter, 6);
     assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING.name());
     assertThat(result.data()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("keywordLike를 리포지토리 조회와 totalCount 집계에 그대로 전달한다")
+  void getConversations_withKeyword_forwardsKeywordToRepository() {
+    UUID requesterId = UUID.randomUUID();
+
+    given(
+            conversationRepository.findConversationsByCursor(
+                requesterId, "철수", SortDirection.DESCENDING, null, null, 21))
+        .willReturn(List.of());
+    given(conversationRepository.countByMemberUserId(requesterId, "철수")).willReturn(0L);
+
+    CursorResponse<ConversationDto> result =
+        directMessageService.getConversations(
+            requesterId, new ConversationSearchRequest("철수", null, null, null, null, null));
+
+    verify(conversationRepository)
+        .findConversationsByCursor(requesterId, "철수", SortDirection.DESCENDING, null, null, 21);
+    verify(conversationRepository).countByMemberUserId(requesterId, "철수");
+    assertThat(result.data()).isEmpty();
+    assertThat(result.totalCount()).isZero();
   }
 
   @Test
@@ -634,14 +657,14 @@ class DirectMessageServiceTest {
     UUID requesterId = UUID.randomUUID();
 
     ConversationSearchRequest cursorOnly =
-        new ConversationSearchRequest("2026-06-30T10:15:30Z", null, null, null, null);
+        new ConversationSearchRequest(null, "2026-06-30T10:15:30Z", null, null, null, null);
     assertThatThrownBy(() -> directMessageService.getConversations(requesterId, cursorOnly))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
 
     ConversationSearchRequest idAfterOnly =
-        new ConversationSearchRequest(null, UUID.randomUUID(), null, null, null);
+        new ConversationSearchRequest(null, null, UUID.randomUUID(), null, null, null);
     assertThatThrownBy(() -> directMessageService.getConversations(requesterId, idAfterOnly))
         .isInstanceOfSatisfying(
             BusinessException.class,
@@ -658,7 +681,7 @@ class DirectMessageServiceTest {
                 directMessageService.getConversations(
                     requesterId,
                     new ConversationSearchRequest(
-                        "not-a-date", UUID.randomUUID(), null, null, null)))
+                        null, "not-a-date", UUID.randomUUID(), null, null, null)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR));

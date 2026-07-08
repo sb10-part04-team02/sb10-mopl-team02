@@ -2,6 +2,7 @@ package com.team02.mopl.domain.dm.repository;
 
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.team02.mopl.domain.dm.entity.Conversation;
 import com.team02.mopl.domain.dm.entity.QConversation;
@@ -26,7 +27,12 @@ public class ConversationRepositoryImpl implements ConversationRepositoryCustom 
 
   @Override
   public List<Conversation> findConversationsByCursor(
-      UUID userId, SortDirection direction, Instant cursor, UUID idAfter, int limit) {
+      UUID userId,
+      String keyword,
+      SortDirection direction,
+      Instant cursor,
+      UUID idAfter,
+      int limit) {
     boolean ascending = direction == SortDirection.ASCENDING;
     boolean firstPage = cursor == null && idAfter == null;
 
@@ -36,6 +42,7 @@ public class ConversationRepositoryImpl implements ConversationRepositoryCustom 
         .on(member.conversation.eq(conversation), member.user.id.eq(userId))
         .where(
             conversation.deletedAt.isNull(),
+            counterpartNameContains(userId, keyword),
             firstPage ? null : cursorCondition(cursor, idAfter, ascending))
         .orderBy(
             ascending ? conversation.createdAt.asc() : conversation.createdAt.desc(),
@@ -43,6 +50,35 @@ public class ConversationRepositoryImpl implements ConversationRepositoryCustom 
         .setHint(HibernateHints.HINT_READ_ONLY, true)
         .limit(limit)
         .fetch();
+  }
+
+  @Override
+  public long countByMemberUserId(UUID userId, String keyword) {
+    Long count =
+        queryFactory
+            .select(conversation.count())
+            .from(conversation)
+            .join(member)
+            .on(member.conversation.eq(conversation), member.user.id.eq(userId))
+            .where(conversation.deletedAt.isNull(), counterpartNameContains(userId, keyword))
+            .fetchOne();
+    return count == null ? 0L : count;
+  }
+
+  // 상대방 이름 부분일치 (대소문자 구분 없음). keyword가 없으면 필터 미적용.
+  // EXISTS 서브쿼리로 표현해 조인 중복 행을 만들지 않고 커서 정렬을 그대로 유지한다
+  private BooleanExpression counterpartNameContains(UUID userId, String keyword) {
+    if (keyword == null || keyword.isBlank()) {
+      return null;
+    }
+    QConversationMember counterpart = new QConversationMember("counterpart");
+    return JPAExpressions.selectOne()
+        .from(counterpart)
+        .where(
+            counterpart.conversation.eq(conversation),
+            counterpart.user.id.ne(userId),
+            counterpart.user.name.containsIgnoreCase(keyword))
+        .exists();
   }
 
   private BooleanExpression cursorCondition(Instant cursor, UUID idAfter, boolean ascending) {
