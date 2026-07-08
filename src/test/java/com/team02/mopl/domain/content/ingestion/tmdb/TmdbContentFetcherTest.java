@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class TmdbContentFetcherTest {
@@ -39,8 +38,7 @@ class TmdbContentFetcherTest {
             2,
             Duration.ofSeconds(3),
             Duration.ofSeconds(10));
-    fetcher = new TmdbContentFetcher(tmdbClient, properties);
-    ReflectionTestUtils.setField(fetcher, "defaultThumbnailUrl", "");
+    fetcher = new TmdbContentFetcher(tmdbClient, properties, "");
   }
 
   private void givenGenres() {
