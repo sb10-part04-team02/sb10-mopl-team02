@@ -26,7 +26,7 @@ CREATE TABLE contents
     external_id    VARCHAR(100) NULL,
 
     CONSTRAINT chk_contents_content_type CHECK (content_type IN ('MOVIE', 'TV_SERIES', 'SPORT')),
-    CONSTRAINT chk_contents_source CHECK (source IN ('TMDB')),
+    CONSTRAINT chk_contents_source CHECK (source IN ('TMDB', 'SPORTS_DB')),
     -- source와 external_id 두 컬럼이 항상 같이 있거나 같이 없거나를 강제
     -- source만 있고 external_id가 없는 행(혹은 그 반대)으로 인해 유니크 인덱스 통과해서 데이터 정합성 깨짐 방지
     CONSTRAINT chk_contents_source_external_id_pair CHECK ((source IS NULL) = (external_id IS NULL))
