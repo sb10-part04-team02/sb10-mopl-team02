@@ -6,9 +6,14 @@ import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
+import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +32,7 @@ public class UserEventListener {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onUserRoleUpdated(RoleUpdatedEvent event) {
     try {
-      // 권한변경
+      // 권한변경시 refreshToken 전체삭제
       jwtRegistry.deleteAllRefreshToken(event.userId());
     } catch (DataAccessException e) {
       log.error(
@@ -53,5 +58,28 @@ public class UserEventListener {
           event.newRole(),
           e);
     }
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Retryable(
+      retryFor = {DataAccessException.class},
+      maxAttempts = 3,
+      backoff = @Backoff(delay = 1000) // 1초 간격으로 최대 3번 재시도
+      )
+  public void onUserLockUpdatedEvent(UserLockUpdatedEvent event) {
+    UUID userId = event.userId();
+
+    if (event.locked()) {
+      jwtRegistry.lockUser(userId);
+    } else {
+      jwtRegistry.unlockUser(userId);
+    }
+  }
+
+  @Recover
+  public void userLockUpdatedRecover(DataAccessException e, UserLockUpdatedEvent event) {
+    String action = event.locked() ? "잠금(토큰삭제)" : "해제(키삭제)";
+    log.error(
+        "[Redis] 유저 계정 {} 최종 실패: userId={}, reason={}", action, event.userId(), e.getMessage(), e);
   }
 }

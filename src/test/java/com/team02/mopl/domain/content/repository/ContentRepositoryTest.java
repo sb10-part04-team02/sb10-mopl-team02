@@ -1,9 +1,11 @@
 package com.team02.mopl.domain.content.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.team02.mopl.domain.content.dto.ContentSearchCondition;
 import com.team02.mopl.domain.content.entity.Content;
+import com.team02.mopl.domain.content.enums.ContentSource;
 import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.content.enums.SortBy;
 import com.team02.mopl.domain.review.entity.Review;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class ContentRepositoryTest extends RepositoryTestSupport {
 
@@ -73,31 +76,91 @@ class ContentRepositoryTest extends RepositoryTestSupport {
   }
 
   @Test
-  @DisplayName("search와 countBySearch는 논리 삭제된 콘텐츠를 제외한다")
-  void search_excludesSoftDeletedContent() {
+  @DisplayName("findBySourceAndExternalId는 source와 externalId가 일치하는 콘텐츠를 조회한다")
+  void findBySourceAndExternalId_returnsMatchingContent() {
     // given
-    insertDeletedContent();
-    ContentSearchCondition condition =
-        new ContentSearchCondition(null, null, List.of(), SortBy.CREATED_AT, true, null, null, 10);
+    Content external =
+        Content.createExternal(
+            ContentSource.TMDB, "12345", ContentType.MOVIE, "외부 영화", "설명", "http://img");
+    em.persist(external);
+    em.flush();
 
     // when
-    List<Content> results = contentRepository.search(condition);
-    long totalCount = contentRepository.countBySearch(condition);
+    Content found =
+        contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "12345").orElseThrow();
 
     // then
-    assertThat(results).extracting(Content::getId).containsExactly(contentId);
-    assertThat(totalCount).isEqualTo(1);
+    assertThat(found.getId()).isEqualTo(external.getId());
+    assertThat(found.getSource()).isEqualTo(ContentSource.TMDB);
+    assertThat(found.getExternalId()).isEqualTo("12345");
   }
 
   @Test
-  @DisplayName("findByIdAndDeletedAtIsNull은 논리 삭제된 콘텐츠를 제외한다")
-  void findByIdAndDeletedAtIsNull_excludesSoftDeletedContent() {
+  @DisplayName("findBySourceAndExternalId는 소프트 삭제된 콘텐츠도 조회한다")
+  void findBySourceAndExternalId_includesSoftDeletedContent() {
     // given
-    UUID deletedContentId = insertDeletedContent();
+    Content external =
+        Content.createExternal(
+            ContentSource.TMDB, "12345", ContentType.MOVIE, "외부 영화", "설명", "http://img");
+    em.persist(external);
+    em.flush();
+    external.delete();
+    em.flush();
+
+    // when
+    Content found =
+        contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "12345").orElseThrow();
+
+    // then - 논리 삭제된 콘텐츠도 조회되어야 재수집 가능함
+    assertThat(found.isDeleted()).isTrue();
+  }
+
+  @Test
+  @DisplayName("동일한 (source, externalId) 쌍은 유니크 인덱스가 중복 저장을 차단한다")
+  void save_whenDuplicateSourceAndExternalId_throwsDataIntegrityViolation() {
+    // given
+    contentRepository.saveAndFlush(
+        Content.createExternal(
+            ContentSource.TMDB, "12345", ContentType.MOVIE, "외부 영화", "설명", "http://img"));
+
+    // when
+    Content duplicate =
+        Content.createExternal(
+            ContentSource.TMDB, "12345", ContentType.MOVIE, "중복 영화", "설명", "http://img");
+
+    // then
+    assertThatThrownBy(() -> contentRepository.saveAndFlush(duplicate))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  @DisplayName("수동 생성 콘텐츠(source/externalId 모두 NULL)는 여러 건 저장할 수 있다")
+  void save_whenSourceAndExternalIdAreNull_allowsMultipleRows() {
+    // given - setUp에서 이미 수동 생성 콘텐츠 1건이 저장돼 있다
+    em.persist(new Content(ContentType.MOVIE, "수동 영화 2", "설명", "http://img"));
+    em.flush();
 
     // when & then
-    assertThat(contentRepository.findByIdAndDeletedAtIsNull(deletedContentId)).isEmpty();
-    assertThat(contentRepository.findByIdAndDeletedAtIsNull(contentId)).isPresent();
+    assertThat(contentRepository.count()).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("search는 소프트 삭제된 콘텐츠를 결과에서 제외한다")
+  void search_excludesSoftDeletedContent() {
+    // given - setUp의 활성 콘텐츠 1건 + 소프트 삭제된 콘텐츠 1건
+    Content deleted = new Content(ContentType.MOVIE, "삭제된 영화", "설명", "http://img");
+    em.persist(deleted);
+    em.flush();
+    deleted.delete();
+    em.flush();
+
+    // when
+    List<Content> results =
+        contentRepository.search(
+            new ContentSearchCondition(null, null, null, SortBy.CREATED_AT, true, null, null, 10));
+
+    // then - deletedAt.isNull() 조건으로 삭제된 콘텐츠는 걸러진다
+    assertThat(results).extracting(Content::getId).containsExactly(contentId);
   }
 
   private UUID insertUser() {
@@ -115,15 +178,6 @@ class ContentRepositoryTest extends RepositoryTestSupport {
   private UUID insertContent() {
     Content content = new Content(ContentType.MOVIE, "테스트 영화", "설명", "http://img");
     em.persist(content);
-    em.flush();
-    return content.getId();
-  }
-
-  private UUID insertDeletedContent() {
-    Content content = new Content(ContentType.MOVIE, "삭제된 영화", "설명", "http://img");
-    em.persist(content);
-    em.flush();
-    content.delete();
     em.flush();
     return content.getId();
   }

@@ -23,6 +23,7 @@ import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import com.team02.mopl.domain.auth.service.AuthService.TokenResult;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.entity.enums.Role;
+import com.team02.mopl.domain.user.exception.UserLockedException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import java.time.Instant;
 import java.util.UUID;
@@ -64,6 +65,7 @@ class AuthServiceTest {
 
       MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
       given(userDetailsService.loadUserByUsername(anyString())).willReturn(mockUserDetails);
+      given(mockUserDetails.isAccountNonLocked()).willReturn(true);
 
       String refresh = "refresh";
       String newAccess = "new Access";
@@ -143,6 +145,30 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("계정이 잠금상태라면 예외를 던진다")
+    void fail_shouldThrowException_whenUserIsLocked() {
+      // given
+      JWTClaimsSet mockClaims = mock(JWTClaimsSet.class);
+      given(jwtTokenProvider.verifyRefreshToken(anyString())).willReturn(mockClaims);
+
+      UUID userId = UUID.randomUUID();
+      given(jwtUtils.getUserId(mockClaims)).willReturn(userId);
+
+      String email = "example@gmail.com";
+      given(mockClaims.getSubject()).willReturn(email);
+
+      MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
+      given(userDetailsService.loadUserByUsername(email)).willReturn(mockUserDetails);
+      given(mockUserDetails.isAccountNonLocked()).willReturn(false);
+
+      String refresh = "refresh";
+
+      // when & then
+      assertThrows(UserLockedException.class, () -> authService.update(refresh));
+      then(jwtRegistry).should(times(1)).deleteAllRefreshToken(eq(userId));
+    }
+
+    @Test
     @DisplayName("토큰이 탈취가 됐으면 예외를 던진다")
     void fail_shouldThrowCompromisedTokenException_whenTokenIsCompromised() {
       // given
@@ -157,6 +183,7 @@ class AuthServiceTest {
 
       MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
       given(userDetailsService.loadUserByUsername(email)).willReturn(mockUserDetails);
+      given(mockUserDetails.isAccountNonLocked()).willReturn(true);
 
       String refresh = "refresh";
       String newAccess = "newAccess";

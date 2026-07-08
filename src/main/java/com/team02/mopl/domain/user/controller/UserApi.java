@@ -2,6 +2,7 @@ package com.team02.mopl.domain.user.controller;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
@@ -146,4 +147,27 @@ public interface UserApi {
   })
   ResponseEntity<Void> updateRole(
       @PathVariable UUID userId, @RequestBody @Valid UserRoleUpdateRequest request);
+
+  @Operation(summary = "[어드민] 계정 잠금 상태 변경", description = "[어드민 기능] 계정 잠금 상태를 변경합니다.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "권한 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<Void> updateLock(
+      @PathVariable UUID userId, @RequestBody @Valid UserLockUpdateRequest request);
 }

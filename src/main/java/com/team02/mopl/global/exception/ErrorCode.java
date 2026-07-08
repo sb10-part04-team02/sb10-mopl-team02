@@ -22,6 +22,7 @@ public enum ErrorCode {
   COMPROMISED_TOKEN(HttpStatus.FORBIDDEN, "AUTH_403", "보안 위협이 감지되어 접속이 차단되었습니다."),
 
   // User
+  USER_LOCKED(HttpStatus.UNAUTHORIZED, "USER_401", "잠금처리된 유저입니다. 어드민에게 문의하세요."),
   USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_404", "사용자를 찾을 수 없습니다."),
   EMAIL_DUPLICATED(HttpStatus.CONFLICT, "USER_409", "이미 존재하는 이메일입니다."),
 
@@ -61,7 +62,10 @@ public enum ErrorCode {
 
   // Notification
   NOTIFICATION_FORBIDDEN(HttpStatus.FORBIDDEN, "NOTIFICATION_403", "해당 알림에 접근할 권한이 없습니다."),
-  NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_404", "알림을 찾을 수 없습니다.");
+  NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_404", "알림을 찾을 수 없습니다."),
+
+  // External (콘텐츠 수집)
+  EXTERNAL_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXTERNAL_500", "외부 API 호출에 실패했습니다.");
 
   private final HttpStatus status;
   private final String code;
