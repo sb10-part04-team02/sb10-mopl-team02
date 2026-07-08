@@ -1,0 +1,156 @@
+services:
+  # 로컬 분산 환경에서 사용할 PostgreSQL 컨테이너
+  # 기존 docker-compose.yml과 볼륨을 분리하기 위해 postgres_distributed_data를 사용한다.
+  db:
+    image: postgres:16
+    environment:
+      # .env 파일에서 DB 이름/계정/비밀번호를 주입받는다.
+      # 값이 없으면 compose 실행 시 즉시 실패하도록 required 문법을 사용한다.
+      POSTGRES_DB: ${DB_NAME:?DB_NAME is required}
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME is required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      # PostgreSQL 데이터 영속화를 위한 전용 볼륨
+      - postgres_distributed_data:/var/lib/postgresql/data
+      # 컨테이너 최초 생성 시 스키마 SQL을 자동 실행하기 위한 마운트
+      # 이미 볼륨이 생성된 이후에는 자동 재실행되지 않는다.
+      - ./src/main/resources/01_schema_v8.sql:/docker-entrypoint-initdb.d/01_schema_v8.sql:ro
+    ports:
+      # 로컬 PostgreSQL 5432 포트 충돌을 피하기 위해 호스트 15432로 노출한다.
+      # 컨테이너 내부에서는 그대로 5432를 사용한다.
+      - "5432:5432"
+    healthcheck:
+      # app-1/app-2가 DB 준비 전에 먼저 실행되지 않도록 DB readiness를 확인한다.
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USERNAME:?DB_USERNAME is required} -d ${DB_NAME:?DB_NAME is required}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # 로컬 분산 환경에서 사용할 Redis 컨테이너
+  # JWT refresh/blacklist 등 Redis 연동 기능을 app-1/app-2가 함께 사용한다.
+  redis:
+    image: redis:7.2-alpine
+    # appendonly yes로 Redis 데이터를 파일에 기록해 컨테이너 재시작 시에도 일부 상태를 유지한다.
+    command: redis-server --appendonly yes
+    volumes:
+      # 기존 Redis 볼륨과 분리하기 위한 분산 환경 전용 볼륨
+      - redis_distributed_data:/data
+    ports:
+      # 로컬에서 Redis 접근이 필요할 때 사용할 수 있도록 6379로 노출한다.
+      - "6379:6379"
+    healthcheck:
+      # app-1/app-2가 Redis 준비 이후 시작되도록 ping으로 상태를 확인한다.
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 첫 번째 Spring Boot 애플리케이션 인스턴스
+  # Nginx upstream의 첫 번째 대상이 된다.
+  app-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # app-2가 같은 이미지를 재사용할 수 있도록 로컬 이미지명을 고정한다.
+    image: mopl-app:local
+    environment:
+      # dev 프로필로 실행한다.
+      SPRING_PROFILES_ACTIVE: dev
+      # 스키마는 db 컨테이너 초기화 SQL로 생성하므로 애플리케이션 SQL init은 비활성화한다.
+      SPRING_SQL_INIT_MODE: never
+      # 컨테이너 내부 애플리케이션 포트
+      SERVER_PORT: 8080
+
+      # 컨테이너 네트워크 내부에서는 db 서비스명을 호스트로 사용한다.
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-mopl}
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+
+      # 컨테이너 네트워크 내부에서는 redis 서비스명을 호스트로 사용한다.
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      # JWT 및 초기 관리자 계정 설정
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
+      ADMIN_NAME: ${ADMIN_NAME:?ADMIN_NAME is required}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+
+      # Nginx 경유 접근 기준 public URL
+      STORAGE_PUBLIC_BASE_URL: http://localhost:8080
+    ports:
+      # app-1 직접 접근 확인용 포트
+      # 일반 사용자는 nginx(localhost:8080)를 통해 접근한다.
+      - "8081:8080"
+    depends_on:
+      # DB/Redis가 healthy 상태가 된 뒤 app-1을 시작한다.
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # 두 번째 Spring Boot 애플리케이션 인스턴스
+  # app-1과 같은 이미지를 사용하며, Nginx upstream의 두 번째 대상이 된다.
+  app-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mopl-app:local
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_SQL_INIT_MODE: never
+      SERVER_PORT: 8080
+
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-mopl}
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
+      ADMIN_NAME: ${ADMIN_NAME:?ADMIN_NAME is required}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+
+      STORAGE_PUBLIC_BASE_URL: http://localhost:8080
+    ports:
+      # app-2 직접 접근 확인용 포트
+      - "8082:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # app-1에서 이미 이미지를 build하므로 app-1 시작 이후 app-2를 시작하도록 둔다.
+      app-1:
+        condition: service_started
+
+  # 로컬 Reverse Proxy 역할을 하는 Nginx 컨테이너
+  # 클라이언트 요청을 받아 app-1/app-2로 분산한다.
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      # 로컬 사용자는 http://localhost:8080 으로 접근한다.
+      # Nginx 컨테이너 내부 80 포트로 전달된다.
+      - "8080:80"
+    volumes:
+      # 프로젝트의 Nginx 설정 파일을 컨테이너 설정으로 마운트한다.
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      # app-1/app-2가 시작된 이후 Nginx를 시작한다.
+      app-1:
+        condition: service_started
+      app-2:
+        condition: service_started
+
+volumes:
+  # 분산 환경 전용 PostgreSQL 데이터 볼륨
+  postgres_distributed_data:
+  # 분산 환경 전용 Redis 데이터 볼륨
+  redis_distributed_data:
