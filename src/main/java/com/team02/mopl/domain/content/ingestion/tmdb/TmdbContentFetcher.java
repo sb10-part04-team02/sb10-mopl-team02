@@ -8,8 +8,10 @@ import com.team02.mopl.domain.content.ingestion.exception.ExternalApiException;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbPageResponse;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.IntFunction;
+import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -45,15 +47,30 @@ public class TmdbContentFetcher implements ContentFetcher {
         "/movie/popular",
         tmdbClient::fetchPopularMovies,
         new TmdbMovieMapper(
-            tmdbClient.fetchMovieGenres(), properties.imageBaseUrl(), defaultThumbnailUrl),
+            fetchGenresSafely(tmdbClient::fetchMovieGenres, "/genre/movie/list"),
+            properties.imageBaseUrl(),
+            defaultThumbnailUrl),
         results);
     collectPages(
         "/tv/popular",
         tmdbClient::fetchPopularTv,
         new TmdbTvMapper(
-            tmdbClient.fetchTvGenres(), properties.imageBaseUrl(), defaultThumbnailUrl),
+            fetchGenresSafely(tmdbClient::fetchTvGenres, "/genre/tv/list"),
+            properties.imageBaseUrl(),
+            defaultThumbnailUrl),
         results);
     return results;
+  }
+
+  // 장르는 태그 부가정보일 뿐이므로 조회 실패가 콘텐츠 수집 본체를 중단시키지 않도록 빈 Map으로 폴백
+  private Map<Integer, String> fetchGenresSafely(
+      Supplier<Map<Integer, String>> genreFetcher, String pathForLog) {
+    try {
+      return genreFetcher.get();
+    } catch (ExternalApiException e) {
+      log.warn("TMDB 장르 조회 실패로 태그 없이 수집을 계속합니다. path={}", pathForLog, e);
+      return Map.of();
+    }
   }
 
   private <T> void collectPages(
