@@ -45,7 +45,7 @@ public class DirectMessageController implements DirectMessageApi {
 
   @GetMapping("/with")
   public ResponseEntity<ConversationDto> findConversationWith(
-      @AuthenticationPrincipal UUID userId, @RequestParam UUID withUserId) {
+      @AuthenticationPrincipal UUID userId, @RequestParam("userId") UUID withUserId) {
     return ResponseEntity.ok(directMessageService.findConversationWith(userId, withUserId));
   }
 

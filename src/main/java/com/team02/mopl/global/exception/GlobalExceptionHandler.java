@@ -12,6 +12,7 @@ import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestCookieException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -38,6 +39,21 @@ public class GlobalExceptionHandler {
         new ErrorResponse("follow.not_followed", "팔로우하지 않은 사용자입니다.", e.getDetails());
 
     return ResponseEntity.status(e.getErrorCode().getStatus()).body(response);
+  }
+
+  // 필수 RequestParam이 누락됐을 때 발생하는 예외 처리
+  @ExceptionHandler(MissingServletRequestParameterException.class)
+  public ResponseEntity<ErrorResponse> handleMissingParameter(
+      MissingServletRequestParameterException e) {
+    String parameter = e.getParameterName();
+
+    ErrorResponse response =
+        new ErrorResponse(
+            e.getClass().getSimpleName(),
+            "잘못된 요청입니다.",
+            Map.of(parameter, "필수 요청 파라미터 '" + parameter + "' 이(가) 누락되었습니다."));
+
+    return ResponseEntity.badRequest().body(response);
   }
 
   // PathVariable, RequestParam 타입이 맞지 않을 때 발생하는 예외 처리
