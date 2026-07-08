@@ -3,19 +3,19 @@ package com.team02.mopl.domain.review.mapper;
 import com.team02.mopl.domain.review.dto.ReviewDto;
 import com.team02.mopl.domain.review.entity.Review;
 import com.team02.mopl.domain.user.dto.UserSummary;
+import com.team02.mopl.domain.user.entity.User;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ReviewMapper {
 
-  // TODO: 사용자 조회 연동 시 UserService를 주입하여 author의 name/profileImageUrl을 채운다.
-  //             현재는 authorId(userId)만 채운 스텁으로 생성한다.
-  public ReviewDto toDto(Review review) {
+  // 이미 조회된 author를 조립 (author 조회·폴백은 서비스 계층에서 처리)
+  public ReviewDto toDto(Review review, UserSummary author) {
     return new ReviewDto(
-        review.getId(),
-        review.getContentId(),
-        new UserSummary(review.getAuthorId(), null, null),
-        review.getText(),
-        review.getRating());
+        review.getId(), review.getContentId(), author, review.getText(), review.getRating());
+  }
+
+  public UserSummary toUserSummary(User user) {
+    return new UserSummary(user.getId(), user.getName(), user.getProfileImageUrl());
   }
 }
