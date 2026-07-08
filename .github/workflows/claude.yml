@@ -7,8 +7,8 @@ on:
     types: [ created ]
 
 concurrency:
-  group: claude-review-${{ github.event.issue.number || github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: claude-review-${{ github.event.comment.id }}
+  cancel-in-progress: false
 
 jobs:
   claude-review:
@@ -53,6 +53,11 @@ jobs:
             - 저장소 루트의 CLAUDE.md 컨벤션을 따르세요.
             - .coderabbit.yml 의 path_instructions 기준과 동일하게 판단하세요.
             - 변경된 파일에만 집중하고, 사소한 스타일보다 버그/보안/로직 오류를 우선하세요.
+            
+            게시 방법:
+            - 반드시 아래 도구로 리뷰를 PR에 게시하세요.
+            - 파일/라인별 지적은 mcp__github_inline_comment__create_inline_comment 로 인라인 코멘트를 작성하세요.
+            - 전체 총평은 `gh pr comment` 로 PR에 코멘트를 남기세요. 지적할 사항이 없어도 간단한 총평 코멘트는 반드시 남기세요.
           claude_args: |
             --max-turns 15
             --model claude-opus-4-8
