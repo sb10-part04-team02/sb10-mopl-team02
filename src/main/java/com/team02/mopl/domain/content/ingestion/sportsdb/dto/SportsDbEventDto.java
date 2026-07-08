@@ -2,7 +2,6 @@ package com.team02.mopl.domain.content.ingestion.sportsdb.dto;
 
 // SportsDB /eventsseason.php 응답의 경기 1건 (수집에 필요한 필드만 역직렬화)
 // https://www.thesportsdb.com/documentation
-// 컴포넌트명이 JSON 키와 동일해 @JsonProperty 불필요
 public record SportsDbEventDto(
     String idEvent, // externalId 재료 (필수)
     String strEvent, // 경기명, 예: "Liverpool vs Bournemouth" (필수)

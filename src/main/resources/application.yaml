@@ -36,11 +36,11 @@ app:
     connect-timeout: 3s
     read-timeout: 10s
   sportsdb:
-    api-key: ${SPORTSDB_API_KEY:123}  # 무료 테스트 키 "123" (30 req/min). v1 인증 방식상 키가 URL 경로에 포함됨
+    api-key: ${SPORTSDB_API_KEY:123}  # 무료 테스트 키 "123" (30 req/min)
     base-url: https://www.thesportsdb.com/api/v1/json
     connect-timeout: 3s
     read-timeout: 10s
-    leagues:  # 수집 대상 리그+시즌. 시즌 표기는 리그마다 다름(축구 "2025-2026", 야구 "2025")
+    leagues:  # 수집 대상 리그+시즌. 시즌 표기는 리그마다 다름
       - id: "4328"
         season: "2025-2026"  # English Premier League
   ingestion:

@@ -60,16 +60,17 @@ public class SportsDbEventMapper implements ExternalContentMapper<SportsDbEventD
 
   // strDescriptionEN은 대부분 비어 있으므로 리그/시즌/경기장/일자를 합성해 대체한다
   private String mapDescription(SportsDbEventDto raw) {
+    // 원본 설명이 있으면 strip하고 그대로 사용
     if (StringUtils.hasText(raw.strDescriptionEN())) {
       return truncate(raw.strDescriptionEN().strip(), DESCRIPTION_MAX_LENGTH);
     }
-    String leagueSeason =
+    String leagueSeason = // 리그 + 시즌 합성
         Stream.of(raw.strLeague(), raw.strSeason())
-            .filter(StringUtils::hasText)
+            .filter(StringUtils::hasText) // 빈 값 걸러내고
             .map(String::strip)
-            .reduce((league, season) -> league + " " + season)
-            .orElse("");
-    String composed =
+            .reduce((league, season) -> league + " " + season) // 공백 넣고 이어 붙이기
+            .orElse(""); // 둘 다 없다면 빈 문자열
+    String composed = // 리그시즌 + 경기장 + 날짜 합성
         Stream.of(leagueSeason, raw.strVenue(), raw.dateEvent())
             .filter(StringUtils::hasText)
             .map(String::strip)
@@ -92,6 +93,7 @@ public class SportsDbEventMapper implements ExternalContentMapper<SportsDbEventD
   }
 
   // 종목/리그명을 태그로 변환. 리그명이 핵심 태그라 20자 초과 시 버리지 않고 truncate한다
+  // TODO: 태그 길이 제한 수정 검토
   private List<String> mapTags(SportsDbEventDto raw) {
     return Stream.of(raw.strSport(), raw.strLeague())
         .filter(StringUtils::hasText)

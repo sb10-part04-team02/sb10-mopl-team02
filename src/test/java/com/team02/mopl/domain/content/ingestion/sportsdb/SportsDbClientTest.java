@@ -32,7 +32,6 @@ class SportsDbClientTest {
 
   private static final String BASE_URL = "https://www.thesportsdb.com/api/v1/json";
   private static final String API_KEY = "test-key";
-  // v1 인증 방식상 API 키가 URL 경로 세그먼트로 들어간다
   private static final String KEYED_URL = BASE_URL + "/" + API_KEY;
 
   private MockRestServiceServer server;

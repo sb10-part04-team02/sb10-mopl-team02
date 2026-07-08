@@ -7,9 +7,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-// 등록된 모든 소스(TMDB, SportsDB ...)의 수집을 오케스트레이션하는 서비스
+// 등록된 모든 소스(TMDB, SportsDB ...)의 수집을 통합 관리하는 서비스
 // fetch -> 건별 upsert 흐름을 소스 단위/항목 단위로 실패 격리하며 결과를 집계한다
 // upsert가 건별 @Transactional이므로 이 서비스는 트랜잭션을 열지 않는다 (부분 실패 격리와 부합)
+/*
+TODO:
+  contentIngestionJob
+  ├─ tmdbStep:     ItemReader(페이지 순회) -> ItemProcessor(매퍼) -> ItemWriter(upsert)
+  └─ sportsDbStep: ItemReader(리그 순회)   -> ItemProcessor(매퍼) -> ItemWriter(upsert)
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor

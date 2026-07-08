@@ -23,8 +23,9 @@ public class SportsDbClient {
     this.restClient = restClient;
   }
 
-  // 리그+시즌의 경기 목록 조회. 무료 키는 호출당 최대 15건 반환
+  // 리그+시즌의 경기 목록 조회. 무료 키는 호출당 최대 15건 반환 (유료 키 - 3000건)
   // 결과가 없으면 SportsDB가 {"events": null}을 반환하므로 빈 리스트가 된다 (DTO에서 방어)
+  // Ex: https://www.thesportsdb.com/api/v1/json/123/eventsseason.php?id=4328&s=2014-2015
   public List<SportsDbEventDto> fetchSeasonEvents(String leagueId, String season) {
     SportsDbEventsResponse body =
         fetch(
