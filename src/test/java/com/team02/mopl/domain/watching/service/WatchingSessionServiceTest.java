@@ -27,6 +27,7 @@ import com.team02.mopl.domain.watching.dto.WatchingSessionSearchRequest;
 import com.team02.mopl.domain.watching.entity.WatchingSession;
 import com.team02.mopl.domain.watching.enums.ChangeType;
 import com.team02.mopl.domain.watching.enums.WatchingSessionSortBy;
+import com.team02.mopl.domain.watching.event.WatchingSessionJoinedEvent;
 import com.team02.mopl.domain.watching.mapper.WatchingSessionMapper;
 import com.team02.mopl.domain.watching.repository.WatchingSessionRepository;
 import com.team02.mopl.global.dto.CursorResponse;
@@ -40,11 +41,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -55,6 +58,7 @@ class WatchingSessionServiceTest {
   @Mock private TagRepository tagRepository;
   @Mock private UserRepository userRepository;
   @Mock private WatchingSessionMapper watchingSessionMapper;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private WatchingSessionService watchingSessionService;
 
@@ -268,6 +272,18 @@ class WatchingSessionServiceTest {
     assertThat(change.watchingSession()).isEqualTo(dto);
     assertThat(change.watcherCount()).isEqualTo(3L);
     verify(watchingSessionRepository).save(any(WatchingSession.class));
+
+    ArgumentCaptor<WatchingSessionJoinedEvent> eventCaptor =
+        ArgumentCaptor.forClass(WatchingSessionJoinedEvent.class);
+
+    verify(eventPublisher).publishEvent(eventCaptor.capture());
+
+    WatchingSessionJoinedEvent event = eventCaptor.getValue();
+
+    assertThat(event.watcherId()).isEqualTo(userId);
+    assertThat(event.watcherName()).isEqualTo(watcher.getName());
+    assertThat(event.contentId()).isEqualTo(contentId);
+    assertThat(event.contentTitle()).isEqualTo(content.getTitle());
   }
 
   @Test
@@ -298,6 +314,7 @@ class WatchingSessionServiceTest {
     assertThat(change.watchingSession()).isEqualTo(dto);
     assertThat(change.watcherCount()).isEqualTo(1L);
     verify(watchingSessionRepository, never()).save(any(WatchingSession.class));
+    verify(eventPublisher, never()).publishEvent(any());
   }
 
   @Test
