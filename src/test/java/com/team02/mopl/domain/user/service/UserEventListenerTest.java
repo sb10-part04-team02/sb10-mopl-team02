@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,7 +62,7 @@ class UserEventListenerTest {
   }
 
   @Nested
-  class OnUserLocked {
+  class onUserLockUpdatedEvent {
 
     @Test
     @DisplayName("유저잠금 이벤트가 오면 redis에서 유저를 잠금처리한다")
@@ -92,33 +93,19 @@ class UserEventListenerTest {
       then(jwtRegistry).should(never()).lockUser(any(UUID.class));
       then(jwtRegistry).should(times(1)).unlockUser(userId);
     }
+  }
 
+  @Nested
+  class UserLockUpdatedRecover {
     @Test
-    @DisplayName("계정 잠금 중 레디스에 문제가 생기면 예외를 던지지만 catch로 방어한다")
-    void fail_shouldDefenceException_whenRedisIsDownDuringLock() {
+    @DisplayName("Recover함수가 호출되면 예외를 정상적으로 처리한다")
+    void success_shouldNotThrowException_whenRecoverMethodIsCalled() {
       // given
-      UUID userId = UUID.randomUUID();
-      UserLockUpdatedEvent event = new UserLockUpdatedEvent(userId, true);
-      willThrow(RedisConnectionFailureException.class).given(jwtRegistry).lockUser(userId);
+      DataAccessException e = new RedisConnectionFailureException("test");
+      UserLockUpdatedEvent event = new UserLockUpdatedEvent(UUID.randomUUID(), true);
 
       // when & then
-      assertDoesNotThrow(() -> eventListener.onUserLockUpdatedEvent(event));
-      then(jwtRegistry).should(times(1)).lockUser(userId);
-      then(jwtRegistry).should(never()).unlockUser(any(UUID.class));
-    }
-
-    @Test
-    @DisplayName("계정 잠금 해제중 레디스에 문제가 생기면 예외를 던지지만 catch로 방어한다")
-    void fail_shouldDefenceException_whenRedisIsDownDuringUnlock() {
-      // given
-      UUID userId = UUID.randomUUID();
-      UserLockUpdatedEvent event = new UserLockUpdatedEvent(userId, false);
-      willThrow(RedisConnectionFailureException.class).given(jwtRegistry).unlockUser(userId);
-
-      // when & then
-      assertDoesNotThrow(() -> eventListener.onUserLockUpdatedEvent(event));
-      then(jwtRegistry).should(never()).lockUser(any(UUID.class));
-      then(jwtRegistry).should(times(1)).unlockUser(userId);
+      assertDoesNotThrow(() -> eventListener.userLockUpdatedRecover(e, event));
     }
   }
 }

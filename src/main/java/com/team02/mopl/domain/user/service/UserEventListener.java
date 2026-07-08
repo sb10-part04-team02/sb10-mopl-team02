@@ -7,6 +7,9 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -33,18 +36,25 @@ public class UserEventListener {
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Retryable(
+      retryFor = {DataAccessException.class},
+      maxAttempts = 3,
+      backoff = @Backoff(delay = 1000) // 1초 간격으로 최대 3번 재시도
+      )
   public void onUserLockUpdatedEvent(UserLockUpdatedEvent event) {
     UUID userId = event.userId();
 
-    try {
-      if (event.locked()) {
-        jwtRegistry.lockUser(userId);
-      } else {
-        jwtRegistry.unlockUser(userId);
-      }
-    } catch (DataAccessException e) {
-      String action = event.locked() ? "잠금(토큰삭제)" : "해제(키삭제)";
-      log.error("[Redis] 유저 계정 {} 실패: userId={}, reason={}", action, userId, e.getMessage(), e);
+    if (event.locked()) {
+      jwtRegistry.lockUser(userId);
+    } else {
+      jwtRegistry.unlockUser(userId);
     }
+  }
+
+  @Recover
+  public void userLockUpdatedRecover(DataAccessException e, UserLockUpdatedEvent event) {
+    String action = event.locked() ? "잠금(토큰삭제)" : "해제(키삭제)";
+    log.error(
+        "[Redis] 유저 계정 {} 최종 실패: userId={}, reason={}", action, event.userId(), e.getMessage(), e);
   }
 }
