@@ -1,6 +1,7 @@
 package com.team02.mopl.global.exception;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import com.team02.mopl.domain.follow.exception.NotFollowedException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,15 @@ public class GlobalExceptionHandler {
         new ErrorResponse(e.getClass().getSimpleName(), errorCode.getMessage(), e.getDetails());
 
     return ResponseEntity.status(errorCode.getStatus()).body(response);
+  }
+
+  // 프로필용 팔로워 수 조회 응답에 필요한 예외입니다.
+  @ExceptionHandler(NotFollowedException.class)
+  public ResponseEntity<ErrorResponse> handleNotFollowedException(NotFollowedException e) {
+    ErrorResponse response =
+        new ErrorResponse("follow.not_followed", "팔로우하지 않은 사용자입니다.", e.getDetails());
+
+    return ResponseEntity.status(e.getErrorCode().getStatus()).body(response);
   }
 
   // PathVariable, RequestParam 타입이 맞지 않을 때 발생하는 예외 처리
