@@ -11,6 +11,18 @@ spring:
         format_sql: true
     show-sql: false
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: senderExample@gmail.com
+    password: 1234@QWER
+    properties:
+      mail:
+        stmp:
+          auth: true
+          starttls:
+            enable: true    # TLS 보안설정
+
 app:
   jwt:
     secret-key: ${JWT_SECRET_KEY:"this-is-a-dummy-secret-key-for-testing-purposes-only-32bytes"}

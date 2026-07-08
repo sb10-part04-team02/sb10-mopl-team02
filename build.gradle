@@ -33,6 +33,7 @@ dependencies {
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
     compileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.6'
     runtimeOnly 'org.postgresql:postgresql'
     // QueryDSL (Jakarta) — 버전은 Spring Boot BOM 이 관리
