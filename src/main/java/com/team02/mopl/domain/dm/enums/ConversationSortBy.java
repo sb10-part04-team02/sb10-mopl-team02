@@ -1,5 +1,16 @@
 package com.team02.mopl.domain.dm.enums;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+import lombok.Getter;
+
+@Getter
 public enum ConversationSortBy {
-  CREATED_AT
+  CREATED_AT("createdAt");
+
+  @JsonValue // 응답 직렬화 시 camelCase 값 사용
+  private final String value;
+
+  ConversationSortBy(String value) {
+    this.value = value;
+  }
 }

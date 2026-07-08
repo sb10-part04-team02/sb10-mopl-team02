@@ -6,6 +6,7 @@ import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
+import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.service.UserService;
 import com.team02.mopl.global.dto.CursorResponse;
 import jakarta.validation.Valid;
@@ -38,7 +39,8 @@ public class UserController implements UserApi {
   @Override
   @PostMapping
   public ResponseEntity<UserDto> createUser(@RequestBody @Valid UserCreateRequest request) {
-    return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(request));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(userService.createUser(request, Role.USER));
   }
 
   @Override

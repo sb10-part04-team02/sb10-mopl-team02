@@ -69,7 +69,7 @@ public class ReviewService {
     }
 
     return new CursorResponse<>(
-        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.name(), direction.name());
+        data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.getValue(), direction.name());
   }
 
   @Transactional

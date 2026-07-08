@@ -2,12 +2,15 @@ package com.team02.mopl.domain.content.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.team02.mopl.domain.content.dto.ContentSearchCondition;
 import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.enums.ContentType;
+import com.team02.mopl.domain.content.enums.SortBy;
 import com.team02.mopl.domain.review.entity.Review;
 import com.team02.mopl.domain.review.repository.ReviewRepository;
 import com.team02.mopl.support.RepositoryTestSupport;
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -69,6 +72,34 @@ class ContentRepositoryTest extends RepositoryTestSupport {
     assertThat(updated).isEqualTo(0);
   }
 
+  @Test
+  @DisplayName("search와 countBySearch는 논리 삭제된 콘텐츠를 제외한다")
+  void search_excludesSoftDeletedContent() {
+    // given
+    insertDeletedContent();
+    ContentSearchCondition condition =
+        new ContentSearchCondition(null, null, List.of(), SortBy.CREATED_AT, true, null, null, 10);
+
+    // when
+    List<Content> results = contentRepository.search(condition);
+    long totalCount = contentRepository.countBySearch(condition);
+
+    // then
+    assertThat(results).extracting(Content::getId).containsExactly(contentId);
+    assertThat(totalCount).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("findByIdAndDeletedAtIsNull은 논리 삭제된 콘텐츠를 제외한다")
+  void findByIdAndDeletedAtIsNull_excludesSoftDeletedContent() {
+    // given
+    UUID deletedContentId = insertDeletedContent();
+
+    // when & then
+    assertThat(contentRepository.findByIdAndDeletedAtIsNull(deletedContentId)).isEmpty();
+    assertThat(contentRepository.findByIdAndDeletedAtIsNull(contentId)).isPresent();
+  }
+
   private UUID insertUser() {
     UUID id = UUID.randomUUID();
     em.createNativeQuery(
@@ -84,6 +115,15 @@ class ContentRepositoryTest extends RepositoryTestSupport {
   private UUID insertContent() {
     Content content = new Content(ContentType.MOVIE, "테스트 영화", "설명", "http://img");
     em.persist(content);
+    em.flush();
+    return content.getId();
+  }
+
+  private UUID insertDeletedContent() {
+    Content content = new Content(ContentType.MOVIE, "삭제된 영화", "설명", "http://img");
+    em.persist(content);
+    em.flush();
+    content.delete();
     em.flush();
     return content.getId();
   }
