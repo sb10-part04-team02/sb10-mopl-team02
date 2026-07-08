@@ -225,6 +225,22 @@ class JwtRegistryTest {
   }
 
   @Nested
+  class DeleteAllRefreshToken {
+    @Test
+    @DisplayName("리프레시 토큰을 전체 삭제한다")
+    void success_shouldDeleteAllRefreshToken_whenUserIdIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+
+      // when
+      jwtRegistry.deleteAllRefreshToken(userId);
+
+      // then
+      then(redisTemplate).should(times(1)).delete(anyString());
+    }
+  }
+
+  @Nested
   class LockUser {
     @Test
     @DisplayName("유저ID가 주어지면 리프레시 토큰을 전체 삭제하고 유저 잠금키를 추가한다")

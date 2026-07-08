@@ -104,6 +104,12 @@ public class JwtRegistry {
     COMPROMISED
   }
 
+  public void deleteAllRefreshToken(UUID userId) {
+    String refreshKey = refreshKey(userId);
+    // RefreshToken 전체삭제
+    redisTemplate.delete(refreshKey);
+  }
+
   public void lockUser(UUID userId) {
     String refreshKey = refreshKey(userId);
     String lockKey = lockKey(userId);

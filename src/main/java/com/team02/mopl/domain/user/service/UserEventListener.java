@@ -21,8 +21,8 @@ public class UserEventListener {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onUserRoleUpdated(RoleUpdatedEvent event) {
     try {
-      // 권한변경
-      jwtRegistry.lockUser(event.userId());
+      // 권한변경시 refreshToken 전체삭제
+      jwtRegistry.deleteAllRefreshToken(event.userId());
     } catch (DataAccessException e) {
       log.error(
           "[Redis] 유저 권한 변경 후 리프레시토큰 삭제 실패: userId={}, reason={}",

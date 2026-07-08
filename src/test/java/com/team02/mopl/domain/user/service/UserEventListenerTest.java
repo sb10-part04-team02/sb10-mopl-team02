@@ -41,7 +41,7 @@ class UserEventListenerTest {
       eventListener.onUserRoleUpdated(event);
 
       // then
-      then(jwtRegistry).should(times(1)).lockUser(userId);
+      then(jwtRegistry).should(times(1)).deleteAllRefreshToken(userId);
     }
 
     @Test
@@ -50,11 +50,13 @@ class UserEventListenerTest {
       // given
       UUID userId = UUID.randomUUID();
       RoleUpdatedEvent event = new RoleUpdatedEvent(userId, Role.USER, Role.ADMIN);
-      willThrow(RedisConnectionFailureException.class).given(jwtRegistry).lockUser(userId);
+      willThrow(RedisConnectionFailureException.class)
+          .given(jwtRegistry)
+          .deleteAllRefreshToken(userId);
 
       // when & then
       assertDoesNotThrow(() -> eventListener.onUserRoleUpdated(event));
-      then(jwtRegistry).should(times(1)).lockUser(userId);
+      then(jwtRegistry).should(times(1)).deleteAllRefreshToken(userId);
     }
   }
 
