@@ -15,11 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/**
- * TMDB popular 영화/드라마 수집기. 설정된 페이지 수만큼 순회하며, 페이지 단위 호출 실패는 warn 로그 후 나머지 페이지를 계속 수집한다.
- *
- * <p>장르 목록 조회 실패는 전파한다(인증/네트워크 문제라 이후 호출도 전부 실패할 상황이므로).
- */
+// TMDB popular 영화/드라마 수집기
+// 설정된 페이지 수만큼 순회하며, 페이지 단위 호출 실패는 warn 로그 후 나머지 페이지를 계속 수집
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -61,10 +58,10 @@ public class TmdbContentFetcher implements ContentFetcher {
       List<ExternalContentData> results) {
     for (int page = 1; page <= properties.pages(); page++) {
       try {
-        pageFetcher.apply(page).results().stream()
-            .map(mapper::map)
-            .flatMap(Optional::stream)
-            .forEach(results::add);
+        pageFetcher.apply(page).results().stream() // 응답 순회
+            .map(mapper::map) // 원본 DTO를 Optional<ExternalContentData>로 변환
+            .flatMap(Optional::stream) // 유효한 항목만 남김
+            .forEach(results::add); // 결과 리스트에 추가
       } catch (ExternalApiException e) {
         log.warn("TMDB 페이지 수집 실패로 해당 페이지를 건너뜁니다. path={}, page={}", pathForLog, page, e);
       }

@@ -10,12 +10,9 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/**
- * 기동 시 1회 TMDB 수집을 실행하는 검증/수동 실행용 진입점(app.tmdb.run-on-startup=true일 때만 등록).
- *
- * <p>주기 실행 스케줄러(#289)와 소스 통합 오케스트레이션(#288)이 이 자리를 대체할 예정이다. 수집 실패가 애플리케이션 기동을 막지 않도록 예외는 모두 잡아 로그만
- * 남긴다.
- */
+// 기동 시 1회 TMDB 수집을 실행하는 검증/수동 실행용 진입점(app.tmdb.run-on-startup=true일 때만 등록)
+// 수집 실패가 애플리케이션 기동을 막지 않도록 예외는 모두 자바아 로그만 남김
+// TODO: 주기 실행 스케줄러가 대체 예정
 @Slf4j
 @Component
 @RequiredArgsConstructor

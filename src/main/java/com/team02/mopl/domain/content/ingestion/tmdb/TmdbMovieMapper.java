@@ -6,7 +6,7 @@ import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbMovieDto;
 import java.util.Map;
 import java.util.Optional;
 
-/** TMDB 영화 응답 1건을 정규화된 수집 데이터(MOVIE)로 변환한다. */
+// TMDB 영화 응답 1건을 정규화된 수집 데이터(MOVIE)로 변환
 public class TmdbMovieMapper extends AbstractTmdbMapper<TmdbMovieDto> {
 
   public TmdbMovieMapper(

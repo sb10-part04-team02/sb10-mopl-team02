@@ -11,6 +11,7 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+// 세부 규칙은 TmdbMovieMapper와 공통 로직을 공유하므로 최소 검증
 class TmdbTvMapperTest {
 
   private static final String IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
@@ -21,10 +22,13 @@ class TmdbTvMapperTest {
   @Test
   @DisplayName("정상 응답은 name을 제목으로 하는 TV_SERIES 타입의 수집 데이터로 매핑된다")
   void map_success() {
+    // given
     TmdbTvDto raw = new TmdbTvDto(1399, "왕좌의 게임", "줄거리", "/poster.jpg", List.of(10765));
 
+    // when
     ExternalContentData data = mapper.map(raw).orElseThrow();
 
+    // then
     assertThat(data.source()).isEqualTo(ContentSource.TMDB);
     assertThat(data.externalId()).isEqualTo("1399");
     assertThat(data.contentType()).isEqualTo(ContentType.TV_SERIES);

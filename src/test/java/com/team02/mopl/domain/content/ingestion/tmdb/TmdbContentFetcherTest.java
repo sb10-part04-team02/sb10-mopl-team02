@@ -59,6 +59,7 @@ class TmdbContentFetcherTest {
   @Test
   @DisplayName("설정된 페이지 수만큼 영화/드라마를 조회해 매핑 결과를 합산한다")
   void fetch_collectsConfiguredPagesForMoviesAndTv() {
+    // given
     givenGenres();
     given(tmdbClient.fetchPopularMovies(1))
         .willReturn(moviePage(new TmdbMovieDto(1, "영화1", "줄거리", "/p1.jpg", List.of(28))));
@@ -68,8 +69,10 @@ class TmdbContentFetcherTest {
         .willReturn(tvPage(new TmdbTvDto(3, "드라마1", "줄거리", "/p3.jpg", List.of(10765))));
     given(tmdbClient.fetchPopularTv(2)).willReturn(tvPage());
 
+    // when
     List<ExternalContentData> results = fetcher.fetch();
 
+    // then - 영화 2건 + 드라마 1건 = 총 3건 수집 되어야 함
     assertThat(results).hasSize(3);
     assertThat(results).extracting(ExternalContentData::externalId).containsExactly("1", "2", "3");
     then(tmdbClient).should().fetchPopularMovies(1);
@@ -81,6 +84,7 @@ class TmdbContentFetcherTest {
   @Test
   @DisplayName("매핑에 실패한 항목(필수 값 누락)은 결과에서 제외한다")
   void fetch_excludesItemsThatFailMapping() {
+    // given
     givenGenres();
     given(tmdbClient.fetchPopularMovies(1))
         .willReturn(
@@ -91,14 +95,17 @@ class TmdbContentFetcherTest {
     given(tmdbClient.fetchPopularTv(1)).willReturn(tvPage());
     given(tmdbClient.fetchPopularTv(2)).willReturn(tvPage());
 
+    // when
     List<ExternalContentData> results = fetcher.fetch();
 
+    // then
     assertThat(results).extracting(ExternalContentData::externalId).containsExactly("1");
   }
 
   @Test
   @DisplayName("특정 페이지 조회가 실패해도 나머지 페이지 수집을 계속한다")
   void fetch_continuesAfterPageFailure() {
+    // given - 영화 1페이지 조회 시 예외를 던지도록 설정 (일시적 API 오류 상황 재현)
     givenGenres();
     given(tmdbClient.fetchPopularMovies(1))
         .willThrow(new TmdbApiException(new RuntimeException("일시 오류")));
@@ -108,8 +115,10 @@ class TmdbContentFetcherTest {
         .willReturn(tvPage(new TmdbTvDto(3, "드라마1", "줄거리", "/p3.jpg", List.of())));
     given(tmdbClient.fetchPopularTv(2)).willReturn(tvPage());
 
+    // when
     List<ExternalContentData> results = fetcher.fetch();
 
+    // then - 실패한 영화 1페이지는 건너뛰고, 성공한 2, 3만 수집
     assertThat(results).extracting(ExternalContentData::externalId).containsExactly("2", "3");
   }
 

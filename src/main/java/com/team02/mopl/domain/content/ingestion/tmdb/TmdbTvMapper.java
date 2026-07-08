@@ -6,7 +6,7 @@ import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbTvDto;
 import java.util.Map;
 import java.util.Optional;
 
-/** TMDB 드라마 응답 1건을 정규화된 수집 데이터(TV_SERIES)로 변환한다. */
+// TMDB 드라마 응답 1건을 정규화된 수집 데이터(TV_SERIES)로 변환
 public class TmdbTvMapper extends AbstractTmdbMapper<TmdbTvDto> {
 
   public TmdbTvMapper(
