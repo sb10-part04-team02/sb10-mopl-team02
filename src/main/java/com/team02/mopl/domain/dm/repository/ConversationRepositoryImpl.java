@@ -66,7 +66,10 @@ public class ConversationRepositoryImpl implements ConversationRepositoryCustom 
   }
 
   // 상대방 이름 부분일치 (대소문자 구분 없음). keyword가 없으면 필터 미적용.
-  // EXISTS 서브쿼리로 표현해 조인 중복 행을 만들지 않고 커서 정렬을 그대로 유지한다
+  // EXISTS 서브쿼리로 표현해 조인 중복 행을 만들지 않고 커서 정렬을 그대로 유지한다.
+  // TODO: containsIgnoreCase는 LIKE '%kw%' (선행 와일드카드)로 번역돼 B-Tree 인덱스를 못 타고 순차 스캔함.
+  //  데이터가 많아지면 pg_trgm + GIN 표현식 인덱스(LOWER(users.name))로 부분 문자열 검색 가속을 검토
+  //  (PlaylistRepositoryImpl.keywordContains와 동일한 사안).
   private BooleanExpression counterpartNameContains(UUID userId, String keyword) {
     if (keyword == null || keyword.isBlank()) {
       return null;
