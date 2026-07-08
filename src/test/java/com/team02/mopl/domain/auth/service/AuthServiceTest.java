@@ -34,6 +34,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
@@ -64,6 +65,7 @@ class AuthServiceTest {
 
       MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
       given(userDetailsService.loadUserByUsername(anyString())).willReturn(mockUserDetails);
+      given(mockUserDetails.isAccountNonLocked()).willReturn(true);
 
       String refresh = "refresh";
       String newAccess = "new Access";
@@ -143,6 +145,29 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("계정이 잠금상태라면 예외를 던진다")
+    void sdf() {
+      // given
+      JWTClaimsSet mockClaims = mock(JWTClaimsSet.class);
+      given(jwtTokenProvider.verifyRefreshToken(anyString())).willReturn(mockClaims);
+
+      UUID userId = UUID.randomUUID();
+      given(jwtUtils.getUserId(mockClaims)).willReturn(userId);
+
+      String email = "example@gmail.com";
+      given(mockClaims.getSubject()).willReturn(email);
+
+      MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
+      given(userDetailsService.loadUserByUsername(email)).willReturn(mockUserDetails);
+      given(mockUserDetails.isAccountNonLocked()).willReturn(false);
+
+      String refresh = "refresh";
+
+      // when & then
+      assertThrows(LockedException.class, () -> authService.update(refresh));
+    }
+
+    @Test
     @DisplayName("토큰이 탈취가 됐으면 예외를 던진다")
     void fail_shouldThrowCompromisedTokenException_whenTokenIsCompromised() {
       // given
@@ -157,6 +182,7 @@ class AuthServiceTest {
 
       MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
       given(userDetailsService.loadUserByUsername(email)).willReturn(mockUserDetails);
+      given(mockUserDetails.isAccountNonLocked()).willReturn(true);
 
       String refresh = "refresh";
       String newAccess = "newAccess";
