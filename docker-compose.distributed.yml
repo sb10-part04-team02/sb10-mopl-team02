@@ -16,7 +16,6 @@ services:
       # 이미 볼륨이 생성된 이후에는 자동 재실행되지 않는다.
       - ./src/main/resources/01_schema_v8.sql:/docker-entrypoint-initdb.d/01_schema_v8.sql:ro
     ports:
-      # 로컬 PostgreSQL 5432 포트 충돌을 피하기 위해 호스트 15432로 노출한다.
       # 컨테이너 내부에서는 그대로 5432를 사용한다.
       - "5432:5432"
     healthcheck:
