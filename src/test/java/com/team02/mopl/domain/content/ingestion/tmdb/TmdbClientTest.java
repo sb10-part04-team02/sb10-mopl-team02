@@ -165,6 +165,19 @@ class TmdbClientTest {
   }
 
   @Test
+  @DisplayName("200 응답이지만 본문이 비어 있으면 requireBody가 재시도 후 TmdbApiException을 던진다")
+  void fetchPopularMovies_whenBodyIsNull_retriesThenThrowsTmdbApiException() {
+    // given: 200이지만 본문이 없어 역직렬화 결과가 null (null 본문은 retryable이라 MAX_ATTEMPTS만큼 호출됨)
+    server
+        .expect(ExpectedCount.times(3), requestTo(Matchers.startsWith(BASE_URL + "/movie/popular")))
+        .andRespond(withSuccess());
+
+    // when & then
+    assertThatThrownBy(() -> tmdbClient.fetchPopularMovies(1)).isInstanceOf(TmdbApiException.class);
+    server.verify();
+  }
+
+  @Test
   @DisplayName("5xx 응답이 계속되면 MAX_ATTEMPTS만큼 재시도한 뒤 TmdbApiException을 던진다")
   void fetchTvGenres_whenServerError_retriesThenThrowsTmdbApiException() {
     // given: 3회 모두 5xx
