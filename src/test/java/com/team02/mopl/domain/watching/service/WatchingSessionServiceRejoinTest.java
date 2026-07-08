@@ -50,7 +50,8 @@ class WatchingSessionServiceRejoinTest extends RepositoryTestSupport {
             contentRepository,
             tagRepository,
             userRepository,
-            new WatchingSessionMapper());
+            new WatchingSessionMapper(),
+            event -> {});
 
     Content content = new Content(ContentType.MOVIE, "테스트 영화", "설명", "http://img");
     em.persist(content);

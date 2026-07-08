@@ -94,7 +94,8 @@ public interface DirectMessageApi {
   })
   ResponseEntity<ConversationDto> findConversationWith(
       @Parameter(hidden = true) UUID userId,
-      @RequestParam @Parameter(description = "대화 상대 UUID") UUID withUserId);
+      @RequestParam("userId") @Parameter(name = "userId", description = "대화 상대 UUID")
+          UUID withUserId);
 
   @Operation(summary = "대화방 단건 조회", description = "로그인 사용자가 대화방 ID로 대화방을 조회합니다.")
   @ApiResponses({

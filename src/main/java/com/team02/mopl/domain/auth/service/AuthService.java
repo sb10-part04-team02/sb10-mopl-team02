@@ -9,6 +9,7 @@ import com.team02.mopl.domain.auth.jwt.JwtRegistry;
 import com.team02.mopl.domain.auth.jwt.JwtRegistry.RotationResult;
 import com.team02.mopl.domain.auth.jwt.JwtTokenProvider;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
+import com.team02.mopl.domain.user.exception.UserLockedException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -66,6 +67,12 @@ public class AuthService {
       // 탈퇴한 유저일 경우
       jwtRegistry.deleteRefreshToken(userId, refreshToken);
       throw new UserNotFoundException();
+    }
+
+    // 계정이 잠금상태라면
+    if (!userDetails.isAccountNonLocked()) {
+      jwtRegistry.deleteAllRefreshToken(userId);
+      throw new UserLockedException();
     }
 
     String newAccessToken = jwtTokenProvider.generateAccessToken(userDetails);

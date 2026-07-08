@@ -2,6 +2,7 @@ package com.team02.mopl.domain.user.controller;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
@@ -72,6 +73,15 @@ public class UserController implements UserApi {
   public ResponseEntity<Void> updateRole(
       @PathVariable UUID userId, @RequestBody @Valid UserRoleUpdateRequest request) {
     userService.updateRole(userId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  @PreAuthorize("hasRole('ADMIN')")
+  @PatchMapping("/{userId}/locked")
+  public ResponseEntity<Void> updateLock(
+      @PathVariable UUID userId, @RequestBody @Valid UserLockUpdateRequest request) {
+    userService.updateLock(userId, request);
     return ResponseEntity.noContent().build();
   }
 }
