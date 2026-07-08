@@ -72,7 +72,9 @@ class TmdbContentFetcherTest {
 
     // then - 영화 2건 + 드라마 1건 = 총 3건 수집 되어야 함
     assertThat(results).hasSize(3);
-    assertThat(results).extracting(ExternalContentData::externalId).containsExactly("1", "2", "3");
+    assertThat(results)
+        .extracting(ExternalContentData::externalId)
+        .containsExactly("movie:1", "movie:2", "tv:3");
     then(tmdbClient).should().fetchPopularMovies(1);
     then(tmdbClient).should().fetchPopularMovies(2);
     then(tmdbClient).should().fetchPopularTv(1);
@@ -97,7 +99,7 @@ class TmdbContentFetcherTest {
     List<ExternalContentData> results = fetcher.fetch();
 
     // then
-    assertThat(results).extracting(ExternalContentData::externalId).containsExactly("1");
+    assertThat(results).extracting(ExternalContentData::externalId).containsExactly("movie:1");
   }
 
   @Test
@@ -117,7 +119,9 @@ class TmdbContentFetcherTest {
     List<ExternalContentData> results = fetcher.fetch();
 
     // then - 실패한 영화 1페이지는 건너뛰고, 성공한 2, 3만 수집
-    assertThat(results).extracting(ExternalContentData::externalId).containsExactly("2", "3");
+    assertThat(results)
+        .extracting(ExternalContentData::externalId)
+        .containsExactly("movie:2", "tv:3");
   }
 
   @Test

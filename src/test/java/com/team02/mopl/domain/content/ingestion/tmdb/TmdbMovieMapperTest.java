@@ -32,7 +32,7 @@ class TmdbMovieMapperTest {
 
     // then
     assertThat(data.source()).isEqualTo(ContentSource.TMDB);
-    assertThat(data.externalId()).isEqualTo("550");
+    assertThat(data.externalId()).isEqualTo("movie:550");
     assertThat(data.contentType()).isEqualTo(ContentType.MOVIE);
     assertThat(data.title()).isEqualTo("파이트 클럽");
     assertThat(data.description()).isEqualTo("줄거리");
