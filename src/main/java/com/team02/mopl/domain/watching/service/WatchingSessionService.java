@@ -15,6 +15,7 @@ import com.team02.mopl.domain.watching.dto.WatchingSessionSearchRequest;
 import com.team02.mopl.domain.watching.entity.WatchingSession;
 import com.team02.mopl.domain.watching.enums.ChangeType;
 import com.team02.mopl.domain.watching.enums.WatchingSessionSortBy;
+import com.team02.mopl.domain.watching.event.WatchingSessionJoinedEvent;
 import com.team02.mopl.domain.watching.mapper.WatchingSessionMapper;
 import com.team02.mopl.domain.watching.repository.WatchingSessionRepository;
 import com.team02.mopl.domain.watching.util.WatchingSessionCursorConverter;
@@ -29,6 +30,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +44,7 @@ public class WatchingSessionService {
   private final TagRepository tagRepository;
   private final UserRepository userRepository;
   private final WatchingSessionMapper watchingSessionMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   // 시청 세션 참여: 세션을 생성하고 구독자들에게 전파할 JOIN 변경 정보를 반환한다.
   @Transactional
@@ -56,13 +59,23 @@ public class WatchingSessionService {
     // 유저·콘텐츠당 삭제되지 않은 세션은 1건만 허용(부분 유니크 인덱스)되므로,
     // 중복 SUBSCRIBE(중복 탭, 재연결)로 활성 세션이 이미 있으면 새로 만들지 않고 재사용한다.
     // leave가 종료와 소프트 삭제를 함께 수행하므로 삭제되지 않은 세션은 항상 활성 상태다.
-    WatchingSession session =
-        watchingSessionRepository
-            .findByContent_IdAndUser_IdAndDeletedAtIsNull(contentId, userId)
-            .orElseGet(
-                () ->
-                    watchingSessionRepository.save(
-                        new WatchingSession(content, watcher, Instant.now(), null)));
+    Optional<WatchingSession> existingSession =
+        watchingSessionRepository.findByContent_IdAndUser_IdAndDeletedAtIsNull(contentId, userId);
+
+    WatchingSession session;
+    if (existingSession.isPresent()) {
+      session = existingSession.get();
+    } else {
+      session =
+          watchingSessionRepository.save(
+              new WatchingSession(content, watcher, Instant.now(), null));
+
+      // 새 시청 세션이 생성된 경우에만 팔로워 알림 이벤트를 발행한다.
+      // 기존 활성 세션 재사용 시에도 이벤트를 발행하면 새로고침/재연결마다 중복 알림이 생성될 수 있다.
+      eventPublisher.publishEvent(
+          new WatchingSessionJoinedEvent(
+              watcher.getId(), watcher.getName(), content.getId(), content.getTitle()));
+    }
 
     return toChange(ChangeType.JOIN, session, content);
   }
