@@ -142,7 +142,7 @@ public class JwtRegistry {
 
       return new AuthCheckResult(isBlacklisted, isUserLocked);
     } catch (DataAccessException e) {
-      log.error("[Redis] 인증상태 조회 중 네트워크 장애 발생: reason={}", e.getMessage());
+      log.error("[Redis] 인증상태 조회 중 네트워크 장애 발생: reason={}", e.getMessage(), e);
       throw new InternalAuthenticationServiceException("redis 장애로 요청을 처리할 수 없습니다.", e);
     }
   }
