@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
 import com.team02.mopl.domain.auth.jwt.JwtRegistry;
@@ -14,6 +15,7 @@ import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
+import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
 import java.lang.reflect.Method;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +26,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -122,6 +125,54 @@ class UserEventListenerTest {
       // then
       assertThat(transactional).isNotNull();
       assertThat(transactional.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+    }
+  }
+
+  @Nested
+  class onUserLockUpdatedEvent {
+
+    @Test
+    @DisplayName("유저잠금 이벤트가 오면 redis에서 유저를 잠금처리한다")
+    void success_shouldLockUser_whenUserLockedEventIsTrue() {
+      // given
+      UUID userId = UUID.randomUUID();
+      UserLockUpdatedEvent event = new UserLockUpdatedEvent(userId, true);
+
+      // when
+      eventListener.onUserLockUpdatedEvent(event);
+
+      // then
+      then(jwtRegistry).should(times(1)).lockUser(userId);
+      then(jwtRegistry).should(never()).unlockUser(any(UUID.class));
+    }
+
+    @Test
+    @DisplayName("유저잠금해제 이벤트가 오면 redis에서 유저를 잠금해제처리한다")
+    void success_shouldUnlockUser_whenUserLockedEventIsFalse() {
+      // given
+      UUID userId = UUID.randomUUID();
+      UserLockUpdatedEvent event = new UserLockUpdatedEvent(userId, false);
+
+      // when
+      eventListener.onUserLockUpdatedEvent(event);
+
+      // then
+      then(jwtRegistry).should(never()).lockUser(any(UUID.class));
+      then(jwtRegistry).should(times(1)).unlockUser(userId);
+    }
+  }
+
+  @Nested
+  class UserLockUpdatedRecover {
+    @Test
+    @DisplayName("Recover함수가 호출되면 예외를 정상적으로 처리한다")
+    void success_shouldNotThrowException_whenRecoverMethodIsCalled() {
+      // given
+      DataAccessException e = new RedisConnectionFailureException("test");
+      UserLockUpdatedEvent event = new UserLockUpdatedEvent(UUID.randomUUID(), true);
+
+      // when & then
+      assertDoesNotThrow(() -> eventListener.userLockUpdatedRecover(e, event));
     }
   }
 }

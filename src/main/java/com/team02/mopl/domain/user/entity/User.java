@@ -62,4 +62,10 @@ public class User extends BaseMutableEntity {
     this.role = newRole;
     return oldRole;
   }
+
+  public boolean updateLock(boolean locked) {
+    boolean oldLocked = this.isLocked;
+    this.isLocked = locked;
+    return oldLocked;
+  }
 }

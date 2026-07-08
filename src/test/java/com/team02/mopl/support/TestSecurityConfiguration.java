@@ -22,6 +22,8 @@ public class TestSecurityConfiguration {
                     .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.PATCH, "/api/users/{userId}/role")
                     .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.PATCH, "/api/users/{userId}/locked")
+                    .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.POST, "/api/contents")
                     .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.PATCH, "/api/contents/{contentId}")
