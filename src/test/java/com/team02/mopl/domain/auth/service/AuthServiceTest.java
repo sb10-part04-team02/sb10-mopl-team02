@@ -23,6 +23,7 @@ import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import com.team02.mopl.domain.auth.service.AuthService.TokenResult;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.entity.enums.Role;
+import com.team02.mopl.domain.user.exception.UserLockedException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import java.time.Instant;
 import java.util.UUID;
@@ -34,7 +35,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
@@ -164,7 +164,7 @@ class AuthServiceTest {
       String refresh = "refresh";
 
       // when & then
-      assertThrows(LockedException.class, () -> authService.update(refresh));
+      assertThrows(UserLockedException.class, () -> authService.update(refresh));
       then(jwtRegistry).should(times(1)).deleteAllRefreshToken(eq(userId));
     }
 
