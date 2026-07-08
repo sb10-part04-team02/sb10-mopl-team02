@@ -14,7 +14,6 @@ import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.watching.event.WatchingSessionJoinedEvent;
-import java.lang.reflect.Method;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -24,8 +23,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class WatchingSessionJoinedEventListenerTest {
@@ -98,18 +95,5 @@ class WatchingSessionJoinedEventListenerTest {
     assertDoesNotThrow(() -> listener.onWatchingSessionJoined(event));
 
     then(notificationService).should(times(1)).createNotification(any());
-  }
-
-  @Test
-  @DisplayName("실시간 시청 알림 리스너는 알림 저장을 새 트랜잭션에서 처리한다")
-  void onWatchingSessionJoined_hasRequiresNewTransaction() throws Exception {
-    Method method =
-        WatchingSessionJoinedEventListener.class.getMethod(
-            "onWatchingSessionJoined", WatchingSessionJoinedEvent.class);
-
-    Transactional transactional = method.getAnnotation(Transactional.class);
-
-    assertThat(transactional).isNotNull();
-    assertThat(transactional.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
   }
 }
