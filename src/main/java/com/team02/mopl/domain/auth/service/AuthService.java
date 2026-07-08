@@ -9,11 +9,11 @@ import com.team02.mopl.domain.auth.jwt.JwtRegistry;
 import com.team02.mopl.domain.auth.jwt.JwtRegistry.RotationResult;
 import com.team02.mopl.domain.auth.jwt.JwtTokenProvider;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
+import com.team02.mopl.domain.user.exception.UserLockedException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -72,7 +72,7 @@ public class AuthService {
     // 계정이 잠금상태라면
     if (!userDetails.isAccountNonLocked()) {
       jwtRegistry.deleteAllRefreshToken(userId);
-      throw new LockedException("잠금처리된 유저입니다. 어드민에게 문의하세요.");
+      throw new UserLockedException();
     }
 
     String newAccessToken = jwtTokenProvider.generateAccessToken(userDetails);

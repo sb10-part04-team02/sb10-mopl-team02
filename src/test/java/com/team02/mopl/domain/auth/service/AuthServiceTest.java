@@ -146,7 +146,7 @@ class AuthServiceTest {
 
     @Test
     @DisplayName("계정이 잠금상태라면 예외를 던진다")
-    void sdf() {
+    void fail_shouldThrowException_whenUserIsLocked() {
       // given
       JWTClaimsSet mockClaims = mock(JWTClaimsSet.class);
       given(jwtTokenProvider.verifyRefreshToken(anyString())).willReturn(mockClaims);
@@ -165,6 +165,7 @@ class AuthServiceTest {
 
       // when & then
       assertThrows(LockedException.class, () -> authService.update(refresh));
+      then(jwtRegistry).should(times(1)).deleteAllRefreshToken(eq(userId));
     }
 
     @Test
