@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -70,12 +71,6 @@ public class JwtRegistry {
     }
   }
 
-  //  // TODO: 삭제처리
-  //  public boolean isBlacklisted(String accessTokenId) {
-  //    String blackListKey = blacklistKey(accessTokenId);
-  //    return Objects.equals(redisTemplate.hasKey(blackListKey), true);
-  //  }
-
   private String blacklistKey(String accessTokenId) {
     return blacklistPrefix + accessTokenId;
   }
@@ -113,6 +108,8 @@ public class JwtRegistry {
     String refreshKey = refreshKey(userId);
     String lockKey = lockKey(userId);
 
+    // TODO: 기본 구현 후, 원자적 처리
+
     // RefreshToken 전체삭제
     redisTemplate.delete(refreshKey);
     // AccessToken 만료시간만큼 TTL 설정
@@ -139,8 +136,8 @@ public class JwtRegistry {
 
       return new AuthCheckResult(isBlacklisted, isUserLocked);
     } catch (DataAccessException e) {
-      log.error("[Redis] 인증상태 조회 중 네트워크 장애 발생 - 기본값 반환", e);
-      return new AuthCheckResult(false, false);
+      log.error("[Redis] 인증상태 조회 중 네트워크 장애 발생: reason={}", e.getMessage());
+      throw new InternalAuthenticationServiceException("redis 장애로 요청을 처리할 수 없습니다.", e);
     }
   }
 

@@ -180,7 +180,7 @@ public class UserService {
     boolean newLocked = request.locked();
     if (newLocked == findUser.isLocked()) {
       // 멱득성 보장
-      log.info("유저의 기존 계정잠금과 동일하여 변경을 스킵합니다. userId={} role={}", userId, newLocked);
+      log.info("유저의 기존 계정잠금과 동일하여 변경을 스킵합니다. userId={} isLocked={}", userId, newLocked);
       return;
     }
 

@@ -1,7 +1,7 @@
 package com.team02.mopl.domain.auth.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -32,6 +32,7 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -176,48 +177,6 @@ class JwtRegistryTest {
     }
   }
 
-  //  @Nested
-  //  class IsBlacklisted {
-  //    @Test
-  //    @DisplayName("network오류로 null이 들어온다면 false를 반환한다")
-  //    void fail_shouldReturnFalse_whenRedisReturnsNullDueToNetworkError() {
-  //      // given
-  //      given(redisTemplate.hasKey(any())).willReturn(null);
-  //
-  //      // when
-  //      boolean actual = jwtRegistry.isBlacklisted(UUID.randomUUID().toString());
-  //
-  //      // then
-  //      assertThat(actual).isFalse();
-  //    }
-  //
-  //    @Test
-  //    @DisplayName("blackList에 등록되어 있지 않으면 false를 반환한다")
-  //    void success_shouldReturnFalse_whenTokenIsNotBlacklisted() {
-  //      // given
-  //      given(redisTemplate.hasKey(any())).willReturn(false);
-  //
-  //      // when
-  //      boolean actual = jwtRegistry.isBlacklisted(UUID.randomUUID().toString());
-  //
-  //      // then
-  //      assertThat(actual).isFalse();
-  //    }
-  //
-  //    @Test
-  //    @DisplayName("blackList에 등록되어 있으면 return 반환한다")
-  //    void success_shouldReturnTrue_whenTokenIsBlacklisted() {
-  //      // given
-  //      given(redisTemplate.hasKey(any())).willReturn(true);
-  //
-  //      // when
-  //      boolean actual = jwtRegistry.isBlacklisted(UUID.randomUUID().toString());
-  //
-  //      // then
-  //      assertThat(actual).isTrue();
-  //    }
-  //  }
-
   @Nested
   class RotateRefreshToken {
 
@@ -320,21 +279,18 @@ class JwtRegistryTest {
     }
 
     @Test
-    @DisplayName("redis의 문제가 생기면 기본값 false를 반환한다")
-    void fail_shouldReturnFalse_whenRedisIsDownDuringCheckAuthStatus() {
+    @DisplayName("redis의 문제가 생기면 예외를 던진다")
+    void fail_shouldThrowException_whenRedisIsDownDuringCheckAuthStatus() {
       // given
       String accessTokenId = UUID.randomUUID().toString();
       UUID userId = UUID.randomUUID();
 
       willThrow(RedisConnectionFailureException.class).given(redisTemplate).hasKey(anyString());
 
-      // when
-      AuthCheckResult result =
-          assertDoesNotThrow(() -> jwtRegistry.checkAuthStatus(accessTokenId, userId));
-
-      // then
-      assertThat(result.isBlacklisted()).isFalse();
-      assertThat(result.isUserLocked()).isFalse();
+      // when & then
+      assertThrows(
+          InternalAuthenticationServiceException.class,
+          () -> jwtRegistry.checkAuthStatus(accessTokenId, userId));
     }
   }
 }
