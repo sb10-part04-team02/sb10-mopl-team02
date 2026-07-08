@@ -2,7 +2,8 @@ package com.team02.mopl.domain.user.service;
 
 import com.team02.mopl.domain.auth.jwt.JwtRegistry;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
-import com.team02.mopl.domain.user.event.UserLockedEvent;
+import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -21,7 +22,7 @@ public class UserEventListener {
   public void onUserRoleUpdated(RoleUpdatedEvent event) {
     try {
       // 권한변경
-      jwtRegistry.deleteAllRefreshToken(event.userId());
+      jwtRegistry.lockUser(event.userId());
     } catch (DataAccessException e) {
       log.error(
           "[Redis] 유저 권한 변경 후 리프레시토큰 삭제 실패: userId={}, reason={}",
@@ -32,16 +33,18 @@ public class UserEventListener {
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  public void onUserLocked(UserLockedEvent event) {
+  public void onUserLockUpdatedEvent(UserLockUpdatedEvent event) {
+    UUID userId = event.userId();
+
     try {
-      // 계정잠금
-      jwtRegistry.deleteAllRefreshToken(event.userId());
+      if (event.locked()) {
+        jwtRegistry.lockUser(userId);
+      } else {
+        jwtRegistry.unlockUser(userId);
+      }
     } catch (DataAccessException e) {
-      log.error(
-          "[Redis] 유저 계정잠금 후 리프레시토큰 삭제 실패: userId={}, reason={}",
-          event.userId(),
-          e.getMessage(),
-          e);
+      String action = event.locked() ? "잠금(토큰삭제)" : "해제(키삭제)";
+      log.error("[Redis] 유저 계정 {} 실패: userId={}, reason={}", action, userId, e.getMessage(), e);
     }
   }
 }

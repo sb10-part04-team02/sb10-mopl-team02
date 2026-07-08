@@ -26,7 +26,7 @@ import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
-import com.team02.mopl.domain.user.event.UserLockedEvent;
+import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
@@ -824,8 +824,8 @@ class UserServiceTest {
   class UpdateLock {
 
     @Test
-    @DisplayName("계정잠금요청이 들어오면 잠금상태를 변경하고 이벤트를 발행한다")
-    void success_shouldLockUserAndPublishEvent_whenLockRequestIsTrue() {
+    @DisplayName("계정잠금변환요청이 들어오면 잠금상태를 변경하고 이벤트를 발행한다")
+    void success_shouldChaneLockAndPublishEvent_whenLockUpdateRequestIsProvided() {
       // given
       UUID userId = UUID.randomUUID();
       User user = new User("이름", "example@gmail.com", "password", null, Role.USER, false);
@@ -838,25 +838,7 @@ class UserServiceTest {
 
       // then
       assertThat(user.isLocked()).isEqualTo(true);
-      then(eventPublisher).should(times(1)).publishEvent(new UserLockedEvent(userId));
-    }
-
-    @Test
-    @DisplayName("계정잠금해제요청이 들어오면 잠금상태를 변경한다")
-    void success_shouldUnlockUser_whenLockRequestIsFalse() {
-      // given
-      UUID userId = UUID.randomUUID();
-      User user = new User("이름", "example@gmail.com", "password", null, Role.USER, true);
-      given(userRepository.findByIdAndDeletedAtIsNull(eq(userId))).willReturn(Optional.of(user));
-
-      UserLockUpdateRequest request = new UserLockUpdateRequest(false);
-
-      // when
-      userService.updateLock(userId, request);
-
-      // then
-      assertThat(user.isLocked()).isEqualTo(false);
-      then(eventPublisher).should(never()).publishEvent(any(UserLockedEvent.class));
+      then(eventPublisher).should(times(1)).publishEvent(new UserLockUpdatedEvent(userId, true));
     }
 
     @Test

@@ -4,10 +4,13 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtRegistry {
@@ -21,12 +24,15 @@ public class JwtRegistry {
   @Value("${app.jwt.redis.blacklist-prefix}")
   private String blacklistPrefix;
 
+  @Value("${app.jwt.redis.user-lock-prefix}")
+  private String userLockPrefix;
+
   private final JwtProperties properties;
   private final StringRedisTemplate redisTemplate;
 
   // TODO: 기본구현 후 LuaScript를 통한 원자적 처리 구현
   public void registerRefreshToken(UUID userId, String refreshToken) {
-    String key = userKey(userId);
+    String key = refreshKey(userId);
     long now = System.currentTimeMillis();
     long tokenExpirationTime = now + properties.refreshTokenExpiration().toMillis();
 
@@ -44,12 +50,12 @@ public class JwtRegistry {
     redisTemplate.expire(key, properties.refreshTokenExpiration());
   }
 
-  private String userKey(UUID userId) {
+  private String refreshKey(UUID userId) {
     return refreshPrefix + userId.toString();
   }
 
   public void deleteRefreshToken(UUID userId, String refreshToken) {
-    String key = userKey(userId);
+    String key = refreshKey(userId);
 
     // RefreshToken 삭제
     redisTemplate.opsForZSet().remove(key, refreshToken);
@@ -64,10 +70,11 @@ public class JwtRegistry {
     }
   }
 
-  public boolean isBlacklisted(String accessTokenId) {
-    String blackListKey = blacklistKey(accessTokenId);
-    return Objects.equals(redisTemplate.hasKey(blackListKey), true);
-  }
+  //  // TODO: 삭제처리
+  //  public boolean isBlacklisted(String accessTokenId) {
+  //    String blackListKey = blacklistKey(accessTokenId);
+  //    return Objects.equals(redisTemplate.hasKey(blackListKey), true);
+  //  }
 
   private String blacklistKey(String accessTokenId) {
     return blacklistPrefix + accessTokenId;
@@ -76,7 +83,7 @@ public class JwtRegistry {
   // TODO: 기본구현 후 LuaScript를 통한 원자적 처리 구현
   public RotationResult rotateRefreshToken(
       UUID userId, String refreshToken, String newRefreshToken) {
-    String key = userKey(userId);
+    String key = refreshKey(userId);
 
     // 값이 있으면 double값, 없으면 null. O(1)
     if (redisTemplate.opsForZSet().score(key, refreshToken) == null) {
@@ -102,10 +109,40 @@ public class JwtRegistry {
     COMPROMISED
   }
 
-  public void deleteAllRefreshToken(UUID userId) {
-    String key = userKey(userId);
+  public void lockUser(UUID userId) {
+    String refreshKey = refreshKey(userId);
+    String lockKey = lockKey(userId);
 
     // RefreshToken 전체삭제
-    redisTemplate.delete(key);
+    redisTemplate.delete(refreshKey);
+    // AccessToken 만료시간만큼 TTL 설정
+    redisTemplate.opsForValue().set(lockKey, "lock", properties.accessTokenExpiration());
   }
+
+  public void unlockUser(UUID userId) {
+    String lockKey = lockKey(userId);
+    // userLockKey 삭제
+    redisTemplate.delete(lockKey);
+  }
+
+  private String lockKey(UUID userId) {
+    return userLockPrefix + userId.toString();
+  }
+
+  public AuthCheckResult checkAuthStatus(String accessTokenId, UUID userId) {
+    try {
+      String blacklistKey = blacklistKey(accessTokenId);
+      String lockKey = lockKey(userId);
+
+      boolean isBlacklisted = Objects.equals(redisTemplate.hasKey(blacklistKey), true);
+      boolean isUserLocked = Objects.equals(redisTemplate.hasKey(lockKey), true);
+
+      return new AuthCheckResult(isBlacklisted, isUserLocked);
+    } catch (DataAccessException e) {
+      log.error("[Redis] 인증상태 조회 중 네트워크 장애 발생 - 기본값 반환", e);
+      return new AuthCheckResult(false, false);
+    }
+  }
+
+  public record AuthCheckResult(boolean isBlacklisted, boolean isUserLocked) {}
 }

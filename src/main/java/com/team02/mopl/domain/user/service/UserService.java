@@ -10,7 +10,7 @@ import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
-import com.team02.mopl.domain.user.event.UserLockedEvent;
+import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
@@ -185,10 +185,7 @@ public class UserService {
     }
 
     boolean oldLocked = findUser.updateLock(request.locked());
-    // 유저 잠금시에만 이벤트 전송
-    if (newLocked) {
-      eventPublisher.publishEvent(new UserLockedEvent(userId));
-    }
+    eventPublisher.publishEvent(new UserLockUpdatedEvent(userId, newLocked));
     log.info(
         "유저 계정잠금변경 로직 완료: userId={}, isLocked=[{} -> {}]", findUser.getId(), oldLocked, newLocked);
   }
