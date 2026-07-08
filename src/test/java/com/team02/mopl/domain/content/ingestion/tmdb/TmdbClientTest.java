@@ -24,6 +24,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -164,28 +165,80 @@ class TmdbClientTest {
   }
 
   @Test
-  @DisplayName("5xx 응답이면 TmdbApiException을 던진다")
-  void fetchTvGenres_whenServerError_throwsTmdbApiException() {
-    // given
+  @DisplayName("200 응답이지만 본문이 비어 있으면 requireBody가 재시도 후 TmdbApiException을 던진다")
+  void fetchPopularMovies_whenBodyIsNull_retriesThenThrowsTmdbApiException() {
+    // given: 200이지만 본문이 없어 역직렬화 결과가 null (null 본문은 retryable이라 MAX_ATTEMPTS만큼 호출됨)
     server
-        .expect(requestTo(Matchers.startsWith(BASE_URL + "/genre/tv/list")))
+        .expect(ExpectedCount.times(3), requestTo(Matchers.startsWith(BASE_URL + "/movie/popular")))
+        .andRespond(withSuccess());
+
+    // when & then
+    assertThatThrownBy(() -> tmdbClient.fetchPopularMovies(1)).isInstanceOf(TmdbApiException.class);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("5xx 응답이 계속되면 MAX_ATTEMPTS만큼 재시도한 뒤 TmdbApiException을 던진다")
+  void fetchTvGenres_whenServerError_retriesThenThrowsTmdbApiException() {
+    // given: 3회 모두 5xx
+    server
+        .expect(ExpectedCount.times(3), requestTo(Matchers.startsWith(BASE_URL + "/genre/tv/list")))
         .andRespond(withServerError());
 
     // when & then
     assertThatThrownBy(() -> tmdbClient.fetchTvGenres()).isInstanceOf(TmdbApiException.class);
+    server.verify();
   }
 
   @Test
-  @DisplayName("타임아웃 등 IO 오류는 TmdbApiException으로 래핑한다")
-  void fetchPopularMovies_whenIoError_wrapsInTmdbApiException() {
-    // given
+  @DisplayName("일시적 5xx 이후 정상 응답이 오면 재시도로 복구해 결과를 반환한다")
+  void fetchPopularMovies_whenTransientServerError_retriesAndSucceeds() {
+    // given: 첫 호출은 5xx, 재시도 호출은 성공
     server
         .expect(requestTo(Matchers.startsWith(BASE_URL + "/movie/popular")))
+        .andRespond(withServerError());
+    server
+        .expect(requestTo(Matchers.startsWith(BASE_URL + "/movie/popular")))
+        .andRespond(
+            withSuccess(
+                """
+                {"page": 1, "results": [{"id": 550, "title": "파이트 클럽", "genre_ids": []}], "total_pages": 1}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    // when
+    TmdbPageResponse<TmdbMovieDto> response = tmdbClient.fetchPopularMovies(1);
+
+    // then
+    assertThat(response.results().get(0).id()).isEqualTo(550L);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("4xx(401) 응답은 재시도 없이 즉시 TmdbApiException을 던진다")
+  void fetchPopularMovies_whenUnauthorized_doesNotRetry() {
+    // given: 401은 1회만 호출되어야 함
+    server
+        .expect(ExpectedCount.once(), requestTo(Matchers.startsWith(BASE_URL + "/movie/popular")))
+        .andRespond(withUnauthorizedRequest());
+
+    // when & then
+    assertThatThrownBy(() -> tmdbClient.fetchPopularMovies(1)).isInstanceOf(TmdbApiException.class);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("타임아웃 등 IO 오류는 재시도 후 TmdbApiException으로 래핑한다")
+  void fetchPopularMovies_whenIoError_retriesThenWrapsInTmdbApiException() {
+    // given: 3회 모두 IO 오류
+    server
+        .expect(ExpectedCount.times(3), requestTo(Matchers.startsWith(BASE_URL + "/movie/popular")))
         .andRespond(withException(new SocketTimeoutException("read timed out")));
 
     // when & then
     assertThatThrownBy(() -> tmdbClient.fetchPopularMovies(1))
         .isInstanceOf(TmdbApiException.class)
         .hasRootCauseInstanceOf(SocketTimeoutException.class);
+    server.verify();
   }
 }

@@ -7,6 +7,7 @@ import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbMovieDto;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbPageResponse;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbTvDto;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
@@ -24,6 +25,9 @@ public class TmdbClient {
       new ParameterizedTypeReference<>() {};
   private static final ParameterizedTypeReference<TmdbPageResponse<TmdbTvDto>> TV_PAGE_TYPE =
       new ParameterizedTypeReference<>() {};
+
+  private static final int MAX_ATTEMPTS = 3; // 최초 호출 포함 총 시도 횟수
+  private static final long BASE_BACKOFF_MILLIS = 200L; // 지수 백오프 기준: 200, 400ms ...
 
   private final RestClient restClient;
   private final String language;
@@ -51,36 +55,64 @@ public class TmdbClient {
 
   private <T> TmdbPageResponse<T> getPage(
       String path, int page, ParameterizedTypeReference<TmdbPageResponse<T>> responseType) {
-    try {
-      TmdbPageResponse<T> body =
-          restClient
-              .get() // GET 요청 빌더 시작
-              .uri(
-                  uriBuilder -> // URI 조합
-                  uriBuilder
-                          .path(path)
-                          .queryParam("language", language)
-                          .queryParam("page", page)
-                          .build())
-              .retrieve() // 실제 HTTP 요청을 보내고 응답을 받아옴
-              .body(responseType); // 역직렬화
-      return requireBody(body); // null 체크
-    } catch (RestClientException e) {
-      throw new TmdbApiException(e);
-    }
+    return fetch(
+        () ->
+            requireBody(
+                restClient
+                    .get() // GET 요청 빌더 시작
+                    .uri(
+                        uriBuilder -> // URI 조합
+                        uriBuilder
+                                .path(path)
+                                .queryParam("language", language)
+                                .queryParam("page", page)
+                                .build())
+                    .retrieve() // 실제 HTTP 요청을 보내고 응답을 받아옴
+                    .body(responseType))); // 역직렬화 + null 체크
   }
 
   private Map<Integer, String> fetchGenres(String path) {
+    TmdbGenreListResponse body =
+        fetch(
+            () ->
+                requireBody(
+                    restClient
+                        .get()
+                        .uri(
+                            uriBuilder ->
+                                uriBuilder.path(path).queryParam("language", language).build())
+                        .retrieve()
+                        .body(TmdbGenreListResponse.class)));
+    return body.genres().stream()
+        .collect(Collectors.toMap(TmdbGenreDto::id, TmdbGenreDto::name)); // Map으로 변환
+  }
+
+  // 페이지/장르 호출 공통 재시도. 일시적 장애(5xx, IO/타임아웃)만 지수 백오프로 재시도하고
+  // 4xx 등 비일시적 오류는 즉시 던져 불필요한 재시도를 피한다. IO 오류는 TmdbApiException으로 래핑.
+  private <T> T fetch(Supplier<T> operation) {
+    int attempt = 1;
+    while (true) {
+      try {
+        return operation.get(); // 성공하면 즉시 반환
+      } catch (RestClientException e) { // IO/타임아웃 등 상태 핸들러가 잡지 못한 오류
+        if (attempt >= MAX_ATTEMPTS) {
+          throw new TmdbApiException(e);
+        }
+      } catch (TmdbApiException e) { // 상태 핸들러가 던진 4xx/5xx
+        if (!e.isRetryable() || attempt >= MAX_ATTEMPTS) {
+          throw e;
+        }
+      }
+      backoff(attempt++);
+    }
+  }
+
+  // 지수 백오프 계산
+  private static void backoff(int attempt) {
     try {
-      TmdbGenreListResponse body =
-          restClient
-              .get()
-              .uri(uriBuilder -> uriBuilder.path(path).queryParam("language", language).build())
-              .retrieve()
-              .body(TmdbGenreListResponse.class);
-      return requireBody(body).genres().stream()
-          .collect(Collectors.toMap(TmdbGenreDto::id, TmdbGenreDto::name)); // Map으로 변환
-    } catch (RestClientException e) {
+      Thread.sleep(BASE_BACKOFF_MILLIS << (attempt - 1)); // 200, 400ms ... 지수 증가
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt(); // 인터럽트 상태 복원 후 중단
       throw new TmdbApiException(e);
     }
   }

@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.IntFunction;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -19,14 +18,20 @@ import org.springframework.stereotype.Component;
 // 설정된 페이지 수만큼 순회하며, 페이지 단위 호출 실패는 warn 로그 후 나머지 페이지를 계속 수집
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class TmdbContentFetcher implements ContentFetcher {
 
   private final TmdbClient tmdbClient;
   private final TmdbProperties properties;
+  private final String defaultThumbnailUrl;
 
-  @Value("${app.storage.default-thumbnail-url:}")
-  private String defaultThumbnailUrl;
+  public TmdbContentFetcher(
+      TmdbClient tmdbClient,
+      TmdbProperties properties,
+      @Value("${app.storage.default-thumbnail-url:}") String defaultThumbnailUrl) {
+    this.tmdbClient = tmdbClient;
+    this.properties = properties;
+    this.defaultThumbnailUrl = defaultThumbnailUrl;
+  }
 
   @Override
   public ContentSource source() {

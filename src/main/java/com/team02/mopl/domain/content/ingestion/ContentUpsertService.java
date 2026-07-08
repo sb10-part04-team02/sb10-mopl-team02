@@ -4,6 +4,7 @@ import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.entity.Tag;
 import com.team02.mopl.domain.content.repository.ContentRepository;
 import com.team02.mopl.domain.content.repository.TagRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -41,7 +42,8 @@ public class ContentUpsertService {
                   data.title(),
                   data.description(),
                   data.thumbnailUrl()));
-      mergeAddTags(content, data);
+      // 신규 콘텐츠는 기존 태그가 없으므로 조회 없이 바로 저장
+      saveTags(content, data.tags().stream().distinct().toList());
       return UpsertResult.INSERTED;
     }
 
@@ -65,9 +67,15 @@ public class ContentUpsertService {
         tagRepository.findByContentIdAndDeletedAtIsNull(content.getId()).stream()
             .map(Tag::getName)
             .collect(Collectors.toSet());
-    data.tags().stream()
-        .distinct()
-        .filter(name -> !existingNames.contains(name))
-        .forEach(name -> tagRepository.save(new Tag(content, name)));
+    saveTags(
+        content,
+        data.tags().stream().distinct().filter(name -> !existingNames.contains(name)).toList());
+  }
+
+  private void saveTags(Content content, List<String> names) {
+    if (names.isEmpty()) {
+      return;
+    }
+    tagRepository.saveAll(names.stream().map(name -> new Tag(content, name)).toList());
   }
 }
