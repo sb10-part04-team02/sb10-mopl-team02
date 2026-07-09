@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <!-- Spring Boot 기본 콘솔 출력(색상, 예외 변환 등)을 그대로 유지 -->
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+  <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+  <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="mopl"/>
+
+  <!-- dev에서만 로컬 Logstash(TCP 5000)로 JSON 로그 전송. appender가 비동기라
+       Logstash 미기동 시에도 앱은 블로킹 없이 정상 동작한다(버퍼 초과분 드롭). -->
+  <springProfile name="dev">
+    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+      <destination>${LOGSTASH_HOST:-localhost}:${LOGSTASH_PORT:-5000}</destination>
+      <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+        <!-- context 포함 시 appName이 중복 필드로 실려서 customFields의 app만 남긴다 -->
+        <includeContext>false</includeContext>
+        <customFields>{"app":"${appName}"}</customFields>
+      </encoder>
+    </appender>
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+      <appender-ref ref="LOGSTASH"/>
+    </root>
+  </springProfile>
+
+  <springProfile name="!dev">
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+    </root>
+  </springProfile>
+</configuration>

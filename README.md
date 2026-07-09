@@ -73,6 +73,27 @@ mkdir -p logs/app && set -a && source .env && set +a && ./gradlew bootRun 2>&1 |
 
 실행 후 Swagger UI: http://localhost:8080/swagger-ui.html
 
+### 3-1. 로컬 ELK 로그 수집 (선택)
+
+dev 프로파일 앱 로그를 Kibana에서 검색/필터링할 수 있습니다.
+수집 경로: 앱(logback JSON) --TCP 5000--> Logstash --> Elasticsearch(9200) --> Kibana(5601)
+
+#### 시작 / 종료
+```bash
+docker compose -f docker-compose-elk.yml up -d     # ES + Logstash + Kibana 기동
+```
+```bash
+docker compose -f docker-compose-elk.yml down      # 종료 (볼륨 없음 = 로그 데이터 초기화)
+```
+
+#### Kibana 조회
+- data view(`mopl-logs-*`)는 기동 시 `kibana-init` 컨테이너가 자동 생성합니다 (재기동 때마다 복구, 이미 있으면 스킵).
+- http://localhost:5601 -> **Discover**에서 로그 조회 (`requestId`, `app`, `level` 등으로 필터링)
+
+> - ELK가 꺼져 있어도 앱은 정상 동작합니다. 전송 appender가 비동기라 콘솔 로그만 남고 초과분은 드롭됩니다.
+> - Linux에서는 Elasticsearch 기동에 `sudo sysctl -w vm.max_map_count=262144`가 필요할 수 있습니다.
+> - macOS에서 포트 5000이 AirPlay Receiver와 충돌하면 `docker-compose-elk.yml`의 매핑을 `5001:5000`으로 바꾸고 `LOGSTASH_PORT=5001`로 실행하세요.
+
 ### 4. 빌드
 
 ```bash
