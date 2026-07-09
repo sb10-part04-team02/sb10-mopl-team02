@@ -72,7 +72,11 @@ public class ContentIngestionScheduler {
     } catch (Exception e) {
       log.error("스케줄 콘텐츠 수집 실패. elapsedMs={}", System.currentTimeMillis() - startedAt, e);
     } finally {
-      runLock.release(token); // 락 해제가 실패해도 TTL이 최종 안전망
+      try {
+        runLock.release(token); // 락 해제가 실패해도 TTL이 최종 안전망
+      } catch (Exception e) {
+        log.warn("수집 락 해제 실패(Redis 오류). TTL 만료로 자동 해제됩니다.", e);
+      }
     }
   }
 }

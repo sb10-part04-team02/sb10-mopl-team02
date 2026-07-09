@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 
 import com.team02.mopl.domain.content.enums.ContentSource;
 import com.team02.mopl.domain.content.ingestion.CollectResult;
@@ -73,6 +74,20 @@ class ContentIngestionSchedulerTest {
     // when & then
     assertThatCode(() -> scheduler.collectAll()).doesNotThrowAnyException();
     then(runLock).should().release(TOKEN);
+  }
+
+  @Test
+  @DisplayName("락 해제 중 Redis 오류가 나도 예외를 전파하지 않는다 (정상 완료 보장, TTL이 안전망)")
+  void collectAll_whenReleaseFails_doesNotPropagate() {
+    // given - 수집은 성공했지만 락 해제에서 Redis 오류가 발생하는 상황
+    given(runLock.tryAcquire(any())).willReturn(TOKEN);
+    given(contentCollectService.collectAll())
+        .willReturn(List.of(new CollectResult(ContentSource.TMDB, 10, 5, 3, 2, 0)));
+    willThrow(new RuntimeException("Redis 오류")).given(runLock).release(TOKEN);
+
+    // when & then - 해제 실패가 성공한 수집을 예외로 뒤바꾸지 않아야 한다
+    assertThatCode(() -> scheduler.collectAll()).doesNotThrowAnyException();
+    then(contentCollectService).should().collectAll();
   }
 
   @Test
