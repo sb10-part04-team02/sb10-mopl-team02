@@ -20,9 +20,12 @@ public class SportsDbClient {
   private static final long BASE_BACKOFF_MILLIS = 200L; // 지수 백오프 기준: 200, 400ms ...
 
   private final RestClient restClient;
+  private final String apiKey; // IO 예외 메시지의 URI 마스킹용
 
-  public SportsDbClient(@Qualifier("sportsDbRestClient") RestClient restClient) {
+  public SportsDbClient(
+      @Qualifier("sportsDbRestClient") RestClient restClient, SportsDbProperties properties) {
     this.restClient = restClient;
+    this.apiKey = properties.apiKey();
   }
 
   // 리그+시즌의 경기 목록 조회. 무료 키는 호출당 최대 15건 반환 (유료 키 - 3000건)
@@ -56,7 +59,7 @@ public class SportsDbClient {
         return operation.get(); // 성공하면 즉시 반환
       } catch (RestClientException e) { // IO/타임아웃 등 상태 핸들러가 잡지 못한 오류
         if (attempt >= MAX_ATTEMPTS) {
-          throw new SportsDbApiException(e);
+          throw new SportsDbApiException(sanitize(e));
         }
         // 재시도 전 기록. 예외 메시지에는 API 키가 포함된 URI가 담길 수 있어 클래스명만 남긴다
         log.warn(
@@ -77,6 +80,19 @@ public class SportsDbClient {
       }
       backoff(attempt++);
     }
+  }
+
+  // IO 예외 메시지에는 API 키가 포함된 요청 URI가 담긴다
+  // 로그 스택트레이스로 키가 새지 않도록 메시지만 마스킹하고, 원본 타입명/스택/cause 체인은 보존한다
+  private RestClientException sanitize(RestClientException e) {
+    RestClientException masked =
+        new RestClientException(
+            e.getClass().getSimpleName()
+                + ": "
+                + SportsDbClientConfig.maskApiKey(String.valueOf(e.getMessage()), apiKey),
+            e.getCause());
+    masked.setStackTrace(e.getStackTrace());
+    return masked;
   }
 
   // 지수 백오프 계산

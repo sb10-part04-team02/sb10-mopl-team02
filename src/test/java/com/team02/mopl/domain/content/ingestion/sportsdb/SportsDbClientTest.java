@@ -49,7 +49,7 @@ class SportsDbClientTest {
     RestClient.Builder builder = RestClient.builder();
     server = MockRestServiceServer.bindTo(builder).build();
     sportsDbClient =
-        new SportsDbClient(SportsDbClientConfig.customize(builder, properties).build());
+        new SportsDbClient(SportsDbClientConfig.customize(builder, properties).build(), properties);
   }
 
   @Test
@@ -205,7 +205,13 @@ class SportsDbClientTest {
     // when & then
     assertThatThrownBy(() -> sportsDbClient.fetchSeasonEvents("4328", "2025-2026"))
         .isInstanceOf(SportsDbApiException.class)
-        .hasRootCauseInstanceOf(SocketTimeoutException.class);
+        .hasRootCauseInstanceOf(SocketTimeoutException.class)
+        .satisfies(
+            e -> {
+              // 래핑된 IO 예외 메시지의 요청 URI에서 API 키가 마스킹된다 (로그 스택트레이스 유출 방지)
+              assertThat(e.getCause().getMessage()).contains("/***/eventsseason.php");
+              assertThat(e.getCause().getMessage()).doesNotContain(API_KEY);
+            });
     server.verify();
   }
 
