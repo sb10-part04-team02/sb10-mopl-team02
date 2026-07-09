@@ -49,6 +49,42 @@ services:
       timeout: 5s
       retries: 5
 
+  # 로컬 분산 환경에서 사용할 Kafka 브로커
+  # AWS 연동 시에는 Confluent Cloud bootstrap server로 대체할 예정이다.
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    hostname: kafka
+    ports:
+      # 로컬 PC에서 Kafka에 직접 접근할 때 사용하는 포트
+      - "9092:9092"
+    environment:
+      # 단일 브로커 KRaft 모드 설정
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+      # 컨테이너 내부 통신용 PLAINTEXT, 로컬 PC 접근용 PLAINTEXT_HOST, 컨트롤러용 CONTROLLER 리스너
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # 로컬 단일 브로커라 replication factor를 1로 설정한다.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      # KRaft 클러스터 식별자
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics --bootstrap-server kafka:29092 --list >/dev/null 2>&1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   # 첫 번째 Spring Boot 애플리케이션 인스턴스
   # Nginx upstream의 첫 번째 대상이 된다.
   app-1:
@@ -74,6 +110,10 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
 
+      # 컨테이너 네트워크 내부에서는 kafka 서비스명과 내부 리스너 포트로 접근한다.
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_CONSUMER_GROUP_ID: mopl-local
+
       # JWT 및 초기 관리자 계정 설정
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
       ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
@@ -91,6 +131,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
 
   # 두 번째 Spring Boot 애플리케이션 인스턴스
@@ -112,6 +154,9 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
 
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_CONSUMER_GROUP_ID: mopl-local
+
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
       ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
       ADMIN_NAME: ${ADMIN_NAME:?ADMIN_NAME is required}
@@ -125,6 +170,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
       # app-1에서 이미 이미지를 build하므로 app-1 시작 이후 app-2를 시작하도록 둔다.
       app-1:
