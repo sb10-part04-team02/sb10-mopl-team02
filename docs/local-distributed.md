@@ -9,6 +9,7 @@ Docker Compose로 로컬에서 다음 컨테이너를 실행합니다.
 - `app-2`: Spring Boot 인스턴스 2, 직접 접근 `localhost:8082`
 - `db`: PostgreSQL
 - `redis`: Redis
+- `kafka`: Kafka broker, 로컬 접근 `localhost:9092`
 
 요청 흐름은 다음과 같습니다.
 
@@ -50,7 +51,7 @@ docker compose -f docker-compose.distributed.yml --env-file .env up -d --build
 docker compose -f docker-compose.distributed.yml --env-file .env ps
 ```
 
-`app-1`, `app-2`, `db`, `redis`가 `healthy` 또는 `Up` 상태이고, `nginx`가 `Up` 상태이면 정상입니다.
+`app-1`, `app-2`, `db`, `redis`, `kafka`가 `healthy` 또는 `Up` 상태이고, `nginx`가 `Up` 상태이면 정상입니다.
 
 ## 접속 주소
 

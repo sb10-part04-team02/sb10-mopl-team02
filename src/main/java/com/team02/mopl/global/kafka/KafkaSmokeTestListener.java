@@ -10,7 +10,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class KafkaSmokeTestListener {
 
-  @KafkaListener(topics = "mopl.local.test", groupId = "${spring.kafka.consumer.group-id}")
+  @KafkaListener(
+      topics = KafkaSmokeTestTopics.LOCAL_TEST,
+      groupId = "${spring.kafka.consumer.group-id}")
   public void listen(String message) {
     log.info("Kafka smoke message received: {}", message);
   }

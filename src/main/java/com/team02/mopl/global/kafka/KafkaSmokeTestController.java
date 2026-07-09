@@ -1,6 +1,7 @@
 package com.team02.mopl.global.kafka;
 
 import java.time.Instant;
+import java.util.concurrent.ExecutionException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
@@ -13,13 +14,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class KafkaSmokeTestController {
 
-  private static final String TOPIC = "mopl.local.test";
-
   private final KafkaTemplate<String, String> kafkaTemplate;
 
   @PostMapping("/api/dev/kafka/smoke")
   public ResponseEntity<Void> publishSmokeMessage() {
-    kafkaTemplate.send(TOPIC, "local-smoke", "Kafka smoke test: " + Instant.now());
-    return ResponseEntity.noContent().build();
+    try {
+      kafkaTemplate
+          .send(
+              KafkaSmokeTestTopics.LOCAL_TEST, "local-smoke", "Kafka smoke test: " + Instant.now())
+          .get();
+
+      return ResponseEntity.noContent().build();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Kafka smoke message send was interrupted.", e);
+    } catch (ExecutionException e) {
+      throw new IllegalStateException("Kafka smoke message send failed.", e);
+    }
   }
 }
