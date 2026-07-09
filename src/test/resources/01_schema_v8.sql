@@ -26,7 +26,7 @@ CREATE TABLE contents
     external_id    VARCHAR(100) NULL,
 
     CONSTRAINT chk_contents_content_type CHECK (content_type IN ('MOVIE', 'TV_SERIES', 'SPORT')),
-    CONSTRAINT chk_contents_source CHECK (source IN ('TMDB')),
+    CONSTRAINT chk_contents_source CHECK (source IN ('TMDB', 'SPORTS_DB')),
     CONSTRAINT chk_contents_source_external_id_pair CHECK ((source IS NULL) = (external_id IS NULL))
 );
 

@@ -9,6 +9,7 @@ import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbTvDto;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 // TMDB HTTP 호출 캡슐화. 에러 응답은 RestClient 상태 핸들러가, IO 오류는 이 클래스가 TmdbApiException으로 변환
+@Slf4j
 @Component
 public class TmdbClient {
 
@@ -98,10 +100,19 @@ public class TmdbClient {
         if (attempt >= MAX_ATTEMPTS) {
           throw new TmdbApiException(e);
         }
+        // 재시도 전 기록. 메시지 대신 클래스명만 남김
+        log.warn(
+            "TMDB 호출 실패로 재시도합니다. attempt={}/{}, cause={}",
+            attempt,
+            MAX_ATTEMPTS,
+            e.getClass().getSimpleName());
       } catch (TmdbApiException e) { // 상태 핸들러가 던진 4xx/5xx
         if (!e.isRetryable() || attempt >= MAX_ATTEMPTS) {
           throw e;
         }
+        // details는 statusCode만 담긴다
+        log.warn(
+            "TMDB 호출 실패로 재시도합니다. attempt={}/{}, details={}", attempt, MAX_ATTEMPTS, e.getDetails());
       }
       backoff(attempt++);
     }

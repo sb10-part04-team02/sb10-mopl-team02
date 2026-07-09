@@ -200,3 +200,4 @@ volumes:
   postgres_distributed_data:
   # 분산 환경 전용 Redis 데이터 볼륨
   redis_distributed_data:
+

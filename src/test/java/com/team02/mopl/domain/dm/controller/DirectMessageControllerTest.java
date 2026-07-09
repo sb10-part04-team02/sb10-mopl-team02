@@ -119,6 +119,44 @@ class DirectMessageControllerTest {
   }
 
   @Test
+  @DisplayName("상대방 UUID로 대화방 조회 시 userId 파라미터로 200을 반환한다")
+  void findConversationWith_success_returns200() throws Exception {
+    UUID userId = UUID.randomUUID();
+    UUID withUserId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+
+    ConversationDto conversationDto =
+        new ConversationDto(conversationId, new UserSummary(withUserId, "상대방", null), null, false);
+
+    given(directMessageService.findConversationWith(userId, withUserId))
+        .willReturn(conversationDto);
+
+    mockMvc
+        .perform(
+            get("/api/conversations/with")
+                .queryParam("userId", withUserId.toString())
+                .with(authentication(new TestingAuthenticationToken(userId, null))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(conversationId.toString()))
+        .andExpect(jsonPath("$.with.userId").value(withUserId.toString()));
+
+    verify(directMessageService).findConversationWith(userId, withUserId);
+  }
+
+  @Test
+  @DisplayName("상대방 UUID로 대화방 조회 시 userId 파라미터가 누락되면 400을 반환한다")
+  void findConversationWith_missingUserId_returns400() throws Exception {
+    UUID userId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            get("/api/conversations/with")
+                .with(authentication(new TestingAuthenticationToken(userId, null))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.exceptionName").value("MissingServletRequestParameterException"));
+  }
+
+  @Test
   @DisplayName("DM 목록 조회 성공 시 200과 CursorResponse를 반환한다")
   void getDirectMessages_success_returns200() throws Exception {
     UUID userId = UUID.randomUUID();
