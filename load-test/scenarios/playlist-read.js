@@ -2,7 +2,7 @@
 // 응답에 requester-relative subscribedByMe 가 포함된다.
 // 실행: k6 run -e BASE_URL=... -e CONFIG=smoke load-test/scenarios/playlist-read.js
 import http from 'k6/http';
-import { sleep } from 'k6';
+import { sleep, check } from 'k6';
 import { BASE_URL, authParams, checkCursorResponse } from '../lib/http.js';
 import { login } from '../lib/auth.js';
 import { pickUser } from '../data/users.js';
@@ -22,6 +22,17 @@ export default function (data) {
     listParams
   );
   checkCursorResponse(listRes, 'playlists-list');
+  // 계약상 응답 항목에 requester-relative subscribedByMe 가 포함돼야 한다.
+  check(listRes, {
+    'playlists-list: has subscribedByMe': (r) => {
+      try {
+        const data = r.json('data') || [];
+        return data.length === 0 || typeof data[0].subscribedByMe === 'boolean';
+      } catch (_) {
+        return false;
+      }
+    },
+  });
 
   let ids = [];
   try {

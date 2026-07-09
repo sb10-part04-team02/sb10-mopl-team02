@@ -6,13 +6,16 @@ import { check } from 'k6';
 export const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 
 // accessToken 을 Bearer 헤더로 감싼 요청 파라미터를 만든다.
+// extra.headers 는 headers 로 병합하고, 나머지 필드만 최상위로 편다.
+// (extra 를 통째로 펴면 headers 가 덮여 Authorization 이 유실됨)
 export function authParams(accessToken, extra = {}) {
+  const { headers: extraHeaders, ...rest } = extra;
   return {
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      ...(extra.headers || {}),
+      ...(extraHeaders || {}),
     },
-    ...extra,
+    ...rest,
   };
 }
 

@@ -4,7 +4,7 @@
 
 ## 구조
 
-```
+```text
 load-test/
   config/
     thresholds.js   # SLO threshold (p95<500, 에러율<1%)
@@ -34,6 +34,7 @@ load-test/
      `app.tmdb.run-on-startup=true` 로 앱을 기동하면 1회 수집이 돈다.
    - 빈 DB 로 조회 부하를 걸면 병목이 안 드러난다.
 3. 테스트 계정 시딩:
+
    ```bash
    k6 run -e BASE_URL=http://localhost:8080 --iterations 1 --vus 1 load-test/seed-users.js
    ```
