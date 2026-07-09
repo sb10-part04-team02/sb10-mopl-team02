@@ -244,7 +244,7 @@ class ContentServiceTest {
               "인셉션",
               "꿈 속의 꿈",
               Arrays.asList("SF", " SF ", "  ", "", null, "스릴러"));
-      MultipartFile thumbnail = mockThumbnail(false);
+      MultipartFile thumbnail = mockThumbnail(true);
       given(tagRepository.findByContentIdAndDeletedAtIsNull(any())).willReturn(List.of());
       given(tagRepository.saveAll(anyList())).willAnswer(inv -> inv.getArgument(0));
 
@@ -262,7 +262,7 @@ class ContentServiceTest {
       // given
       ContentCreateRequest request =
           new ContentCreateRequest(ContentType.MOVIE, "인셉션", "꿈 속의 꿈", List.of("SF", "스릴러"));
-      MultipartFile thumbnail = mockThumbnail(false);
+      MultipartFile thumbnail = mockThumbnail(true);
       // 기존 활성 태그로 "SF"가 이미 존재
       given(tagRepository.findByContentIdAndDeletedAtIsNull(any()))
           .willReturn(List.of(new Tag(newContent(), "SF")));
@@ -282,7 +282,7 @@ class ContentServiceTest {
       // given
       ContentCreateRequest request =
           new ContentCreateRequest(ContentType.MOVIE, "인셉션", "꿈 속의 꿈", List.of());
-      MultipartFile thumbnail = mockThumbnail(false);
+      MultipartFile thumbnail = mockThumbnail(true);
 
       // when
       contentService.create(request, thumbnail);
@@ -528,7 +528,7 @@ class ContentServiceTest {
       assertThat(condition.sortBy()).isEqualTo(SortBy.WATCHER_COUNT);
       assertThat(condition.asc()).isFalse();
       assertThat(condition.limit()).isEqualTo(21); // fetchLimit = normalizedLimit + 1
-      assertThat(response.sortBy()).isEqualTo("WATCHER_COUNT");
+      assertThat(response.sortBy()).isEqualTo("watcherCount");
       assertThat(response.sortDirection()).isEqualTo("DESCENDING");
     }
 
@@ -548,7 +548,7 @@ class ContentServiceTest {
       ContentSearchCondition condition = conditionCaptor.getValue();
       assertThat(condition.sortBy()).isEqualTo(SortBy.CREATED_AT);
       assertThat(condition.asc()).isTrue();
-      assertThat(response.sortBy()).isEqualTo("CREATED_AT");
+      assertThat(response.sortBy()).isEqualTo("createdAt");
       assertThat(response.sortDirection()).isEqualTo("ASCENDING");
     }
 

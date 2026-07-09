@@ -4,7 +4,7 @@ import com.team02.mopl.global.exception.ErrorCode;
 
 public class TokenGenerationException extends AuthException {
 
-  public TokenGenerationException(Throwable cause) {
-    super(ErrorCode.INTERNAL_SERVER_ERROR, cause);
+  public TokenGenerationException() {
+    super(ErrorCode.INTERNAL_SERVER_ERROR);
   }
 }

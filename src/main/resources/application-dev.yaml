@@ -11,8 +11,8 @@ spring:
 
   sql:
     init:
-      mode: always
-      schema-locations: classpath:01_schema_v8.sql
+      mode: never
+  #      schema-locations: classpath:01_schema_v8.sql
 
   jpa:
     hibernate:
@@ -29,3 +29,6 @@ server:
 app:
   jwt:
     secret-key: ${JWT_SECRET_KEY:"local-dev-insecure-jwt-secret-change-me-in-env"}
+  storage:
+    local:
+      public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080}

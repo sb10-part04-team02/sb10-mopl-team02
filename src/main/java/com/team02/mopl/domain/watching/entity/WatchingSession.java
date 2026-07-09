@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -35,13 +36,16 @@ public class WatchingSession extends BaseMutableEntity {
   private Instant exitedAt;
 
   public WatchingSession(Content content, User user, Instant joinedAt, Instant exitedAt) {
-    this.content = content;
-    this.user = user;
-    this.joinedAt = joinedAt;
+    this.content = Objects.requireNonNull(content, "content는 null일 수 없습니다.");
+    this.user = Objects.requireNonNull(user, "user는 null일 수 없습니다.");
+    this.joinedAt = Objects.requireNonNull(joinedAt, "joinedAt은 null일 수 없습니다.");
     this.exitedAt = exitedAt;
   }
 
   public void exit() {
+    if (this.exitedAt != null) {
+      throw new IllegalStateException("이미 종료된 시청 세션입니다.");
+    }
     this.exitedAt = Instant.now();
   }
 }

@@ -16,12 +16,35 @@ spring:
       max-request-size: 20MB  # 단일 요청 전체의 최대 크기
 
 app:
+  admin:
+    email: ${ADMIN_EMAIL}
+    password: ${ADMIN_PASSWORD}
+    name: ${ADMIN_NAME}
   storage:
     local:
-      base-path: storage # 파일이 저장되는 디스크상의 디렉터리 경로
-      base-url: /files   # 저장된 파일에 접근할 때 사용하는 URL 접두사
-    # 썸네일 미제공 시 내려줄 기본 URL.
+      base-path: storage   # 파일이 저장되는 디스크상의 디렉터리 경로
+      base-url: /files     # 저장된 파일을 서빙하는 URL 경로 접두사
+      public-base-url: ""  # dev에서만 절대 URL로 오버라이드
+    # 썸네일 미제공 시 내려줄 기본 URL
     default-thumbnail-url: "" # TODO: S3 전환 후속 이슈에서 실제 기본 이미지의 절대 URL로 교체
+  tmdb:
+    access-token: ${TMDB_ACCESS_TOKEN:}  # v4 Read Access Token
+    base-url: https://api.themoviedb.org/3
+    image-base-url: https://image.tmdb.org/t/p/w500
+    language: ko-KR
+    pages: 3  # popular 수집 페이지 수 (페이지당 20건)
+    connect-timeout: 3s
+    read-timeout: 10s
+  sportsdb:
+    api-key: ${SPORTSDB_API_KEY:123}  # 무료 테스트 키 "123" (30 req/min)
+    base-url: https://www.thesportsdb.com/api/v1/json
+    connect-timeout: 3s
+    read-timeout: 10s
+    leagues:  # 수집 대상 리그+시즌. 시즌 표기는 리그마다 다름
+      - id: "4328"
+        season: "2025-2026"  # English Premier League
+  ingestion:
+    run-on-startup: false  # true면 기동 시 1회 전체 소스 수집 실행 (검증/수동 실행용)
   jwt:
     secret-key: ${JWT_SECRET_KEY}
     access-token-expiration: 10m  # 10분
@@ -30,3 +53,4 @@ app:
       refresh-prefix: "jwt:refresh:"
       max-account-count: 1
       blacklist-prefix: "jwt:blacklist:"
+      user-lock-prefix: "jwt:userlock:"

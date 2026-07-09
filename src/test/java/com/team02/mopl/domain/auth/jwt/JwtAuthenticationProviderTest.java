@@ -9,6 +9,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.team02.mopl.domain.auth.jwt.JwtRegistry.AuthCheckResult;
 import com.team02.mopl.domain.auth.jwt.token.JwtAuthenticationToken;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import java.util.Collection;
@@ -22,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.CredentialsExpiredException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
@@ -50,19 +52,43 @@ class JwtAuthenticationProviderTest {
 
   @Test
   @DisplayName("토큰ID가 블랙리스트에 올라와 있다면 예외를 던진다")
-  void fail_shouldThrowCredentialsExpiredException_whenGetUserIdFails2() {
+  void fail_shouldThrowCredentialsExpiredException_whenTokenIsBlacklisted() {
     // given
     Authentication mockAuth = mock(Authentication.class);
     given(mockAuth.getCredentials()).willReturn("ValidToken");
 
     JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
     given(jwtTokenProvider.verifyAccessToken(anyString())).willReturn(mockClaimSet);
+
+    given(jwtUtils.getUserId(mockClaimSet)).willReturn(UUID.randomUUID());
     given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
-    given(jwtRegistry.isBlacklisted(anyString())).willReturn(true);
+
+    AuthCheckResult authResult = new AuthCheckResult(true, false);
+    given(jwtRegistry.checkAuthStatus(anyString(), any(UUID.class))).willReturn(authResult);
 
     // when & then
     assertThrows(
         CredentialsExpiredException.class, () -> jwtAuthenticationProvider.authenticate(mockAuth));
+  }
+
+  @Test
+  @DisplayName("유저ID가 잠금처리 되어있다면 예외를 던진다")
+  void fail_shouldThrowLockedException_whenUserIsLocked() {
+    // given
+    Authentication mockAuth = mock(Authentication.class);
+    given(mockAuth.getCredentials()).willReturn("ValidToken");
+
+    JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
+    given(jwtTokenProvider.verifyAccessToken(anyString())).willReturn(mockClaimSet);
+
+    given(jwtUtils.getUserId(mockClaimSet)).willReturn(UUID.randomUUID());
+    given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
+
+    AuthCheckResult authResult = new AuthCheckResult(false, true);
+    given(jwtRegistry.checkAuthStatus(anyString(), any(UUID.class))).willReturn(authResult);
+
+    // when & then
+    assertThrows(LockedException.class, () -> jwtAuthenticationProvider.authenticate(mockAuth));
   }
 
   @Test
@@ -74,8 +100,8 @@ class JwtAuthenticationProviderTest {
 
     JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
     given(jwtTokenProvider.verifyAccessToken(anyString())).willReturn(mockClaimSet);
-    given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
-    given(jwtRegistry.isBlacklisted(anyString())).willReturn(false);
+
+    // userId 얻는데 예외 발생
     given(jwtUtils.getUserId(mockClaimSet)).willThrow(BadCredentialsException.class);
 
     // when & then
@@ -92,9 +118,14 @@ class JwtAuthenticationProviderTest {
 
     JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
     given(jwtTokenProvider.verifyAccessToken(anyString())).willReturn(mockClaimSet);
-    given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
-    given(jwtRegistry.isBlacklisted(anyString())).willReturn(false);
+
     given(jwtUtils.getUserId(mockClaimSet)).willReturn(UUID.randomUUID());
+    given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
+
+    AuthCheckResult authResult = new AuthCheckResult(false, false);
+    given(jwtRegistry.checkAuthStatus(anyString(), any(UUID.class))).willReturn(authResult);
+
+    // 권한 얻는데 예외 발생
     given(jwtUtils.getAuthorities(mockClaimSet)).willThrow(BadCredentialsException.class);
 
     // when & then
@@ -107,16 +138,18 @@ class JwtAuthenticationProviderTest {
   void success_shouldReturnAuthenticationToken_whenTokenIsValid() {
     // given
     String token = "accessToken";
+    Authentication authentication = mock(Authentication.class);
+    given(authentication.getCredentials()).willReturn(token);
+
     JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
     given(jwtTokenProvider.verifyAccessToken(token)).willReturn(mockClaimSet);
 
-    Authentication authentication = mock(Authentication.class);
-    given(authentication.getCredentials()).willReturn(token);
-    given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
-    given(jwtRegistry.isBlacklisted(anyString())).willReturn(false);
-
     UUID userId = UUID.randomUUID();
-    given(jwtUtils.getUserId(any(JWTClaimsSet.class))).willReturn(userId);
+    given(jwtUtils.getUserId(mockClaimSet)).willReturn(userId);
+
+    AuthCheckResult authResult = new AuthCheckResult(false, false);
+    given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
+    given(jwtRegistry.checkAuthStatus(anyString(), any(UUID.class))).willReturn(authResult);
 
     Collection<? extends GrantedAuthority> authorities =
         List.of(new SimpleGrantedAuthority("ROLE_USER"));

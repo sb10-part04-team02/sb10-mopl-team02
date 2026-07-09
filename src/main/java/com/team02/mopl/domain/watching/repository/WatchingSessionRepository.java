@@ -2,12 +2,18 @@ package com.team02.mopl.domain.watching.repository;
 
 import com.team02.mopl.domain.watching.entity.WatchingSession;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface WatchingSessionRepository extends JpaRepository<WatchingSession, UUID> {
+public interface WatchingSessionRepository
+    extends JpaRepository<WatchingSession, UUID>, WatchingSessionRepositoryCustom {
+
+  // 유저·콘텐츠당 삭제되지 않은 세션은 부분 유니크 인덱스로 최대 1건이다.
+  Optional<WatchingSession> findByContent_IdAndUser_IdAndDeletedAtIsNull(
+      UUID contentId, UUID userId);
 
   // 단건 콘텐츠의 활성 시청자 수
   @Query(

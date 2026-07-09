@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.auth.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -8,9 +9,13 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
+import com.team02.mopl.domain.auth.jwt.JwtRegistry.AuthCheckResult;
+import com.team02.mopl.domain.auth.jwt.JwtRegistry.RotationResult;
 import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,9 +28,11 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -171,44 +178,135 @@ class JwtRegistryTest {
   }
 
   @Nested
-  class IsBlacklisted {
-    @Test
-    @DisplayName("network오류로 null이 들어온다면 false를 반환한다")
-    void fail_shouldReturnFalse_whenRedisReturnsNullDueToNetworkError() {
-      // given
-      given(redisTemplate.hasKey(any())).willReturn(null);
+  class RotateRefreshToken {
 
-      // when
-      boolean actual = jwtRegistry.isBlacklisted(UUID.randomUUID().toString());
+    private UUID userId;
+    private String refreshToken;
+    private String newRefreshToken;
 
-      // then
-      assertThat(actual).isFalse();
+    @BeforeEach
+    void SetUp() {
+      userId = UUID.randomUUID();
+      refreshToken = "refresh token";
+      newRefreshToken = "new refresh token";
+      given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
     }
 
     @Test
-    @DisplayName("blackList에 등록되어 있지 않으면 false를 반환한다")
-    void success_shouldReturnFalse_whenTokenIsNotBlacklisted() {
+    @DisplayName("refresh토큰이 없다면 키를 전체삭제하고 COMPROMISED 결과값을 반환한다")
+    void fail_shouldDeleteAllAndReturnCompromisedResult_whenRefreshTokenDoesNotExist() {
       // given
-      given(redisTemplate.hasKey(any())).willReturn(false);
+      given(zSetOperations.score(anyString(), anyString())).willReturn(null);
 
       // when
-      boolean actual = jwtRegistry.isBlacklisted(UUID.randomUUID().toString());
+      RotationResult actual = jwtRegistry.rotateRefreshToken(userId, refreshToken, newRefreshToken);
 
       // then
-      assertThat(actual).isFalse();
+      then(redisTemplate).should(times(1)).delete(anyString());
+      assertThat(actual).isEqualTo(RotationResult.COMPROMISED);
     }
 
     @Test
-    @DisplayName("blackList에 등록되어 있으면 return 반환한다")
-    void success_shouldReturnTrue_whenTokenIsBlacklisted() {
+    @DisplayName("refresh토큰이 있다면 rotate과정을 진행한다")
+    void success_shouldProcessRotate_whenRefreshTokenExists() {
       // given
-      given(redisTemplate.hasKey(any())).willReturn(true);
+      given(zSetOperations.score(anyString(), eq(refreshToken))).willReturn(3.0);
+      given(properties.refreshTokenExpiration()).willReturn(Duration.ofMinutes(10));
 
       // when
-      boolean actual = jwtRegistry.isBlacklisted(UUID.randomUUID().toString());
+      RotationResult actual = jwtRegistry.rotateRefreshToken(userId, refreshToken, newRefreshToken);
 
       // then
-      assertThat(actual).isTrue();
+      then(zSetOperations).should(times(1)).remove(anyString(), eq(refreshToken));
+      then(zSetOperations).should(times(1)).add(anyString(), eq(newRefreshToken), anyDouble());
+      then(redisTemplate).should(times(1)).expire(anyString(), any(Duration.class));
+      assertThat(actual).isEqualTo(RotationResult.OK);
+    }
+  }
+
+  @Nested
+  class DeleteAllRefreshToken {
+    @Test
+    @DisplayName("리프레시 토큰을 전체 삭제한다")
+    void success_shouldDeleteAllRefreshToken_whenUserIdIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+
+      // when
+      jwtRegistry.deleteAllRefreshToken(userId);
+
+      // then
+      then(redisTemplate).should(times(1)).delete(anyString());
+    }
+  }
+
+  @Nested
+  class LockUser {
+    @Test
+    @DisplayName("유저ID가 주어지면 리프레시 토큰을 전체 삭제하고 유저 잠금키를 추가한다")
+    void success_shouldDeleteAllRefreshTokenAndLockKeyUserId_whenUserIdIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+      given(redisTemplate.opsForValue()).willReturn(valueOperations);
+      given(properties.accessTokenExpiration()).willReturn(mock(Duration.class));
+
+      // when
+      jwtRegistry.lockUser(userId);
+
+      // then
+      then(redisTemplate).should(times(1)).delete(anyString());
+      then(valueOperations).should(times(1)).set(anyString(), anyString(), any(Duration.class));
+    }
+  }
+
+  @Nested
+  class UnlockUser {
+    @Test
+    @DisplayName("유저ID가 주어지면 유저 잠금키를 제거한다")
+    void success_shouldDeleteUserLockKey_whenUserIdIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+
+      // when
+      jwtRegistry.unlockUser(userId);
+
+      // then
+      then(redisTemplate).should(times(1)).delete(anyString());
+    }
+  }
+
+  @Nested
+  class CheckAuthStatus {
+    @Test
+    @DisplayName("액세스토큰ID와 유저ID가 주어지면 블랙리스트와 유저잠금상태를 반환한다")
+    void success_shouldReturnAuthCheckResult_whenAccessTokenIdAndUserIdAreProvided() {
+      // given
+      String accessTokenId = UUID.randomUUID().toString();
+      UUID userId = UUID.randomUUID();
+
+      given(redisTemplate.hasKey(anyString())).willReturn(true);
+
+      // when
+      AuthCheckResult result = jwtRegistry.checkAuthStatus(accessTokenId, userId);
+
+      // then
+      assertThat(result.isBlacklisted()).isTrue();
+      assertThat(result.isUserLocked()).isTrue();
+    }
+
+    @Test
+    @DisplayName("redis의 문제가 생기면 예외를 던진다")
+    void fail_shouldThrowException_whenRedisIsDownDuringCheckAuthStatus() {
+      // given
+      String accessTokenId = UUID.randomUUID().toString();
+      UUID userId = UUID.randomUUID();
+
+      willThrow(RedisConnectionFailureException.class).given(redisTemplate).hasKey(anyString());
+
+      // when & then
+      assertThrows(
+          InternalAuthenticationServiceException.class,
+          () -> jwtRegistry.checkAuthStatus(accessTokenId, userId));
     }
   }
 }

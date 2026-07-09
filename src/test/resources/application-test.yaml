@@ -12,5 +12,13 @@ spring:
     show-sql: false
 
 app:
+  tmdb:
+    access-token: dummy-token-for-testing
+  sportsdb:
+    api-key: dummy-key-for-testing
   jwt:
     secret-key: ${JWT_SECRET_KEY:"this-is-a-dummy-secret-key-for-testing-purposes-only-32bytes"}
+  admin:
+    email: ${ADMIN_EMAIL:test-admin@example.com}
+    password: ${ADMIN_PASSWORD:test-password123!}
+    name: ${ADMIN_NAME:test-name}

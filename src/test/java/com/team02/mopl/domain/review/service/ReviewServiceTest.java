@@ -1,12 +1,14 @@
 package com.team02.mopl.domain.review.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.times;
 
 import com.team02.mopl.domain.content.service.ContentRatingService;
 import com.team02.mopl.domain.review.dto.ReviewCreateRequest;
@@ -19,6 +21,9 @@ import com.team02.mopl.domain.review.exception.ReviewAlreadyExistsException;
 import com.team02.mopl.domain.review.mapper.ReviewMapper;
 import com.team02.mopl.domain.review.repository.ReviewRepository;
 import com.team02.mopl.domain.user.dto.UserSummary;
+import com.team02.mopl.domain.user.entity.User;
+import com.team02.mopl.domain.user.entity.enums.Role;
+import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
@@ -31,6 +36,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InOrder;
@@ -48,6 +55,8 @@ class ReviewServiceTest {
   @Mock ReviewMapper reviewMapper;
 
   @Mock ContentRatingService contentRatingService;
+
+  @Mock UserRepository userRepository;
 
   @InjectMocks ReviewService reviewService;
 
@@ -81,7 +90,7 @@ class ReviewServiceTest {
                   eq(11)))
           .willReturn(List.of(review(4.0), review(3.0)));
       given(reviewRepository.countActive(eq(contentId))).willReturn(2L);
-      given(reviewMapper.toDto(any(Review.class)))
+      given(reviewMapper.toDto(any(Review.class), any()))
           .willReturn(
               new ReviewDto(
                   UUID.randomUUID(),
@@ -99,7 +108,7 @@ class ReviewServiceTest {
       assertThat(response.nextCursor()).isNull();
       assertThat(response.nextIdAfter()).isNull();
       assertThat(response.totalCount()).isEqualTo(2L);
-      assertThat(response.sortBy()).isEqualTo("CREATED_AT");
+      assertThat(response.sortBy()).isEqualTo("createdAt");
       assertThat(response.sortDirection()).isEqualTo("DESCENDING");
     }
 
@@ -121,7 +130,7 @@ class ReviewServiceTest {
                   eq(2)))
           .willReturn(List.of(first, review(3.0)));
       given(reviewRepository.countActive(eq(contentId))).willReturn(2L);
-      given(reviewMapper.toDto(any(Review.class)))
+      given(reviewMapper.toDto(any(Review.class), any()))
           .willReturn(
               new ReviewDto(
                   first.getId(),
@@ -158,7 +167,7 @@ class ReviewServiceTest {
                   eq(2)))
           .willReturn(List.of(first, review(3.0)));
       given(reviewRepository.countActive(eq(contentId))).willReturn(2L);
-      given(reviewMapper.toDto(any(Review.class)))
+      given(reviewMapper.toDto(any(Review.class), any()))
           .willReturn(
               new ReviewDto(
                   first.getId(),
@@ -189,12 +198,12 @@ class ReviewServiceTest {
                   eq(contentId),
                   eq(ReviewSortBy.RATING),
                   eq(SortDirection.DESCENDING),
-                  eq("4.0"),
+                  eq(4.0),
                   eq(idAfter),
                   eq(11)))
           .willReturn(List.of(review(3.0)));
       given(reviewRepository.countActive(eq(contentId))).willReturn(5L);
-      given(reviewMapper.toDto(any(Review.class)))
+      given(reviewMapper.toDto(any(Review.class), any()))
           .willReturn(
               new ReviewDto(
                   UUID.randomUUID(),
@@ -208,16 +217,119 @@ class ReviewServiceTest {
 
       // then
       assertThat(response.data()).hasSize(1);
-      assertThat(response.sortBy()).isEqualTo("RATING");
+      assertThat(response.sortBy()).isEqualTo("rating");
       then(reviewRepository)
           .should()
           .findReviewsByCursor(
               eq(contentId),
               eq(ReviewSortBy.RATING),
               eq(SortDirection.DESCENDING),
-              eq("4.0"),
+              eq(4.0),
               eq(idAfter),
               eq(11));
+    }
+
+    @Test
+    @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_REQUEST 예외가 발생한다")
+    void partialCursor_throwsInvalidRequest() {
+      ReviewSearchRequest cursorOnly =
+          new ReviewSearchRequest(contentId, "4.0", null, 10, null, ReviewSortBy.RATING);
+      assertThatThrownBy(() -> reviewService.getReviews(cursorOnly))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+
+      ReviewSearchRequest idAfterOnly =
+          new ReviewSearchRequest(
+              contentId, null, UUID.randomUUID(), 10, null, ReviewSortBy.RATING);
+      assertThatThrownBy(() -> reviewService.getReviews(idAfterOnly))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"not-a-number", "NaN", "Infinity", "-Infinity"})
+    @DisplayName("rating 정렬에서 cursor가 유효한 유한 숫자가 아니면 INVALID_CURSOR 예외가 발생한다")
+    void invalidRatingCursor_throwsInvalidCursor(String cursor) {
+      ReviewSearchRequest request =
+          new ReviewSearchRequest(
+              contentId,
+              cursor,
+              UUID.randomUUID(),
+              10,
+              SortDirection.DESCENDING,
+              ReviewSortBy.RATING);
+
+      assertThatThrownBy(() -> reviewService.getReviews(request))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR));
+    }
+
+    @Test
+    @DisplayName("createdAt 정렬에서 cursor가 ISO-8601 형식이 아니면 INVALID_CURSOR 예외가 발생한다")
+    void invalidCreatedAtCursor_throwsInvalidCursor() {
+      ReviewSearchRequest request =
+          new ReviewSearchRequest(
+              contentId,
+              "not-an-instant",
+              UUID.randomUUID(),
+              10,
+              SortDirection.DESCENDING,
+              ReviewSortBy.CREATED_AT);
+
+      assertThatThrownBy(() -> reviewService.getReviews(request))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR));
+    }
+
+    @Test
+    @DisplayName("작성자를 일괄 조회해 리뷰마다 실제 author 요약을 채우고, 삭제된 작성자는 id 스텁으로 대체한다")
+    void fillsAuthorSummary_withBatchLookupAndStubForDeleted() {
+      // given: 살아있는 작성자 1명 + 삭제된 작성자 1명
+      User activeAuthor =
+          new User("홍길동", "hong@test.com", "pw", "http://img/author", Role.USER, false);
+      UUID activeAuthorId = UUID.randomUUID();
+      ReflectionTestUtils.setField(activeAuthor, "id", activeAuthorId);
+
+      UUID deletedAuthorId = UUID.randomUUID();
+
+      Review activeReview = new Review(activeAuthorId, contentId, "리뷰1", 4.0);
+      Review deletedAuthorReview = new Review(deletedAuthorId, contentId, "리뷰2", 3.0);
+
+      ReviewSearchRequest request =
+          new ReviewSearchRequest(
+              contentId, null, null, 10, SortDirection.DESCENDING, ReviewSortBy.CREATED_AT);
+      given(
+              reviewRepository.findReviewsByCursor(
+                  eq(contentId),
+                  eq(ReviewSortBy.CREATED_AT),
+                  eq(SortDirection.DESCENDING),
+                  eq(null),
+                  eq(null),
+                  eq(11)))
+          .willReturn(List.of(activeReview, deletedAuthorReview));
+      given(reviewRepository.countActive(eq(contentId))).willReturn(2L);
+      // 삭제된 작성자는 findAllById 결과에서 제외된다
+      given(userRepository.findAllById(any())).willReturn(List.of(activeAuthor));
+      given(reviewMapper.toUserSummary(activeAuthor))
+          .willReturn(new UserSummary(activeAuthorId, "홍길동", "http://img/author"));
+      given(reviewMapper.toDto(any(Review.class), any(UserSummary.class)))
+          .willReturn(new ReviewDto(UUID.randomUUID(), contentId, null, "리뷰", 4.0));
+
+      // when
+      reviewService.getReviews(request);
+
+      // then: toDto에 전달된 author가 리뷰별로 실제 값/폴백으로 조립됐는지 확인
+      ArgumentCaptor<UserSummary> authorCaptor = ArgumentCaptor.forClass(UserSummary.class);
+      then(reviewMapper).should(times(2)).toDto(any(Review.class), authorCaptor.capture());
+
+      assertThat(authorCaptor.getAllValues())
+          .containsExactly(
+              new UserSummary(activeAuthorId, "홍길동", "http://img/author"),
+              new UserSummary(deletedAuthorId, null, null));
     }
   }
 
@@ -274,7 +386,7 @@ class ReviewServiceTest {
                   eq(authorId), eq(contentId)))
           .willReturn(false);
       given(reviewRepository.saveAndFlush(any(Review.class))).willReturn(savedReview);
-      given(reviewMapper.toDto(any(Review.class))).willReturn(expect);
+      given(reviewMapper.toDto(any(Review.class), any())).willReturn(expect);
 
       // when
       ReviewDto actual = reviewService.createReview(authorId, request);
@@ -288,13 +400,43 @@ class ReviewServiceTest {
       InOrder inOrder = inOrder(reviewRepository, contentRatingService);
       inOrder.verify(reviewRepository).saveAndFlush(reviewCaptor.capture());
       inOrder.verify(contentRatingService).refreshAggregate(eq(contentId));
-      then(reviewMapper).should().toDto(any(Review.class));
+      then(reviewMapper).should().toDto(any(Review.class), any());
 
       Review captured = reviewCaptor.getValue();
       assertThat(captured.getAuthorId()).isEqualTo(authorId);
       assertThat(captured.getContentId()).isEqualTo(contentId);
       assertThat(captured.getText()).isEqualTo(text);
       assertThat(captured.getRating()).isEqualTo(rating);
+    }
+
+    @Test
+    @DisplayName("작성자를 단건 조회해 toDto에 실제 author 요약을 전달한다")
+    void fillsAuthorSummary_onCreate() {
+      // given
+      ReviewCreateRequest request = new ReviewCreateRequest(contentId, text, rating);
+      Review savedReview = new Review(authorId, contentId, text, rating);
+      User author = new User("홍길동", "hong@test.com", "pw", "http://img/author", Role.USER, false);
+      ReflectionTestUtils.setField(author, "id", authorId);
+      UserSummary authorSummary = new UserSummary(authorId, "홍길동", "http://img/author");
+
+      given(
+              reviewRepository.existsByAuthorIdAndContentIdAndDeletedAtIsNull(
+                  eq(authorId), eq(contentId)))
+          .willReturn(false);
+      given(reviewRepository.saveAndFlush(any(Review.class))).willReturn(savedReview);
+      given(userRepository.findByIdAndDeletedAtIsNull(eq(authorId)))
+          .willReturn(Optional.of(author));
+      given(reviewMapper.toUserSummary(author)).willReturn(authorSummary);
+      given(reviewMapper.toDto(any(Review.class), any()))
+          .willReturn(new ReviewDto(UUID.randomUUID(), contentId, authorSummary, text, rating));
+
+      // when
+      reviewService.createReview(authorId, request);
+
+      // then
+      ArgumentCaptor<UserSummary> authorCaptor = ArgumentCaptor.forClass(UserSummary.class);
+      then(reviewMapper).should().toDto(any(Review.class), authorCaptor.capture());
+      assertThat(authorCaptor.getValue()).isEqualTo(authorSummary);
     }
   }
 
@@ -347,7 +489,7 @@ class ReviewServiceTest {
           new ReviewDto(reviewId, contentId, new UserSummary(authorId, null, null), "수정된 내용", 2.0);
       given(reviewRepository.findByIdAndDeletedAtIsNull(eq(reviewId)))
           .willReturn(Optional.of(review));
-      given(reviewMapper.toDto(any(Review.class))).willReturn(expect);
+      given(reviewMapper.toDto(any(Review.class), any())).willReturn(expect);
 
       // when
       ReviewDto actual = reviewService.updateReview(reviewId, authorId, request);
@@ -360,7 +502,7 @@ class ReviewServiceTest {
       InOrder inOrder = inOrder(reviewRepository, contentRatingService);
       inOrder.verify(reviewRepository).flush();
       inOrder.verify(contentRatingService).refreshAggregate(eq(contentId));
-      then(reviewMapper).should().toDto(any(Review.class));
+      then(reviewMapper).should().toDto(any(Review.class), any());
     }
 
     @Test
@@ -371,7 +513,7 @@ class ReviewServiceTest {
       Review review = new Review(authorId, contentId, "원본", 4.5);
       given(reviewRepository.findByIdAndDeletedAtIsNull(eq(reviewId)))
           .willReturn(Optional.of(review));
-      given(reviewMapper.toDto(any(Review.class))).willReturn(null);
+      given(reviewMapper.toDto(any(Review.class), any())).willReturn(null);
 
       // when
       reviewService.updateReview(reviewId, authorId, request);
@@ -379,6 +521,32 @@ class ReviewServiceTest {
       // then
       assertThat(review.getText()).isEqualTo("원본");
       assertThat(review.getRating()).isEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("리뷰 작성자를 단건 조회해 toDto에 실제 author 요약을 전달한다")
+    void fillsAuthorSummary_onUpdate() {
+      // given
+      ReviewUpdateRequest request = new ReviewUpdateRequest("수정된 내용", 2.0);
+      Review review = new Review(authorId, contentId, "원본", 4.5);
+      User author = new User("홍길동", "hong@test.com", "pw", "http://img/author", Role.USER, false);
+      ReflectionTestUtils.setField(author, "id", authorId);
+      UserSummary authorSummary = new UserSummary(authorId, "홍길동", "http://img/author");
+
+      given(reviewRepository.findByIdAndDeletedAtIsNull(eq(reviewId)))
+          .willReturn(Optional.of(review));
+      given(userRepository.findByIdAndDeletedAtIsNull(eq(authorId)))
+          .willReturn(Optional.of(author));
+      given(reviewMapper.toUserSummary(author)).willReturn(authorSummary);
+      given(reviewMapper.toDto(any(Review.class), any())).willReturn(null);
+
+      // when
+      reviewService.updateReview(reviewId, authorId, request);
+
+      // then
+      ArgumentCaptor<UserSummary> authorCaptor = ArgumentCaptor.forClass(UserSummary.class);
+      then(reviewMapper).should().toDto(any(Review.class), authorCaptor.capture());
+      assertThat(authorCaptor.getValue()).isEqualTo(authorSummary);
     }
   }
 
