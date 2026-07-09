@@ -56,6 +56,10 @@ app:
         season: "2025-2026"  # English Premier League
   ingestion:
     run-on-startup: false  # true면 기동 시 1회 전체 소스 수집 실행 (검증/수동 실행용)
+    scheduler:
+      enabled: ${INGESTION_SCHEDULER_ENABLED:false}  # 기본 off. 테스트/로컬에서 실행 방지
+      cron: ${INGESTION_SCHEDULER_CRON:0 0 4 * * *}  # 로컬 테스트 시 주기 바꿔서 실행할 것
+      lock-ttl: 30m  # 중복 실행 방지 락 TTL (최대 수집 소요보다 넉넉히)
   jwt:
     secret-key: ${JWT_SECRET_KEY}
     access-token-expiration: 10m  # 10분
