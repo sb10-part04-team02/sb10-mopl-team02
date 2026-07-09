@@ -19,10 +19,10 @@ export default function () {
       headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': csrf },
       tags: { name: 'seed-user' },
     });
-    // 201 생성 또는 이미 존재(중복 이메일 4xx) 모두 시딩 관점에선 통과.
+    // 201 생성 또는 409 이메일 중복(이미 존재)만 통과
     check(res, {
       [`seed ${u.email}: created or exists`]: (r) =>
-        r.status === 201 || (r.status >= 400 && r.status < 500),
+        r.status === 201 || r.status === 409,
     });
     console.log(`seed ${u.email} → ${res.status}`);
   }
