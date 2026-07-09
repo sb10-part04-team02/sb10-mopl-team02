@@ -26,6 +26,10 @@ spring:
       max-file-size: 10MB     # 업로드 가능한 개별 파일의 최대 크기
       max-request-size: 20MB  # 단일 요청 전체의 최대 크기
 
+logging:
+  pattern:
+    correlation: "[%X{requestId:-}] "  # 전 프로파일 공통. 콘솔/파일 로그의 레벨 옆에 MDC requestId를 표시 (요청 밖 로그는 빈 값)
+
 app:
   admin:
     email: ${ADMIN_EMAIL}
