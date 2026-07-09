@@ -1,6 +1,5 @@
 package com.team02.mopl.global.kafka;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.time.Instant;
 import java.util.concurrent.CompletionException;
 import org.springframework.context.annotation.Profile;
@@ -16,10 +15,6 @@ public class KafkaSmokeTestController {
 
   private final KafkaTemplate<String, String> kafkaTemplate;
 
-  @SuppressFBWarnings(
-      value = "EI_EXPOSE_REP2",
-      justification =
-          "KafkaTemplate is a Spring-managed infrastructure bean injected by the container.")
   public KafkaSmokeTestController(KafkaTemplate<String, String> kafkaTemplate) {
     this.kafkaTemplate = kafkaTemplate;
   }
