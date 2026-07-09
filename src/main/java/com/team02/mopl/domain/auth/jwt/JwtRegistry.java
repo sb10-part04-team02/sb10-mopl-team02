@@ -28,6 +28,9 @@ public class JwtRegistry {
   @Value("${app.jwt.redis.user-lock-prefix}")
   private String userLockPrefix;
 
+  @Value("${app.jwt.redis.temp-password-prefix}")
+  private String tempPwPrefix;
+
   private final JwtProperties properties;
   private final StringRedisTemplate redisTemplate;
 
@@ -148,4 +151,44 @@ public class JwtRegistry {
   }
 
   public record AuthCheckResult(boolean isBlacklisted, boolean isUserLocked) {}
+
+  public boolean registerTempPassword(UUID userId, String tempPassword, Duration expireAt) {
+    try {
+      String tempPwKey = tempPwKey(userId);
+      redisTemplate.opsForValue().set(tempPwKey, tempPassword, expireAt);
+      return true;
+    } catch (Exception e) {
+      log.error("[Redis] 임시 비밀번호 저장 실패: userId={}", userId, e);
+      return false;
+    }
+  }
+
+  public boolean deleteTempPassword(UUID userId) {
+    try {
+      String tempPwKey = tempPwKey(userId);
+      if (!redisTemplate.delete(tempPwKey)) {
+        log.debug("[Redis] 이미 만료되어 키가 존재하지 않음: userId={}", userId);
+      }
+      return true;
+
+    } catch (Exception e) {
+      log.error("[Redis] 임시 비밀번호 삭제 실패: userId={}", userId, e);
+      return false;
+    }
+  }
+
+  public String getTempPassword(UUID userId) {
+    try {
+      String tempKey = tempPwKey(userId);
+      // 값이 있으면 문자열 반환, 없으면 null
+      return redisTemplate.opsForValue().get(tempKey);
+    } catch (Exception e) {
+      log.error("[Redis] 임시 비밀번호 반환 실패: userId={}", userId, e);
+      return null;
+    }
+  }
+
+  private String tempPwKey(UUID userId) {
+    return tempPwPrefix + userId.toString();
+  }
 }

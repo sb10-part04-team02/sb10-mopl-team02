@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.auth.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
@@ -307,6 +308,71 @@ class JwtRegistryTest {
       assertThrows(
           InternalAuthenticationServiceException.class,
           () -> jwtRegistry.checkAuthStatus(accessTokenId, userId));
+    }
+  }
+
+  @Nested
+  class RegisterTempPassword {
+    @Test
+    @DisplayName("임시패스워드를 추가하는데 성공하면 true를 반환한다")
+    void success_shouldReturnTrue_whenRegistrationSucceeds() {
+      // given
+      UUID userId = UUID.randomUUID();
+      String tempPassword = "tmpPassword";
+      given(redisTemplate.opsForValue()).willReturn(valueOperations);
+
+      // when
+      boolean actual =
+          jwtRegistry.registerTempPassword(userId, tempPassword, Duration.ofMinutes(3));
+
+      // then
+      assertThat(actual).isTrue();
+    }
+
+    @Test
+    @DisplayName("레디스에 문제가 생기면 false를 반환한다")
+    void fail_shouldReturnFail_whenRedisThrowsException() {
+      // given
+      UUID userId = UUID.randomUUID();
+      String tempPassword = "tmpPassword";
+      given(redisTemplate.opsForValue()).willReturn(valueOperations);
+      willThrow(RedisConnectionFailureException.class)
+          .given(valueOperations)
+          .set(anyString(), eq(tempPassword), any(Duration.class));
+
+      // when & then
+      boolean actual =
+          assertDoesNotThrow(
+              () -> jwtRegistry.registerTempPassword(userId, tempPassword, Duration.ofMinutes(3)));
+      assertThat(actual).isFalse();
+    }
+  }
+
+  @Nested
+  class DeleteTempPassword {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("임시패스워드를 제거하는데 성공하면 true를 반환한다")
+    void success_shouldReturnTrue_whenDeletionResultIsProvided(boolean isDeleted) {
+      // given
+      given(redisTemplate.delete(anyString())).willReturn(isDeleted);
+
+      // when
+      boolean actual = jwtRegistry.deleteTempPassword(UUID.randomUUID());
+
+      // then
+      assertThat(actual).isTrue();
+    }
+
+    @Test
+    @DisplayName("레디스에 문제가 생기면 false를 반환한다")
+    void fail_shouldReturnFail_whenRedisThrowsException() {
+      // given
+      willThrow(RedisConnectionFailureException.class).given(redisTemplate).delete(anyString());
+
+      // when & then
+      boolean actual = assertDoesNotThrow(() -> jwtRegistry.deleteTempPassword(UUID.randomUUID()));
+      assertThat(actual).isFalse();
     }
   }
 }

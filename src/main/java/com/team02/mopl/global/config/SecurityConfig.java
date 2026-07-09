@@ -3,18 +3,19 @@ package com.team02.mopl.global.config;
 import com.team02.mopl.domain.auth.jwt.JwtAuthenticationProvider;
 import com.team02.mopl.domain.auth.jwt.filter.JwtAuthenticationFilter;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
+import com.team02.mopl.domain.auth.provider.MoplAuthenticationProvider;
 import com.team02.mopl.global.config.auth.handler.SpaCsrfTokenRequestHandler;
+import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -109,19 +110,13 @@ public class SecurityConfig {
 
   @Bean
   public AuthenticationManager authenticationManager(
-      HttpSecurity http,
-      UserDetailsService userDetailsService,
-      PasswordEncoder passwordEncoder,
-      JwtAuthenticationProvider jwtAuthenticationProvider)
-      throws Exception {
+      MoplAuthenticationProvider moplAuthenticationProvider,
+      JwtAuthenticationProvider jwtAuthenticationProvider) {
 
-    AuthenticationManagerBuilder builder = http.getSharedObject(AuthenticationManagerBuilder.class);
-
-    // DaoAuthenticationProvider(일반 로그인용)
-    builder.userDetailsService(userDetailsService).passwordEncoder(passwordEncoder);
-    // JwtAuthenticationProvider
-    builder.authenticationProvider(jwtAuthenticationProvider);
-
-    return builder.build();
+    return new ProviderManager(
+        Arrays.asList(
+            moplAuthenticationProvider, // 일반 로그인 + 임시비밀번호 포함
+            jwtAuthenticationProvider // 토큰용
+            ));
   }
 }
