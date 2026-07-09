@@ -24,15 +24,16 @@ public class ContentIngestionScheduler {
 
   @Scheduled(cron = "${app.ingestion.scheduler.cron}", zone = "Asia/Seoul")
   public void collectAll() {
-    String token;
+    String token; // 락 해제 시 소유권 증명에 사용할 토큰
     try {
-      token = runLock.tryAcquire(properties.lockTtl());
+      token = runLock.tryAcquire(properties.lockTtl()); // 락 획득 시도
     } catch (Exception e) {
       // Redis 장애 시 fail-closed: 이번 주기는 건너뛰고 다음 cron에 재시도 (수집은 지연 허용 배치)
       log.error("수집 락 획득 실패(Redis 오류). 이번 주기 수집을 건너뜁니다.", e);
       return;
     }
     if (token == null) {
+      // 다른 인스턴스가 락을 이미 가지고 있는 경우
       log.info("콘텐츠 수집이 이미 실행 중입니다. 이번 주기를 건너뜁니다.");
       return;
     }
@@ -71,7 +72,7 @@ public class ContentIngestionScheduler {
     } catch (Exception e) {
       log.error("스케줄 콘텐츠 수집 실패. elapsedMs={}", System.currentTimeMillis() - startedAt, e);
     } finally {
-      runLock.release(token); // 해제가 실패해도 TTL이 최종 안전망
+      runLock.release(token); // 락 해제가 실패해도 TTL이 최종 안전망
     }
   }
 }

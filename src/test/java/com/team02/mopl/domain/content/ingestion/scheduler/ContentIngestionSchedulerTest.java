@@ -37,7 +37,7 @@ class ContentIngestionSchedulerTest {
   @Test
   @DisplayName("락 획득에 성공하면 전체 소스 수집을 실행하고 락을 해제한다")
   void collectAll_whenLockAcquired_collectsAndReleases() {
-    // given
+    // given - 락 획득이 성공해서 TOKEN을 돌려주는 상황
     given(runLock.tryAcquire(any())).willReturn(TOKEN);
     given(contentCollectService.collectAll())
         .willReturn(List.of(new CollectResult(ContentSource.TMDB, 10, 5, 3, 2, 0)));
@@ -47,7 +47,7 @@ class ContentIngestionSchedulerTest {
 
     // then
     then(contentCollectService).should().collectAll();
-    then(runLock).should().release(TOKEN);
+    then(runLock).should().release(TOKEN); // 락 해제 호출 확인
   }
 
   @Test
