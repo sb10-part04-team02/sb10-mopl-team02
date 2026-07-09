@@ -42,9 +42,7 @@ public interface PlaylistApi {
   ResponseEntity<PlaylistDto> getPlaylist(
       UUID playlistId, @Parameter(hidden = true) UUID requesterId);
 
-  @Operation(
-      summary = "플레이리스트 목록 조회",
-      description = "플레이리스트 목록을 커서 기반 페이지네이션으로 조회합니다. keyword로 제목·설명을 부분일치 검색할 수 있습니다.")
+  @Operation(summary = "플레이리스트 목록 조회 (커서 페이지네이션)")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "성공"),
     @ApiResponse(
@@ -132,4 +130,54 @@ public interface PlaylistApi {
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   })
   ResponseEntity<Void> deletePlaylist(UUID playlistId, @Parameter(hidden = true) UUID requesterId);
+
+  @Operation(summary = "플레이리스트에 콘텐츠 추가", description = "플레이리스트 소유자만 콘텐츠를 추가할 수 있습니다.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "권한 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "플레이리스트 또는 콘텐츠를 찾을 수 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<Void> addContent(
+      UUID playlistId, UUID contentId, @Parameter(hidden = true) UUID requesterId);
+
+  @Operation(summary = "플레이리스트에서 콘텐츠 삭제", description = "플레이리스트 소유자만 콘텐츠를 삭제할 수 있습니다.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "성공"),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "권한 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "플레이리스트 또는 콘텐츠를 찾을 수 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<Void> removeContent(
+      UUID playlistId, UUID contentId, @Parameter(hidden = true) UUID requesterId);
 }

@@ -4,6 +4,9 @@ import com.team02.mopl.domain.playlist.entity.PlaylistContent;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface PlaylistContentRepository extends JpaRepository<PlaylistContent, UUID> {
 
@@ -15,5 +18,11 @@ public interface PlaylistContentRepository extends JpaRepository<PlaylistContent
 
   boolean existsByPlaylistIdAndContentId(UUID playlistId, UUID contentId);
 
-  void deleteByPlaylistIdAndContentId(UUID playlistId, UUID contentId);
+  // 매핑을 벌크 삭제하고 영향 행 수를 반환. 0이면 미포함(멱등 삭제 판정용)
+  @Modifying(clearAutomatically = true)
+  @Query(
+      "DELETE FROM PlaylistContent pc "
+          + "WHERE pc.playlist.id = :playlistId AND pc.contentId = :contentId")
+  int deleteByPlaylistIdAndContentId(
+      @Param("playlistId") UUID playlistId, @Param("contentId") UUID contentId);
 }

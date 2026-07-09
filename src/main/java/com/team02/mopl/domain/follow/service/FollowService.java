@@ -8,6 +8,7 @@ import com.team02.mopl.domain.follow.exception.CannotFollowSelfException;
 import com.team02.mopl.domain.follow.exception.FollowAlreadyExistsException;
 import com.team02.mopl.domain.follow.exception.FollowForbiddenException;
 import com.team02.mopl.domain.follow.exception.FollowNotFoundException;
+import com.team02.mopl.domain.follow.exception.NotFollowedException;
 import com.team02.mopl.domain.follow.repository.FollowRepository;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -76,7 +77,7 @@ public class FollowService {
     Follow follow =
         followRepository
             .findByFollower_IdAndFollowee_IdAndDeletedAtIsNull(followerId, followeeId)
-            .orElseThrow(FollowNotFoundException::new);
+            .orElseThrow(() -> new NotFollowedException(followeeId, followerId));
 
     return FollowDto.from(follow);
   }

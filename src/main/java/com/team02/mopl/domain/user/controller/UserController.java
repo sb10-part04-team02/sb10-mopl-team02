@@ -2,16 +2,24 @@ package com.team02.mopl.domain.user.controller;
 
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
+import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
+import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
+import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
+import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.service.UserService;
+import com.team02.mopl.global.dto.CursorResponse;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,13 +39,22 @@ public class UserController implements UserApi {
   @Override
   @PostMapping
   public ResponseEntity<UserDto> createUser(@RequestBody @Valid UserCreateRequest request) {
-    return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(request));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(userService.createUser(request, Role.USER));
   }
 
   @Override
   @GetMapping("/{userId}")
   public ResponseEntity<UserDto> getUser(@PathVariable UUID userId) {
     return ResponseEntity.ok(userService.getUser(userId));
+  }
+
+  @PreAuthorize("hasRole('ADMIN')")
+  @Override
+  @GetMapping
+  public ResponseEntity<CursorResponse<UserDto>> getUserList(
+      @ParameterObject @ModelAttribute @Valid UserSearchRequest request) {
+    return ResponseEntity.ok(userService.getUsers(request));
   }
 
   @Override
@@ -48,5 +65,23 @@ public class UserController implements UserApi {
       @RequestPart("request") @Valid UserUpdateRequest request,
       @RequestPart(value = "image", required = false) MultipartFile image) {
     return ResponseEntity.ok(userService.updateProfile(requesterId, userId, request, image));
+  }
+
+  @Override
+  @PreAuthorize("hasRole('ADMIN')")
+  @PatchMapping("/{userId}/role")
+  public ResponseEntity<Void> updateRole(
+      @PathVariable UUID userId, @RequestBody @Valid UserRoleUpdateRequest request) {
+    userService.updateRole(userId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  @PreAuthorize("hasRole('ADMIN')")
+  @PatchMapping("/{userId}/locked")
+  public ResponseEntity<Void> updateLock(
+      @PathVariable UUID userId, @RequestBody @Valid UserLockUpdateRequest request) {
+    userService.updateLock(userId, request);
+    return ResponseEntity.noContent().build();
   }
 }

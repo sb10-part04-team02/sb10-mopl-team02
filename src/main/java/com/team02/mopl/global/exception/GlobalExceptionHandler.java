@@ -1,13 +1,18 @@
 package com.team02.mopl.global.exception;
 
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import com.team02.mopl.domain.follow.exception.NotFollowedException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestCookieException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -27,6 +32,30 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(errorCode.getStatus()).body(response);
   }
 
+  // 프로필용 팔로워 수 조회 응답에 필요한 예외입니다.
+  @ExceptionHandler(NotFollowedException.class)
+  public ResponseEntity<ErrorResponse> handleNotFollowedException(NotFollowedException e) {
+    ErrorResponse response =
+        new ErrorResponse("follow.not_followed", "팔로우하지 않은 사용자입니다.", e.getDetails());
+
+    return ResponseEntity.status(e.getErrorCode().getStatus()).body(response);
+  }
+
+  // 필수 RequestParam이 누락됐을 때 발생하는 예외 처리
+  @ExceptionHandler(MissingServletRequestParameterException.class)
+  public ResponseEntity<ErrorResponse> handleMissingParameter(
+      MissingServletRequestParameterException e) {
+    String parameter = e.getParameterName();
+
+    ErrorResponse response =
+        new ErrorResponse(
+            e.getClass().getSimpleName(),
+            "잘못된 요청입니다.",
+            Map.of(parameter, "필수 요청 파라미터 '" + parameter + "' 이(가) 누락되었습니다."));
+
+    return ResponseEntity.badRequest().body(response);
+  }
+
   // PathVariable, RequestParam 타입이 맞지 않을 때 발생하는 예외 처리
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
@@ -40,10 +69,9 @@ public class GlobalExceptionHandler {
     return ResponseEntity.badRequest().body(response);
   }
 
-  // @Valid 검증 실패 시 발생하는 예외 처리
-  @ExceptionHandler(MethodArgumentNotValidException.class)
-  public ResponseEntity<ErrorResponse> handleValidationException(
-      MethodArgumentNotValidException e) {
+  // @Valid 검증 실패 시 발생하는 예외 처리(BindException이 MethodArgumentNotValidException을 상속)
+  @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
+  public ResponseEntity<ErrorResponse> handleValidationException(BindException e) {
     Map<String, String> details = new LinkedHashMap<>();
 
     e.getBindingResult()
@@ -66,6 +94,25 @@ public class GlobalExceptionHandler {
             Map.of("reason", e.getMethod() + " 메서드는 이 엔드포인트에서 지원되지 않습니다."));
 
     return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
+  }
+
+  // @RequestBody의 JsonBody 변환 실패시 나오는 예외
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
+      HttpMessageNotReadableException e) {
+
+    String exceptionName = "InvalidRequestException";
+    String message = "요청 본문(JSON) 변환에 실패하였습니다.";
+    Map<String, String> details = Map.of("reason", "JSON 형식이 올바르지 않거나 본문이 비어있습니다.");
+
+    if (e.getCause() instanceof InvalidFormatException invalidFormatEx) {
+      String invalidValue = String.valueOf(invalidFormatEx.getValue());
+      String type = invalidFormatEx.getTargetType().getSimpleName().toLowerCase();
+      details = Map.of(type, invalidValue);
+    }
+
+    ErrorResponse response = new ErrorResponse(exceptionName, message, details);
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
   }
 
   // 예상하지 못한 서버 내부 오류 처리

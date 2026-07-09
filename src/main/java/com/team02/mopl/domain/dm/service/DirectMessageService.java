@@ -176,13 +176,14 @@ public class DirectMessageService {
 
     List<Conversation> conversations =
         conversationRepository.findConversationsByCursor(
-            requesterId, direction, cursor, request.idAfter(), limit + 1);
+            requesterId, request.keywordLike(), direction, cursor, request.idAfter(), limit + 1);
 
     boolean hasNext = conversations.size() > limit;
     List<Conversation> page = hasNext ? conversations.subList(0, limit) : conversations;
 
     List<ConversationDto> data = buildConversationDtos(page, requesterId);
-    long totalCount = conversationRepository.countByMemberUserId(requesterId);
+    long totalCount =
+        conversationRepository.countByMemberUserId(requesterId, request.keywordLike());
 
     String nextCursor = null;
     UUID nextIdAfter = null;

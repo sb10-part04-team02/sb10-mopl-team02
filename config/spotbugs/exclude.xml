@@ -30,6 +30,11 @@
     <Match>
         <Class name="com.team02.mopl.global.websocket.StompChannelInterceptor"/>
     </Match>
+    <!-- 위와 동일: DI 협력 빈(서비스/레지스트리/메시징 템플릿) 저장이 설계 의도이므로 해당 클래스만 오탐 제외 -->
+    <Match>
+        <Class name="com.team02.mopl.domain.watching.websocket.WatchingSessionWebSocketEventListener"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
     <!-- 위와 동일한 문제지만 Registry는 위쪽의 패키지들과 다른 성질의 그룹인것 같아 따로 추가함-->
     <Match>
       <Class name="~com\.team02\.mopl\.domain\.auth\.jwt\.(JwtRegistry|JwtAuthenticationProvider|handler\..*)"/>
@@ -38,6 +43,11 @@
     <!-- userService를 활용해서 여기서도 EI2 패턴을 제외 -->
     <Match>
       <Class name="~com\.team02\.mopl\.global\.init\..*" />
+      <Bug pattern="EI_EXPOSE_REP2" />
+    </Match>
+    <!-- 수집(ingestion) 컴포넌트: DI 주입 협력 빈(RestClient 등 싱글톤)을 필드에 저장하는 동일 패턴 -> 오탐 제외 -->
+    <Match>
+      <Class name="~com\.team02\.mopl\.domain\.content\.ingestion\..*" />
       <Bug pattern="EI_EXPOSE_REP2" />
     </Match>
 

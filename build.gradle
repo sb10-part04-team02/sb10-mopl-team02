@@ -39,6 +39,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
     // === 데이터 저장소 ===
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.retry:spring-retry'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    compileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.6'
     runtimeOnly 'org.postgresql:postgresql'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 

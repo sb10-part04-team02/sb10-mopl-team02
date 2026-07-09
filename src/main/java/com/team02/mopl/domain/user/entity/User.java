@@ -56,4 +56,16 @@ public class User extends BaseMutableEntity {
     this.name = Objects.requireNonNull(name, "name은 null일 수 없습니다.");
     this.profileImageUrl = profileImageUrl;
   }
+
+  public Role updateRole(Role newRole) {
+    Role oldRole = this.role;
+    this.role = newRole;
+    return oldRole;
+  }
+
+  public boolean updateLock(boolean locked) {
+    boolean oldLocked = this.isLocked;
+    this.isLocked = locked;
+    return oldLocked;
+  }
 }
