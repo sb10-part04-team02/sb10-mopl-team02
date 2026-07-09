@@ -66,6 +66,20 @@ class RequestIdMdcFilterTest {
   }
 
   @Test
+  @DisplayName("체인 실행 중 다른 컴포넌트가 넣은 MDC 값도 요청 종료 후 제거된다")
+  void success_shouldClearAllMdcEntries_afterChainCompletes() throws ServletException, IOException {
+    // given - 체인 내부에서 다른 키를 MDC에 추가
+    FilterChain filterChain = (req, res) -> MDC.put("userId", "someone");
+
+    // when
+    requestIdMdcFilter.doFilterInternal(request, response, filterChain);
+
+    // then - requestId 뿐 아니라 다른 키까지 모두 비워짐
+    assertThat(MDC.get(RequestIdMdcFilter.MDC_KEY)).isNull();
+    assertThat(MDC.get("userId")).isNull();
+  }
+
+  @Test
   @DisplayName("응답 헤더 X-Request-Id에 MDC와 동일한 UUID 형식의 requestId가 설정된다")
   void success_shouldSetRequestIdHeader_matchingMdcValue() throws ServletException, IOException {
     // given

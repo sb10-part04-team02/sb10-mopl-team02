@@ -31,7 +31,7 @@ public class RequestIdMdcFilter extends OncePerRequestFilter {
     try {
       filterChain.doFilter(request, response);
     } finally {
-      MDC.remove(MDC_KEY); // 요청 처리가 끝나면 MDC에서 requestId 제거
+      MDC.clear(); // 요청 처리가 끝나면 다른 컴포넌트가 넣은 값까지 포함해 MDC 전체 정리
     }
   }
 }
