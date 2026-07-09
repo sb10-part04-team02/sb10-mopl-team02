@@ -48,7 +48,7 @@ class RequestIdMdcFilterTest {
     // when
     requestIdMdcFilter.doFilterInternal(request, response, filterChain);
 
-    // then
+    // then - 체인이 실행되던 시점에 MDC 값이 존재했음을 검증
     assertThat(capturedRequestId.get()).isNotNull();
   }
 
