@@ -102,3 +102,5 @@ docker compose -f docker-compose.distributed.yml --env-file .env down -v
 
 `down -v`를 사용하면 PostgreSQL/Redis 볼륨 데이터도 삭제됩니다.  
 일반적인 종료는 `down`만 사용합니다.
+
+- [로컬 Redis/Kafka 검증 방법](local-redis-kafka.md)

@@ -38,7 +38,6 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-aop'
     compileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.6'
     runtimeOnly 'org.postgresql:postgresql'
-    implementation 'org.springframework.kafka:spring-kafka'
     // QueryDSL (Jakarta) — 버전은 Spring Boot BOM 이 관리
     implementation 'com.querydsl:querydsl-jpa::jakarta'
     annotationProcessor 'com.querydsl:querydsl-apt::jakarta'
@@ -57,7 +56,6 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
-    testImplementation 'org.springframework.kafka:spring-kafka-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'org.springframework.kafka:spring-kafka-test'
     testCompileOnly 'org.projectlombok:lombok'
