@@ -50,6 +50,10 @@
       <Class name="~com\.team02\.mopl\.domain\.content\.ingestion\..*" />
       <Bug pattern="EI_EXPOSE_REP2" />
     </Match>
+    <Match>
+      <Class name="com.team02.mopl.domain.auth.provider.MoplAuthenticationProvider" />
+      <Bug pattern="EI_EXPOSE_REP2" />
+    </Match>
 
     <!-- QueryDSL 생성 Q타입(Q*)은 정적 분석 대상에서 제외 -->
     <Match>

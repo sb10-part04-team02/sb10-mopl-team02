@@ -166,7 +166,7 @@ public class JwtRegistry {
   public boolean deleteTempPassword(UUID userId) {
     try {
       String tempPwKey = tempPwKey(userId);
-      if (!redisTemplate.delete(tempPwKey)) {
+      if (!Objects.equals(redisTemplate.delete(tempPwKey), true)) {
         log.debug("[Redis] 이미 만료되어 키가 존재하지 않음: userId={}", userId);
       }
       return true;
