@@ -16,6 +16,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 
+import com.team02.mopl.domain.user.dto.ChangePasswordRequest;
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
@@ -879,6 +880,41 @@ class UserServiceTest {
       assertThrows(
           UserNotFoundException.class,
           () -> userService.updateLock(UUID.randomUUID(), mock(UserLockUpdateRequest.class)));
+    }
+  }
+
+  @Nested
+  class UpdatePassword {
+    @Test
+    @DisplayName("패스워드변경요청이 들어오면 패스워드를 변경한다")
+    void success_shouldUpdatePassword_whenChangePasswordIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+      User mockUser = mock(User.class);
+      ChangePasswordRequest request = new ChangePasswordRequest("validPassword");
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(mockUser));
+
+      String encodedPassword = "encodedPassword";
+      given(passwordEncoder.encode(anyString())).willReturn(encodedPassword);
+
+      // when
+      userService.updatePassword(userId, request);
+
+      // then
+      then(mockUser).should(times(1)).updatePassword(eq(encodedPassword));
+    }
+
+    @Test
+    @DisplayName("유저가 존재하지 않으면 예외를 던진다")
+    void fail_shouldThrowException_whenUserNotFound() {
+      // given
+      given(userRepository.findByIdAndDeletedAtIsNull(any(UUID.class)))
+          .willReturn(Optional.empty());
+
+      // when & then
+      assertThrows(
+          UserNotFoundException.class,
+          () -> userService.updatePassword(UUID.randomUUID(), mock(ChangePasswordRequest.class)));
     }
   }
 }

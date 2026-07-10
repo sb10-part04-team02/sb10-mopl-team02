@@ -193,7 +193,12 @@ public class UserService {
 
   @Transactional
   public void updatePassword(UUID userId, ChangePasswordRequest request) {
-    return;
+    log.debug("유저 비밀번호변경 시작: userId={}", userId);
+    User findUser =
+        userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
+    findUser.updatePassword(passwordEncoder.encode(request.password()));
+
+    log.info("유저 비밀번호변경 로직 완료: userId={}", userId);
   }
 
   private void validateOwner(UUID requesterId, UUID userId) {
