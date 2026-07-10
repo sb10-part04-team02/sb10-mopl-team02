@@ -51,6 +51,33 @@ class ContentUpsertServiceTest extends RepositoryTestSupport {
   }
 
   @Test
+  @DisplayName("upsert는 SPORTS_DB 소스 콘텐츠도 저장한다 (스키마 source CHECK 제약 통과)")
+  void upsert_whenSportsDbSource_insertsContent() {
+    // given - SPORTS_DB 소스의 스포츠 콘텐츠
+    ExternalContentData data =
+        new ExternalContentData(
+            ContentSource.SPORTS_DB,
+            "event:2267073",
+            ContentType.SPORT,
+            "Liverpool vs Bournemouth",
+            "English Premier League 2025-2026",
+            "http://img",
+            List.of("Soccer"));
+
+    // when
+    UpsertResult result = contentUpsertService.upsert(data);
+
+    // then
+    assertThat(result).isEqualTo(UpsertResult.INSERTED);
+    Content saved =
+        contentRepository
+            .findBySourceAndExternalId(ContentSource.SPORTS_DB, "event:2267073")
+            .orElseThrow();
+    assertThat(saved.getContentType()).isEqualTo(ContentType.SPORT);
+    assertThat(saved.getTitle()).isEqualTo("Liverpool vs Bournemouth");
+  }
+
+  @Test
   @DisplayName("upsert는 동일 데이터로 재실행해도 행이 늘어나지 않는다 (멱등성)")
   void upsert_whenRerunWithSameData_isIdempotent() {
     // given

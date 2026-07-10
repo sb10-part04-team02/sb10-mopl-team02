@@ -10,6 +10,17 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:mopl-local}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
   servlet:
     multipart:
       max-file-size: 10MB     # 업로드 가능한 개별 파일의 최대 크기
@@ -28,6 +39,10 @@ spring:
           connectiontimeout: 5000   # 연결대기시간 5초
           timeout: 5000             # 응답대기시간 5초
           writetimeout: 5000        # 쓰기대기시간 5초
+
+logging:
+  pattern:
+    correlation: "[%X{requestId:-}] "  # 전 프로파일 공통. 콘솔/파일 로그의 레벨 옆에 MDC requestId를 표시 (요청 밖 로그는 빈 값)
 
 app:
   admin:
@@ -49,7 +64,20 @@ app:
     pages: 3  # popular 수집 페이지 수 (페이지당 20건)
     connect-timeout: 3s
     read-timeout: 10s
-    run-on-startup: false  # true면 기동 시 1회 수집 실행 (검증/수동 실행용)
+  sportsdb:
+    api-key: ${SPORTSDB_API_KEY:123}  # 무료 테스트 키 "123" (30 req/min)
+    base-url: https://www.thesportsdb.com/api/v1/json
+    connect-timeout: 3s
+    read-timeout: 10s
+    leagues:  # 수집 대상 리그+시즌. 시즌 표기는 리그마다 다름
+      - id: "4328"
+        season: "2025-2026"  # English Premier League
+  ingestion:
+    run-on-startup: false  # true면 기동 시 1회 전체 소스 수집 실행 (검증/수동 실행용)
+    scheduler:
+      enabled: ${INGESTION_SCHEDULER_ENABLED:false}  # 기본 off. 테스트/로컬에서 실행 방지
+      cron: ${INGESTION_SCHEDULER_CRON:0 0 4 * * *}  # 로컬 테스트 시 주기 바꿔서 실행할 것
+      lock-ttl: 30m  # 중복 실행 방지 락 TTL (최대 수집 소요보다 넉넉히)
   jwt:
     secret-key: ${JWT_SECRET_KEY}
     access-token-expiration: 10m  # 10분
