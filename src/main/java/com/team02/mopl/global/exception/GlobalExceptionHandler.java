@@ -1,13 +1,18 @@
 package com.team02.mopl.global.exception;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import com.team02.mopl.domain.auth.jwt.token.JwtAuthenticationToken;
 import com.team02.mopl.domain.follow.exception.NotFollowedException;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -113,6 +118,31 @@ public class GlobalExceptionHandler {
 
     ErrorResponse response = new ErrorResponse(exceptionName, message, details);
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+  }
+
+  // PreAuthorize를 포함한 컨트롤러/서비스 실행중 발생한 예외
+  @ExceptionHandler(AuthorizationDeniedException.class)
+  public ResponseEntity<ErrorResponse> handleAuthorizationDeniedException(
+      AuthorizationDeniedException e, HttpServletRequest request) {
+
+    Object principal;
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth instanceof JwtAuthenticationToken jwtAuth) {
+      principal = jwtAuth.getPrincipal();
+    } else {
+      principal = "****";
+    }
+    log.warn(
+        "권한 에러: userId={}, authorities={}, uri={}",
+        principal,
+        auth.getAuthorities(),
+        request.getRequestURI());
+
+    String exceptionName = "AuthorizationException";
+    String message = "권한이 부족합니다";
+
+    ErrorResponse response = new ErrorResponse(exceptionName, message, Map.of());
+    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
   }
 
   // 예상하지 못한 서버 내부 오류 처리

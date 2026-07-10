@@ -1,5 +1,6 @@
 package com.team02.mopl.domain.user.service;
 
+import com.team02.mopl.domain.user.dto.ChangePasswordRequest;
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
@@ -188,6 +189,11 @@ public class UserService {
     eventPublisher.publishEvent(new UserLockUpdatedEvent(userId, newLocked));
     log.info(
         "유저 계정잠금변경 로직 완료: userId={}, isLocked=[{} -> {}]", findUser.getId(), oldLocked, newLocked);
+  }
+
+  @Transactional
+  public void updatePassword(UUID userId, ChangePasswordRequest request) {
+    return;
   }
 
   private void validateOwner(UUID requesterId, UUID userId) {

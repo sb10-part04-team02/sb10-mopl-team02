@@ -1,5 +1,6 @@
 package com.team02.mopl.domain.user.controller;
 
+import com.team02.mopl.domain.user.dto.ChangePasswordRequest;
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
@@ -82,6 +83,15 @@ public class UserController implements UserApi {
   public ResponseEntity<Void> updateLock(
       @PathVariable UUID userId, @RequestBody @Valid UserLockUpdateRequest request) {
     userService.updateLock(userId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  @PreAuthorize("authentication.principal == #userId")
+  @PatchMapping("/{userId}/password")
+  public ResponseEntity<Void> updatePassword(
+      @PathVariable UUID userId, @RequestBody @Valid ChangePasswordRequest request) {
+    userService.updatePassword(userId, request);
     return ResponseEntity.noContent().build();
   }
 }
