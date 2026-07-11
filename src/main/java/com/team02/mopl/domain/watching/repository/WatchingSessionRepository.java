@@ -21,6 +21,10 @@ public interface WatchingSessionRepository
           + "where ws.content.id = :contentId and ws.exitedAt is null and ws.deletedAt is null")
   long countActiveByContentId(@Param("contentId") UUID contentId);
 
+  // 유저의 활성(미삭제) 시청 세션 중 가장 최근 1건.
+  // leave가 종료와 소프트 삭제를 함께 수행하므로 deletedAt IS NULL인 세션은 항상 활성 상태다.
+  Optional<WatchingSession> findFirstByUser_IdAndDeletedAtIsNullOrderByCreatedAtDesc(UUID userId);
+
   // 여러 콘텐츠의 활성 시청자 수 일괄 집계 (목록 조회 N+1 방지)
   @Query(
       "select ws.content.id as contentId, count(ws) as count from WatchingSession ws "

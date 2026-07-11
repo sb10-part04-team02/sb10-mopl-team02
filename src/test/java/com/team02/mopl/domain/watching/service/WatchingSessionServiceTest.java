@@ -449,6 +449,69 @@ class WatchingSessionServiceTest {
     assertThat(watchingSessionService.leave(watchingSessionId, UUID.randomUUID())).isEmpty();
   }
 
+  @Test
+  @DisplayName("getWatchingSessionByWatcher는 사용자가 없으면 UserNotFoundException이 발생하고 세션을 조회하지 않는다")
+  void getWatchingSessionByWatcher_userNotFound_throwsException() {
+    // given
+    UUID watcherId = UUID.randomUUID();
+    given(userRepository.findByIdAndDeletedAtIsNull(watcherId)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> watchingSessionService.getWatchingSessionByWatcher(watcherId))
+        .isInstanceOf(UserNotFoundException.class);
+    verify(watchingSessionRepository, never())
+        .findFirstByUser_IdAndDeletedAtIsNullOrderByCreatedAtDesc(any());
+  }
+
+  @Test
+  @DisplayName("getWatchingSessionByWatcher는 활성 세션이 없으면 null을 반환한다")
+  void getWatchingSessionByWatcher_noActiveSession_returnsNull() {
+    // given
+    UUID watcherId = UUID.randomUUID();
+    User watcher = mockUser(watcherId, "시청자", null);
+    given(userRepository.findByIdAndDeletedAtIsNull(watcherId)).willReturn(Optional.of(watcher));
+    given(
+            watchingSessionRepository.findFirstByUser_IdAndDeletedAtIsNullOrderByCreatedAtDesc(
+                watcherId))
+        .willReturn(Optional.empty());
+
+    // when
+    WatchingSessionDto result = watchingSessionService.getWatchingSessionByWatcher(watcherId);
+
+    // then
+    assertThat(result).isNull();
+  }
+
+  @Test
+  @DisplayName("getWatchingSessionByWatcher는 활성 세션이 있으면 세션 콘텐츠로 매핑한 DTO를 반환한다")
+  void getWatchingSessionByWatcher_activeSession_returnsDto() {
+    // given
+    UUID watcherId = UUID.randomUUID();
+    UUID contentId = UUID.randomUUID();
+    Content content = mockContent(contentId);
+    User watcher = mockUser(watcherId, "시청자", null);
+    given(userRepository.findByIdAndDeletedAtIsNull(watcherId)).willReturn(Optional.of(watcher));
+
+    WatchingSession session = mockSession(UUID.randomUUID(), Instant.now(), watcher);
+    given(session.getContent()).willReturn(content);
+    given(
+            watchingSessionRepository.findFirstByUser_IdAndDeletedAtIsNullOrderByCreatedAtDesc(
+                watcherId))
+        .willReturn(Optional.of(session));
+    given(tagRepository.findByContentIdAndDeletedAtIsNull(contentId)).willReturn(List.of());
+
+    WatchingSessionDto dto =
+        new WatchingSessionDto(session.getId(), session.getCreatedAt(), null, null);
+    given(watchingSessionMapper.toDto(eq(session), any())).willReturn(dto);
+
+    // when
+    WatchingSessionDto result = watchingSessionService.getWatchingSessionByWatcher(watcherId);
+
+    // then
+    assertThat(result).isEqualTo(dto);
+    verify(tagRepository).findByContentIdAndDeletedAtIsNull(contentId);
+  }
+
   private WatchingSessionSearchRequest request(
       String watcherNameLike, Integer limit, SortDirection direction) {
     return new WatchingSessionSearchRequest(watcherNameLike, null, null, limit, direction, null);
