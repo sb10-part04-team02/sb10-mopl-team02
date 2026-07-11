@@ -73,6 +73,16 @@ AWS ECS 배포 시에는 아래 값들을 Task Definition의 environment 또는 
     - 로컬: `mopl-local`
     - AWS/운영: 환경별 consumer group id
 
+- `TMDB_ACCESS_TOKEN`
+    - 영화/드라마 콘텐츠 수집용 TMDB API access token
+    - 운영 환경에서는 ECS Secret 또는 Secrets Manager 관리 권장
+    - 수집 기능을 사용하지 않는 환경에서는 비워둘 수 있음
+
+- `SPORTSDB_API_KEY`
+    - 스포츠 콘텐츠 수집용 The Sports DB API key
+    - 운영 환경에서는 ECS Secret 또는 Secrets Manager 관리 권장
+    - 수집 기능을 사용하지 않는 환경에서는 비워둘 수 있음
+
 - `JWT_SECRET_KEY`
     - Secrets Manager 또는 ECS Secret 권장
 

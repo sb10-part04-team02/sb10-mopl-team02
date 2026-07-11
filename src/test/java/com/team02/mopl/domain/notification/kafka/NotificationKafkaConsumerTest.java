@@ -76,8 +76,8 @@ class NotificationKafkaConsumerTest {
   }
 
   @Test
-  @DisplayName("알림 생성 처리 중 예외가 발생해도 consumer는 예외를 전파하지 않는다")
-  void consume_notificationFailure_doesNotThrow() throws Exception {
+  @DisplayName("알림 생성 처리 중 예외가 발생하면 Kafka 재시도를 위해 예외를 전파한다")
+  void consume_notificationFailure_throwsException() throws Exception {
     // given
     NotificationKafkaConsumer consumer =
         new NotificationKafkaConsumer(objectMapper, notificationService);
@@ -97,7 +97,10 @@ class NotificationKafkaConsumerTest {
         .willThrow(new RuntimeException("notification failed"));
 
     // when & then
-    assertThatCode(() -> consumer.consume(payload)).doesNotThrowAnyException();
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> consumer.consume(payload))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessage("notification failed");
+
     then(notificationService).should().createNotification(org.mockito.ArgumentMatchers.any());
   }
 }

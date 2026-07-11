@@ -34,8 +34,6 @@ public class NotificationKafkaConsumer {
               message.notificationType()));
     } catch (JsonProcessingException e) {
       log.warn("알림 Kafka 메시지 역직렬화 실패. payload={}", payload, e);
-    } catch (RuntimeException e) {
-      log.warn("알림 Kafka 메시지 처리 실패. payload={}", payload, e);
     }
   }
 }
