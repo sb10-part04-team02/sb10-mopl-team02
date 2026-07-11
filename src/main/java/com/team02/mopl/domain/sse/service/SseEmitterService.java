@@ -72,7 +72,12 @@ public class SseEmitterService {
       log.warn("잘못된 SSE Last-Event-ID 형식입니다. userId={}, lastEventId={}", userId, lastEventId, e);
     } catch (NotificationNotFoundException e) {
       log.warn(
-          "SSE Last-Event-ID에 해당하는 알림을 찾을 수 없습니다. userId={}, lastEventId={}", userId, lastEventId);
+          "SSE Last-Event-ID에 해당하는 알림을 찾을 수 없습니다. userId={}, lastEventId={}",
+          userId,
+          lastEventId,
+          e);
+    } catch (RuntimeException e) {
+      log.warn("SSE 누락 알림 복구 중 예외가 발생했습니다. userId={}, lastEventId={}", userId, lastEventId, e);
     }
   }
 

@@ -23,8 +23,11 @@ public interface NotificationRepository
       "SELECT n FROM Notification n "
           + "WHERE n.receiver.id = :receiverId "
           + "AND n.deletedAt IS NULL "
-          + "AND n.createdAt > :lastCreatedAt "
+          + "AND (n.createdAt > :lastCreatedAt "
+          + "OR (n.createdAt = :lastCreatedAt AND n.id > :lastNotificationId)) "
           + "ORDER BY n.createdAt ASC, n.id ASC")
   List<Notification> findUnreadNotificationsAfter(
-      @Param("receiverId") UUID receiverId, @Param("lastCreatedAt") Instant lastCreatedAt);
+      @Param("receiverId") UUID receiverId,
+      @Param("lastCreatedAt") Instant lastCreatedAt,
+      @Param("lastNotificationId") UUID lastNotificationId);
 }

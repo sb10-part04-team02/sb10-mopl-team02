@@ -106,13 +106,14 @@ public class NotificationService {
 
     List<NotificationDto> missedNotifications =
         notificationRepository
-            .findUnreadNotificationsAfter(receiverId, lastNotification.getCreatedAt())
+            .findUnreadNotificationsAfter(
+                receiverId, lastNotification.getCreatedAt(), lastNotificationId)
             .stream()
             .map(NotificationDto::from)
             .toList();
 
     for (NotificationDto notificationDto : missedNotifications) {
-      sendNotification(notificationDto);
+      sendNotificationAfterCommit(notificationDto);
     }
   }
 

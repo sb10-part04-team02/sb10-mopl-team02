@@ -257,6 +257,24 @@ class SseEmitterServiceTest {
     inOrder.verify(sseEmitterRepository).save(userId, emitter);
   }
 
+  @Test
+  @DisplayName("누락 알림 복구 중 예외가 발생해도 SSE 연결은 유지한다")
+  void connect_whenRecoverFails_doesNotThrow() {
+    UUID userId = UUID.randomUUID();
+    UUID lastNotificationId = UUID.randomUUID();
+
+    given(sseEmitterRepository.save(eq(userId), any(SseEmitter.class)))
+        .willReturn(Optional.empty());
+    doThrow(new RuntimeException("recover failed"))
+        .when(notificationService)
+        .resendNotificationsAfter(userId, lastNotificationId);
+
+    SseEmitter result = sseEmitterService.connect(userId, lastNotificationId.toString());
+
+    assertThat(result).isNotNull();
+    verify(notificationService).resendNotificationsAfter(userId, lastNotificationId);
+  }
+
   private static class TestableSseEmitterService extends SseEmitterService {
 
     private final SseEmitter emitter;

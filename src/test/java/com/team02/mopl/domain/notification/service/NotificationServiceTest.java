@@ -19,6 +19,7 @@ import com.team02.mopl.domain.notification.entity.Notification;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.enums.NotificationSortBy;
+import com.team02.mopl.domain.notification.exception.NotificationNotFoundException;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
 import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
@@ -451,7 +452,7 @@ class NotificationServiceTest {
         .willReturn(Optional.of(lastNotification));
     given(
             notificationRepository.findUnreadNotificationsAfter(
-                receiverId, lastNotification.getCreatedAt()))
+                receiverId, lastNotification.getCreatedAt(), lastNotificationId))
         .willReturn(List.of(missedNotification1, missedNotification2));
 
     // when
@@ -473,6 +474,66 @@ class NotificationServiceTest {
             eq("notifications"),
             eq(missedNotification2.getId().toString()),
             any(NotificationDto.class));
+  }
+
+  @Test
+  @DisplayName("Last-Event-ID에 해당하는 알림이 없으면 NotificationNotFoundException을 던진다")
+  void resendNotificationsAfter_throwsException_whenLastNotificationNotFound() {
+    // given
+    UUID receiverId = UUID.randomUUID();
+    UUID lastNotificationId = UUID.randomUUID();
+
+    given(notificationRepository.findByIdAndReceiver_Id(lastNotificationId, receiverId))
+        .willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(
+            () -> notificationService.resendNotificationsAfter(receiverId, lastNotificationId))
+        .isInstanceOf(NotificationNotFoundException.class);
+
+    then(notificationRepository).should().findByIdAndReceiver_Id(lastNotificationId, receiverId);
+    then(notificationRepository).should(never()).findUnreadNotificationsAfter(any(), any(), any());
+    then(sseEventService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("Last-Event-ID 이후 누락 알림이 없으면 SSE를 전송하지 않는다")
+  void resendNotificationsAfter_doesNotSend_whenNoMissedNotifications() {
+    // given
+    UUID receiverId = UUID.randomUUID();
+    UUID lastNotificationId = UUID.randomUUID();
+
+    User receiver = new User("수신자", "receiver@mopl.io", "password", null, Role.USER, false);
+
+    Notification lastNotification =
+        new Notification(
+            receiver,
+            "마지막 수신 알림",
+            "마지막 수신 알림 내용",
+            NotificationLevel.INFO,
+            NotificationType.USER_FOLLOWED);
+
+    ReflectionTestUtils.setField(receiver, "id", receiverId);
+    ReflectionTestUtils.setField(lastNotification, "id", lastNotificationId);
+    ReflectionTestUtils.setField(
+        lastNotification, "createdAt", Instant.parse("2026-07-11T00:00:00Z"));
+
+    given(notificationRepository.findByIdAndReceiver_Id(lastNotificationId, receiverId))
+        .willReturn(Optional.of(lastNotification));
+    given(
+            notificationRepository.findUnreadNotificationsAfter(
+                receiverId, lastNotification.getCreatedAt(), lastNotificationId))
+        .willReturn(List.of());
+
+    // when
+    notificationService.resendNotificationsAfter(receiverId, lastNotificationId);
+
+    // then
+    then(notificationRepository)
+        .should()
+        .findUnreadNotificationsAfter(
+            receiverId, lastNotification.getCreatedAt(), lastNotificationId);
+    then(sseEventService).shouldHaveNoInteractions();
   }
 
   private Notification createNotificationWithIdAndCreatedAt(
