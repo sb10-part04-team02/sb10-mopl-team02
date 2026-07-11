@@ -111,8 +111,12 @@ public interface AuthApi {
         description = "잘못된 요청",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     @ApiResponse(
-        responseCode = "401",
-        description = "인증 실패",
+        responseCode = "403",
+        description = "권한 오류", // CSRF용
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "해당 리소스 없음",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     @ApiResponse(
         responseCode = "500",

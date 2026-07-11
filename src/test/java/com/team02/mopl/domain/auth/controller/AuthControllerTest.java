@@ -333,6 +333,7 @@ class AuthControllerTest {
           .perform(createResetPasswordRequest(content))
           .andDo(print())
           .andExpect(status().isOk());
+      then(mailService).should(times(1)).sendResetPasswordEmail(any(ResetPasswordRequest.class));
     }
 
     @Test

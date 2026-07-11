@@ -2,7 +2,6 @@ package com.team02.mopl.domain.auth.provider;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -44,13 +43,12 @@ class MoplAuthenticationProviderTest {
       // given
       String email = "example@gmail.com";
       MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
+      UsernamePasswordAuthenticationToken mockAuthToken =
+          mock(UsernamePasswordAuthenticationToken.class);
       given(userDetailsService.loadUserByUsername(eq(email))).willReturn(mockUserDetails);
 
       // when & then
-      assertDoesNotThrow(
-          () ->
-              authenticationProvider.retrieveUser(
-                  email, any(UsernamePasswordAuthenticationToken.class)));
+      assertDoesNotThrow(() -> authenticationProvider.retrieveUser(email, mockAuthToken));
       then(userDetailsService).should(times(1)).loadUserByUsername(eq(email));
     }
 
@@ -59,15 +57,15 @@ class MoplAuthenticationProviderTest {
     void fail_shouldThrowBadCredentials_whenUserNotFoundExceptionOccurs() {
       // given
       String email = "notfound@gmail.com";
+      UsernamePasswordAuthenticationToken mockAuthToken =
+          mock(UsernamePasswordAuthenticationToken.class);
       given(userDetailsService.loadUserByUsername(anyString()))
           .willThrow(UsernameNotFoundException.class);
 
       // when & then
       assertThrows(
           BadCredentialsException.class,
-          () ->
-              authenticationProvider.retrieveUser(
-                  email, any(UsernamePasswordAuthenticationToken.class)));
+          () -> authenticationProvider.retrieveUser(email, mockAuthToken));
     }
   }
 
@@ -103,6 +101,20 @@ class MoplAuthenticationProviderTest {
 
       // then
       then(jwtRegistry).should(times(1)).deleteTempPassword(userId);
+    }
+
+    @Test
+    @DisplayName("authToken에 credential이 없으면 예외를 던진다")
+    void fail_shouldThrowException_whenCredentialsIsNull() {
+      // given
+      UsernamePasswordAuthenticationToken mockAuth =
+          mock(UsernamePasswordAuthenticationToken.class);
+      given(mockAuth.getCredentials()).willReturn(null);
+
+      // when & then
+      assertThrows(
+          BadCredentialsException.class,
+          () -> authenticationProvider.additionalAuthenticationChecks(mockUserDetails, mockAuth));
     }
 
     @Test

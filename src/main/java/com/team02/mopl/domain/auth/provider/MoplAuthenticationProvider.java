@@ -22,6 +22,8 @@ public class MoplAuthenticationProvider extends AbstractUserDetailsAuthenticatio
   private final PasswordEncoder passwordEncoder;
   private final JwtRegistry jwtRegistry;
 
+  private static final String EMAIL_OR_PASSWORD_NOT_MATCHES = "이메일 또는 비밀번호가 일치하지 않습니다";
+
   @Override
   protected UserDetails retrieveUser(
       String username, UsernamePasswordAuthenticationToken authentication)
@@ -45,6 +47,10 @@ public class MoplAuthenticationProvider extends AbstractUserDetailsAuthenticatio
     // 일반 로그인과 임시비밀번호 로그인 API가 동일해서
     // 어쩔수없이 redis의 임시패스워드부터 검사를 진행합니다
 
+    if (authentication.getCredentials() == null) {
+      throw new BadCredentialsException(EMAIL_OR_PASSWORD_NOT_MATCHES);
+    }
+
     // 1차 검사 (임시 패스워드)
     String tempPassword = jwtRegistry.getTempPassword(userId);
     if (tempPassword != null) {
@@ -54,7 +60,7 @@ public class MoplAuthenticationProvider extends AbstractUserDetailsAuthenticatio
         return;
       }
 
-      throw new BadCredentialsException("이메일 또는 비밀번호가 일치하지 않습니다");
+      throw new BadCredentialsException(EMAIL_OR_PASSWORD_NOT_MATCHES);
     }
 
     // 2차 검사 (일반 패스워드)
@@ -64,6 +70,6 @@ public class MoplAuthenticationProvider extends AbstractUserDetailsAuthenticatio
       return;
     }
 
-    throw new BadCredentialsException("이메일 또는 비밀번호가 일치하지 않습니다");
+    throw new BadCredentialsException(EMAIL_OR_PASSWORD_NOT_MATCHES);
   }
 }

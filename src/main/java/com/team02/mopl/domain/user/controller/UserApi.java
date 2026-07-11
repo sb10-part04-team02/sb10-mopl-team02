@@ -188,6 +188,10 @@ public interface UserApi {
         description = "권한 오류",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     @ApiResponse(
+        responseCode = "404",
+        description = "해당 리소스 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
         responseCode = "500",
         description = "서버 오류",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
