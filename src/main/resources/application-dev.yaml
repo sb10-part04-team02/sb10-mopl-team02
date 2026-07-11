@@ -12,7 +12,6 @@ spring:
   sql:
     init:
       mode: never
-  #      schema-locations: classpath:01_schema_v8.sql
 
   jpa:
     hibernate:
@@ -32,3 +31,5 @@ app:
   storage:
     local:
       public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080}
+    # dev는 절대 URL로 반환 (업로드 파일 URL이 절대 URL인 것과 일관)
+    default-thumbnail-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080}/images/default-thumbnail.svg
