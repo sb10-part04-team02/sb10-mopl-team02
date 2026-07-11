@@ -312,22 +312,23 @@ class ContentServiceTest {
     }
 
     @Test
-    @DisplayName("썸네일이 비어 있으면 fileStorage를 호출하지 않고 기본 썸네일 URL로 콘텐츠를 저장한다")
-    void success_usesDefaultThumbnail_whenThumbnailIsEmpty() {
-      // given
+    @DisplayName("기본 썸네일 설정이 비어 있어도 500 없이 코드 레벨 fallback URL로 정상 저장한다")
+    void success_usesFallbackThumbnail_whenDefaultUrlBlank() {
+      // given: default-thumbnail-url 설정 누락 상황 재현 (이슈 #340의 실제 500 유발 조건)
+      ReflectionTestUtils.setField(contentService, "defaultThumbnailUrl", "");
       ContentCreateRequest request =
           new ContentCreateRequest(ContentType.MOVIE, "인셉션", "꿈 속의 꿈", List.of());
-      MultipartFile thumbnail = mockThumbnail(true); // isEmpty == true
       given(contentMapper.toDto(any(Content.class), anyList(), eq(0L)))
           .willReturn(mockDto(UUID.randomUUID(), List.of(), 0L));
 
       // when
-      contentService.create(request, thumbnail);
+      contentService.create(request, null);
 
-      // then
+      // then: Content blank 검증(500)에 걸리지 않고 코드 레벨 fallback URL이 저장됨
       then(fileStorage).should(never()).store(any());
       then(contentRepository).should().save(contentCaptor.capture());
-      assertThat(contentCaptor.getValue().getThumbnailUrl()).isEqualTo(DEFAULT_THUMBNAIL_URL);
+      assertThat(contentCaptor.getValue().getThumbnailUrl())
+          .isEqualTo("/images/default-thumbnail.svg");
     }
   }
 
