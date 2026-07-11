@@ -13,8 +13,11 @@ import com.team02.mopl.domain.content.mapper.ContentMapper;
 import com.team02.mopl.domain.content.repository.ContentRepository;
 import com.team02.mopl.domain.content.repository.TagRepository;
 import com.team02.mopl.domain.content.util.ContentCursorConverter;
+import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
+import com.team02.mopl.global.exception.BusinessException;
+import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.global.storage.FileStorage;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -79,11 +82,14 @@ public class ContentService {
   // 콘텐츠 목록 조회 (QueryDSL 동적 필터 + 동적 정렬 + 복합 커서)
   @Transactional(readOnly = true)
   public CursorResponse<ContentDto> getContents(ContentSearchRequest request) {
+    int limit = CursorPageRequest.normalizeLimit(request.limit());
+    SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
     // 정렬 기준 미지정 시 인기순(WATCHER_COUNT)으로 기본 정렬
     SortBy sortBy = request.sortBy() != null ? request.sortBy() : SortBy.WATCHER_COUNT;
-    // 정렬 방향 미지정 시 내림차순(최신순) 기본값
-    SortDirection direction =
-        request.sortDirection() != null ? request.sortDirection() : SortDirection.DESCENDING;
+
+    if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
+      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+    }
     boolean asc = direction == SortDirection.ASCENDING;
 
     // 필터 정규화
@@ -102,13 +108,12 @@ public class ContentService {
             asc,
             ContentCursorConverter.toSortKey(sortBy, request.cursor()),
             request.idAfter(),
-            request.fetchLimit());
+            limit + 1);
 
     // limit + 1 적재분을 잘라 hasNext 판정 (커서 페이지네이션)
     List<Content> rows = contentRepository.search(condition);
-    int size = request.normalizedLimit();
-    boolean hasNext = rows.size() > size;
-    List<Content> pageContents = hasNext ? rows.subList(0, size) : rows;
+    boolean hasNext = rows.size() > limit;
+    List<Content> pageContents = hasNext ? rows.subList(0, limit) : rows;
     // 이번 페이지에 있는 contentId를 한 번에 다 뽑는다
     List<UUID> pageIds = pageContents.stream().map(Content::getId).toList();
 
