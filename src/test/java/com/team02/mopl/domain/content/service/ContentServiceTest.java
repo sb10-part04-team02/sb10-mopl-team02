@@ -740,6 +740,37 @@ class ContentServiceTest {
       assertThat(response.nextIdAfter()).isEqualTo(id1);
       assertThat(response.nextCursor()).isEqualTo(lastCreatedAt.toString());
     }
+
+    @Test
+    @DisplayName("cursor만 있고 idAfter가 없으면 INVALID_REQUEST로 거부하고 repository를 호출하지 않는다")
+    void rejectsHalfCursor_whenIdAfterMissing() {
+      // given
+      ContentSearchRequest req = request(null, null, "somecursor", 20, null, null);
+
+      // when & then
+      assertThatThrownBy(() -> contentService.getContents(req))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(ErrorCode.INVALID_REQUEST);
+
+      then(contentRepository).should(never()).search(any());
+    }
+
+    @Test
+    @DisplayName("idAfter만 있고 cursor가 없으면 INVALID_REQUEST로 거부하고 repository를 호출하지 않는다")
+    void rejectsHalfCursor_whenCursorMissing() {
+      // given
+      ContentSearchRequest req =
+          new ContentSearchRequest(null, null, null, null, UUID.randomUUID(), 20, null, null);
+
+      // when & then
+      assertThatThrownBy(() -> contentService.getContents(req))
+          .isInstanceOf(BusinessException.class)
+          .extracting("errorCode")
+          .isEqualTo(ErrorCode.INVALID_REQUEST);
+
+      then(contentRepository).should(never()).search(any());
+    }
   }
 
   // ===
