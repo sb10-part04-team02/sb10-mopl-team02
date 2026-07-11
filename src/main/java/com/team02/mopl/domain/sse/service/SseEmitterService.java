@@ -1,5 +1,7 @@
 package com.team02.mopl.domain.sse.service;
 
+import com.team02.mopl.domain.notification.exception.NotificationNotFoundException;
+import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.sse.repository.SseEmitterRepository;
 import java.io.IOException;
 import java.util.UUID;
@@ -17,6 +19,7 @@ public class SseEmitterService {
   private static final String CONNECT_EVENT_NAME = "connect";
 
   private final SseEmitterRepository sseEmitterRepository;
+  private final NotificationService notificationService;
 
   // 사용자별 SSE 연결을 생성하고 기존 연결이 있으면 새 연결로 교체
   public SseEmitter connect(UUID userId, String lastEventId) {
@@ -30,6 +33,7 @@ public class SseEmitterService {
     registerCallbacks(userId, emitter);
     sseEmitterRepository.save(userId, emitter).ifPresent(SseEmitter::complete);
     sendConnectEvent(userId, emitter);
+    recoverMissedNotifications(userId, lastEventId);
 
     return emitter;
   }
@@ -52,6 +56,23 @@ public class SseEmitterService {
     } catch (IOException e) {
       emitter.completeWithError(e);
       log.warn("SSE 연결 이벤트 전송 실패. userId={}", userId, e);
+    }
+  }
+
+  // 복구만 skip, 연결은 유지
+  private void recoverMissedNotifications(UUID userId, String lastEventId) {
+    if (lastEventId == null || lastEventId.isBlank()) {
+      return;
+    }
+
+    try {
+      UUID lastNotificationId = UUID.fromString(lastEventId);
+      notificationService.resendNotificationsAfter(userId, lastNotificationId);
+    } catch (IllegalArgumentException e) {
+      log.warn("잘못된 SSE Last-Event-ID 형식입니다. userId={}, lastEventId={}", userId, lastEventId, e);
+    } catch (NotificationNotFoundException e) {
+      log.warn(
+          "SSE Last-Event-ID에 해당하는 알림을 찾을 수 없습니다. userId={}, lastEventId={}", userId, lastEventId);
     }
   }
 

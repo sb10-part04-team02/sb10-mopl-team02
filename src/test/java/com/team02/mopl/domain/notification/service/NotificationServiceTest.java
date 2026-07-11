@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
@@ -20,6 +22,7 @@ import com.team02.mopl.domain.notification.enums.NotificationSortBy;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
 import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
+import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
@@ -397,6 +400,78 @@ class NotificationServiceTest {
             eq(receiverId),
             eq("notifications"),
             eq(notificationId.toString()),
+            any(NotificationDto.class));
+  }
+
+  @Test
+  @DisplayName("Last-Event-ID 이후 알림들을 SSE로 재전송한다")
+  void resendNotificationsAfter_sendsMissedNotifications() {
+    // given
+    UUID receiverId = UUID.randomUUID();
+    UUID lastNotificationId = UUID.randomUUID();
+
+    User receiver = new User("수신자", "receiver@mopl.io", "password", null, Role.USER, false);
+
+    Notification lastNotification =
+        new Notification(
+            receiver,
+            "마지막 수신 알림",
+            "마지막 수신 알림 내용",
+            NotificationLevel.INFO,
+            NotificationType.USER_FOLLOWED);
+
+    Notification missedNotification1 =
+        new Notification(
+            receiver,
+            "누락 알림 1",
+            "누락 알림 내용 1",
+            NotificationLevel.INFO,
+            NotificationType.USER_FOLLOWED);
+
+    Notification missedNotification2 =
+        new Notification(
+            receiver,
+            "누락 알림 2",
+            "누락 알림 내용 2",
+            NotificationLevel.INFO,
+            NotificationType.USER_FOLLOWED);
+
+    ReflectionTestUtils.setField(receiver, "id", receiverId);
+    ReflectionTestUtils.setField(lastNotification, "id", lastNotificationId);
+    ReflectionTestUtils.setField(
+        lastNotification, "createdAt", Instant.parse("2026-07-11T00:00:00Z"));
+    ReflectionTestUtils.setField(missedNotification1, "id", UUID.randomUUID());
+    ReflectionTestUtils.setField(
+        missedNotification1, "createdAt", Instant.parse("2026-07-11T00:01:00Z"));
+    ReflectionTestUtils.setField(missedNotification2, "id", UUID.randomUUID());
+    ReflectionTestUtils.setField(
+        missedNotification2, "createdAt", Instant.parse("2026-07-11T00:02:00Z"));
+
+    given(notificationRepository.findByIdAndReceiver_Id(lastNotificationId, receiverId))
+        .willReturn(Optional.of(lastNotification));
+    given(
+            notificationRepository.findUnreadNotificationsAfter(
+                receiverId, lastNotification.getCreatedAt()))
+        .willReturn(List.of(missedNotification1, missedNotification2));
+
+    // when
+    notificationService.resendNotificationsAfter(receiverId, lastNotificationId);
+
+    // then
+    then(sseEventService)
+        .should(times(1))
+        .send(
+            eq(receiverId),
+            eq("notifications"),
+            eq(missedNotification1.getId().toString()),
+            any(NotificationDto.class));
+
+    then(sseEventService)
+        .should(times(1))
+        .send(
+            eq(receiverId),
+            eq("notifications"),
+            eq(missedNotification2.getId().toString()),
             any(NotificationDto.class));
   }
 
