@@ -36,6 +36,7 @@ spring:
           auth: true
           starttls:
             enable: true    # TLS 보안설정
+            required: true
           connectiontimeout: 5000   # 연결대기시간 5초
           timeout: 5000             # 응답대기시간 5초
           writetimeout: 5000        # 쓰기대기시간 5초
