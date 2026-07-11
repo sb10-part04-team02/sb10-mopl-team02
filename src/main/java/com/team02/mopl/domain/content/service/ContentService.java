@@ -40,10 +40,9 @@ public class ContentService {
   private final WatcherCountService watcherCountService;
   private final FileStorage fileStorage;
 
-  // 썸네일 미제공 시 사용할 기본값.
+  // 썸네일 미제공 시 사용할 기본값. 앱 내장 정적 리소스(static/images/default-thumbnail.svg) URL.
   // 생성 폼 - 썸네일을 클라이언트단에서 필수로 강제하고 있으나 직접 API 호출 시 방어 목적.
   // project-mopl-fe-1.0.2/src/pages/contents/components/ContentFormDialog.tsx 98-101 lines
-  // TODO: S3 스토리지 구현 이슈에서 실제 기본 이미지의 절대 URL로 교체 예정
   @Value("${app.storage.default-thumbnail-url:}")
   private String defaultThumbnailUrl;
 
