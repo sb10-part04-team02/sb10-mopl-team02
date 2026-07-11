@@ -27,7 +27,7 @@ class CursorPageRequestTest {
     @ParameterizedTest
     @CsvSource({
       "-5, 1", // 음수 -> 하한 1로 클램프
-      "0, 1", // 0 -> 하한 1로 클램프 (미지정이 아닌 '보낸 값'으로 취급)
+      "0, 1", // 0 -> 하한 1로 클램프
       "1, 1", // 하한 경계
       "20, 20", // 기본 페이지 크기
       "100, 100", // 상한 경계
@@ -95,7 +95,6 @@ class CursorPageRequestTest {
     void invalid_whenIdAfterOnly() {
       // when & then
       assertThat(CursorPageRequest.isValidCursorCombo(null, UUID.randomUUID())).isFalse();
-      // 공백 커서 + idAfter도 cursor 부재로 취급되어 유효하지 않다
       assertThat(CursorPageRequest.isValidCursorCombo("  ", UUID.randomUUID())).isFalse();
     }
   }
