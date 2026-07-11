@@ -43,10 +43,12 @@ public class ContentService {
   private final WatcherCountService watcherCountService;
   private final FileStorage fileStorage;
 
-  // 썸네일 미제공 시 사용할 기본값.
+  // default-thumbnail-url 설정이 비어 있을 때 최종적으로 사용할 코드 레벨 fallback (앱 내장 정적 리소스)
+  private static final String FALLBACK_THUMBNAIL_URL = "/images/default-thumbnail.svg";
+
+  // 썸네일 미제공 시 사용할 기본값. 앱 내장 정적 리소스(static/images/default-thumbnail.svg) URL.
   // 생성 폼 - 썸네일을 클라이언트단에서 필수로 강제하고 있으나 직접 API 호출 시 방어 목적.
   // project-mopl-fe-1.0.2/src/pages/contents/components/ContentFormDialog.tsx 98-101 lines
-  // TODO: S3 스토리지 구현 이슈에서 실제 기본 이미지의 절대 URL로 교체 예정
   @Value("${app.storage.default-thumbnail-url:}")
   private String defaultThumbnailUrl;
 
@@ -56,7 +58,7 @@ public class ContentService {
     String thumbnailUrl =
         (thumbnail != null && !thumbnail.isEmpty())
             ? fileStorage.store(thumbnail)
-            : defaultThumbnailUrl;
+            : resolveDefaultThumbnailUrl();
     Content content =
         new Content(request.type(), request.title(), request.description(), thumbnailUrl);
     contentRepository.save(content);
@@ -68,6 +70,16 @@ public class ContentService {
         request.type(),
         tags.size());
     return contentMapper.toDto(content, tags, 0L);
+  }
+
+  // default-thumbnail-url 설정이 비어 있어도 500(blank 검증 실패)이 발생하지 않도록 코드 레벨 fallback 보장
+  private String resolveDefaultThumbnailUrl() {
+    if (defaultThumbnailUrl == null || defaultThumbnailUrl.isBlank()) {
+      log.warn(
+          "app.storage.default-thumbnail-url 미설정. 코드 레벨 fallback 사용: {}", FALLBACK_THUMBNAIL_URL);
+      return FALLBACK_THUMBNAIL_URL;
+    }
+    return defaultThumbnailUrl;
   }
 
   // 콘텐츠 단건 조회
