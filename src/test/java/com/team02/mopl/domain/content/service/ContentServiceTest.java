@@ -463,6 +463,33 @@ class ContentServiceTest {
       then(contentMapper).should().toDto(eq(content), mapperTagListCaptor.capture(), eq(0L));
       assertThat(mapperTagListCaptor.getValue()).extracting(Tag::getName).containsExactly("액션");
     }
+
+    @Test
+    @DisplayName("tags가 빈 리스트면 기존 태그를 모두 논리 삭제하고 새 태그는 저장하지 않는다")
+    void success_removesAllTags_whenTagsEmptyList() {
+      // given
+      UUID contentId = UUID.randomUUID();
+      Content content = contentWithId(contentId);
+      ContentUpdateRequest request = new ContentUpdateRequest(null, null, List.of());
+      Tag oldTag = new Tag(content, "SF");
+
+      given(contentRepository.findByIdAndDeletedAtIsNull(contentId))
+          .willReturn(Optional.of(content));
+      given(tagRepository.findByContentIdAndDeletedAtIsNull(contentId)).willReturn(List.of(oldTag));
+      given(watcherCountService.count(contentId)).willReturn(0L);
+      given(contentMapper.toDto(eq(content), anyList(), eq(0L)))
+          .willReturn(mockDto(contentId, List.of(), 0L));
+
+      // when
+      contentService.update(contentId, request, null);
+
+      // then: tags == null이면 유지되지만, 빈 리스트면 전부 제거된다
+      assertThat(oldTag.isDeleted()).isTrue();
+      then(tagRepository).should().flush();
+      then(tagRepository).should(never()).saveAll(any());
+      then(contentMapper).should().toDto(eq(content), mapperTagListCaptor.capture(), eq(0L));
+      assertThat(mapperTagListCaptor.getValue()).isEmpty();
+    }
   }
 
   @Nested
