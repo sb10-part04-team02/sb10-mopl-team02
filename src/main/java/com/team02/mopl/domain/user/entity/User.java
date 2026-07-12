@@ -11,6 +11,7 @@ import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.util.StringUtils;
 
 @Getter
 @Entity
@@ -53,7 +54,9 @@ public class User extends BaseMutableEntity {
   }
 
   public void updateProfile(String name, String profileImageUrl) {
-    this.name = Objects.requireNonNull(name, "name은 null일 수 없습니다.");
+    if (StringUtils.hasText(name)) {
+      this.name = name;
+    }
     this.profileImageUrl = profileImageUrl;
   }
 
