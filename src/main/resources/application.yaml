@@ -26,18 +26,28 @@ spring:
       max-file-size: 10MB     # 업로드 가능한 개별 파일의 최대 크기
       max-request-size: 20MB  # 단일 요청 전체의 최대 크기
 
+logging:
+  pattern:
+    correlation: "[%X{requestId:-}] "  # 전 프로파일 공통. 콘솔/파일 로그의 레벨 옆에 MDC requestId를 표시 (요청 밖 로그는 빈 값)
+
 app:
   admin:
     email: ${ADMIN_EMAIL}
     password: ${ADMIN_PASSWORD}
     name: ${ADMIN_NAME}
+  kafka:
+    consumer:
+      retry:
+        interval: 1s
+        max-retries: 3
   storage:
     local:
       base-path: storage   # 파일이 저장되는 디스크상의 디렉터리 경로
       base-url: /files     # 저장된 파일을 서빙하는 URL 경로 접두사
       public-base-url: ""  # dev에서만 절대 URL로 오버라이드
-    # 썸네일 미제공 시 내려줄 기본 URL
-    default-thumbnail-url: "" # TODO: S3 전환 후속 이슈에서 실제 기본 이미지의 절대 URL로 교체
+    # 썸네일 미제공 시 내려줄 기본 URL. 앱 내장 정적 리소스(static/images/default-thumbnail.svg)를 서빙
+    # prod는 상대 경로(동일 origin), dev는 application-dev.yaml에서 절대 URL로 오버라이드
+    default-thumbnail-url: /images/default-thumbnail.svg
   tmdb:
     access-token: ${TMDB_ACCESS_TOKEN:}  # v4 Read Access Token
     base-url: https://api.themoviedb.org/3
@@ -51,7 +61,7 @@ app:
     base-url: https://www.thesportsdb.com/api/v1/json
     connect-timeout: 3s
     read-timeout: 10s
-    leagues:  # 수집 대상 리그+시즌. 시즌 표기는 리그마다 다름
+    leagues: # 수집 대상 리그+시즌. 시즌 표기는 리그마다 다름
       - id: "4328"
         season: "2025-2026"  # English Premier League
   ingestion:
