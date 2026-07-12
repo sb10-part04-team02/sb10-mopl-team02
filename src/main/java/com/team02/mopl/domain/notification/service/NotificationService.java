@@ -17,6 +17,7 @@ import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
+import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
@@ -70,7 +71,7 @@ public class NotificationService {
         request.sortBy() != null ? request.sortBy() : NotificationSortBy.createdAt;
 
     if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new InvalidCursorRequestException();
     }
 
     Instant cursor = NotificationCursorConverter.toSortKey(sortBy, request.cursor());

@@ -1,6 +1,6 @@
 package com.team02.mopl.domain.watching.util;
 
-import com.team02.mopl.domain.watching.exception.InvalidWatchingCursorException;
+import com.team02.mopl.global.exception.InvalidCursorException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 
@@ -16,7 +16,7 @@ public final class WatchingSessionCursorConverter {
     try {
       return Instant.parse(cursor);
     } catch (DateTimeParseException e) {
-      throw new InvalidWatchingCursorException(cursor, e);
+      throw new InvalidCursorException("createdAt", cursor, e);
     }
   }
 }

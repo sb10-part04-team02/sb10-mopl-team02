@@ -2,7 +2,7 @@ package com.team02.mopl.domain.content.util;
 
 import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.enums.SortBy;
-import com.team02.mopl.domain.content.exception.InvalidCursorException;
+import com.team02.mopl.global.exception.InvalidCursorException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 
@@ -25,7 +25,7 @@ public final class ContentCursorConverter {
         case WATCHER_COUNT -> Long.valueOf(cursor);
       };
     } catch (DateTimeParseException | NumberFormatException e) {
-      throw new InvalidCursorException(sortBy, cursor);
+      throw new InvalidCursorException(sortBy.name(), cursor, e);
     }
   }
 

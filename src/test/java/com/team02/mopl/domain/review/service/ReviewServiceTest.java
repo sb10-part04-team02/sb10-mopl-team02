@@ -230,14 +230,14 @@ class ReviewServiceTest {
     }
 
     @Test
-    @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_REQUEST 예외가 발생한다")
+    @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_CURSOR_REQUEST 예외가 발생한다")
     void partialCursor_throwsInvalidRequest() {
       ReviewSearchRequest cursorOnly =
           new ReviewSearchRequest(contentId, "4.0", null, 10, null, ReviewSortBy.RATING);
       assertThatThrownBy(() -> reviewService.getReviews(cursorOnly))
           .isInstanceOfSatisfying(
               BusinessException.class,
-              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST));
 
       ReviewSearchRequest idAfterOnly =
           new ReviewSearchRequest(
@@ -245,7 +245,7 @@ class ReviewServiceTest {
       assertThatThrownBy(() -> reviewService.getReviews(idAfterOnly))
           .isInstanceOfSatisfying(
               BusinessException.class,
-              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST));
     }
 
     @ParameterizedTest

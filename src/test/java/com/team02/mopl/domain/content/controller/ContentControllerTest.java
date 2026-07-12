@@ -21,11 +21,11 @@ import com.team02.mopl.domain.content.dto.ContentUpdateRequest;
 import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.content.enums.SortBy;
 import com.team02.mopl.domain.content.exception.ContentNotFoundException;
-import com.team02.mopl.domain.content.exception.InvalidCursorException;
-import com.team02.mopl.domain.content.exception.InvalidCursorRequestException;
 import com.team02.mopl.domain.content.service.ContentService;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.exception.GlobalExceptionHandler;
+import com.team02.mopl.global.exception.InvalidCursorException;
+import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import com.team02.mopl.support.TestSecurityConfiguration;
 import java.util.List;
 import java.util.UUID;
@@ -231,7 +231,7 @@ class ContentControllerTest {
     void fail_shouldReturn400_whenInvalidCursor() throws Exception {
       // given
       given(contentService.getContents(any(ContentSearchRequest.class)))
-          .willThrow(new InvalidCursorException(SortBy.RATE, "abc"));
+          .willThrow(new InvalidCursorException(SortBy.RATE.name(), "abc", null));
 
       // when & then
       mockMvc
