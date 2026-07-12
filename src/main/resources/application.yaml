@@ -35,7 +35,7 @@ app:
     consumer:
       retry:
         interval: 1s
-        max-attempts: 3
+        max-retries: 3
   storage:
     local:
       base-path: storage   # 파일이 저장되는 디스크상의 디렉터리 경로

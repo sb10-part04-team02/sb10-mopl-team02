@@ -13,7 +13,8 @@ public class KafkaConsumerConfig {
   @Bean
   public DefaultErrorHandler kafkaDefaultErrorHandler(
       @Value("${app.kafka.consumer.retry.interval:1s}") Duration retryInterval,
-      @Value("${app.kafka.consumer.retry.max-attempts:3}") long maxAttempts) {
-    return new DefaultErrorHandler(new FixedBackOff(retryInterval.toMillis(), maxAttempts));
+      @Value("${app.kafka.consumer.retry.max-retries:3}") long maxRetries) {
+    // FixedBackOff의 두 번째 인자는 최초 처리 실패 이후 재시도 횟수다.
+    return new DefaultErrorHandler(new FixedBackOff(retryInterval.toMillis(), maxRetries));
   }
 }
