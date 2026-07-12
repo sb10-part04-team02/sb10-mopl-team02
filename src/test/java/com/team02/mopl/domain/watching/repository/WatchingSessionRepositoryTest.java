@@ -259,7 +259,7 @@ class WatchingSessionRepositoryTest extends RepositoryTestSupport {
   @Test
   @DisplayName("유저가 여러 콘텐츠에서 활성 세션을 가지면 가장 최근 세션을 반환한다")
   void findFirstByUser_multipleActiveSessions_returnsMostRecent() {
-    // given: 같은 유저가 서로 다른 콘텐츠에서 동시에 시청 중 (부분 유니크 인덱스는 콘텐츠별로만 1건 제한)
+    // given: 같은 유저가 서로 다른 콘텐츠에서 동시에 시청 중
     insertSession(contentId, userId, Instant.parse("2026-06-29T01:00:00Z"));
     UUID recent = insertSession(insertContent(), userId, Instant.parse("2026-06-29T03:00:00Z"));
     insertSession(insertContent(), userId, Instant.parse("2026-06-29T02:00:00Z"));
