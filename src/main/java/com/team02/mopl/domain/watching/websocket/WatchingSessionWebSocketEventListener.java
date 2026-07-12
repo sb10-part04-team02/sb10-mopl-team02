@@ -59,7 +59,7 @@ public class WatchingSessionWebSocketEventListener {
       contentId = UUID.fromString(matcher.group(1));
       userId = UUID.fromString(user.getName());
     } catch (IllegalArgumentException e) {
-      log.warn("잘못된 시청 세션 구독 대상입니다. destination={}", destination);
+      log.warn("watching.subscribe_invalid_destination destination={}", destination);
       return;
     }
 
@@ -71,9 +71,9 @@ public class WatchingSessionWebSocketEventListener {
           subscriptionId,
           new WatchingSubscription(change.watchingSession().id(), userId));
       broadcast(contentId, change);
-      log.debug("시청 세션 JOIN. contentId={}, userId={}", contentId, userId);
+      log.debug("watching.subscribe_joined contentId={} userId={}", contentId, userId);
     } catch (Exception e) {
-      log.warn("시청 세션 JOIN 처리 실패. contentId={}, userId={}", contentId, userId, e);
+      log.warn("watching.subscribe_join_failed contentId={} userId={}", contentId, userId, e);
     }
   }
 
@@ -100,7 +100,10 @@ public class WatchingSessionWebSocketEventListener {
           .leave(subscription.watchingSessionId(), subscription.userId())
           .ifPresent(change -> broadcast(change.watchingSession().content().id(), change));
     } catch (Exception e) {
-      log.warn("시청 세션 LEAVE 처리 실패. watchingSessionId={}", subscription.watchingSessionId(), e);
+      log.warn(
+          "watching.unsubscribe_leave_failed watchingSessionId={}",
+          subscription.watchingSessionId(),
+          e);
     }
   }
 
