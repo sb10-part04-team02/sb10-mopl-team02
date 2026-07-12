@@ -31,6 +31,11 @@ app:
     email: ${ADMIN_EMAIL}
     password: ${ADMIN_PASSWORD}
     name: ${ADMIN_NAME}
+  kafka:
+    consumer:
+      retry:
+        interval: 1s
+        max-attempts: 3
   storage:
     local:
       base-path: storage   # 파일이 저장되는 디스크상의 디렉터리 경로
@@ -51,7 +56,7 @@ app:
     base-url: https://www.thesportsdb.com/api/v1/json
     connect-timeout: 3s
     read-timeout: 10s
-    leagues:  # 수집 대상 리그+시즌. 시즌 표기는 리그마다 다름
+    leagues: # 수집 대상 리그+시즌. 시즌 표기는 리그마다 다름
       - id: "4328"
         season: "2025-2026"  # English Premier League
   ingestion:

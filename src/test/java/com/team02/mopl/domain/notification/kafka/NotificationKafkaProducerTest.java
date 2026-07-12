@@ -1,9 +1,11 @@
 package com.team02.mopl.domain.notification.kafka;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,10 +26,9 @@ class NotificationKafkaProducerTest {
 
   @Mock private KafkaTemplate<String, String> kafkaTemplate;
   @Mock private ObjectMapper objectMapper;
-  @Mock private SendResult<String, String> sendResult;
 
   @Test
-  @DisplayName("알림 Kafka 메시지를 JSON으로 직렬화해 토픽에 발행한다")
+  @DisplayName("알림 Kafka 메시지를 JSON으로 직렬화해 비동기로 토픽에 발행한다")
   void publish_success() throws Exception {
     // given
     NotificationKafkaProducer producer = new NotificationKafkaProducer(kafkaTemplate, objectMapper);
@@ -42,17 +43,17 @@ class NotificationKafkaProducerTest {
             NotificationType.USER_FOLLOWED);
 
     String payload = "{\"receiverId\":\"" + receiverId + "\"}";
+    CompletableFuture<SendResult<String, String>> pendingFuture = new CompletableFuture<>();
 
     given(objectMapper.writeValueAsString(message)).willReturn(payload);
     given(
             kafkaTemplate.send(
                 NotificationKafkaTopics.NOTIFICATION_EVENTS, receiverId.toString(), payload))
-        .willReturn(CompletableFuture.completedFuture(sendResult));
+        .willReturn(pendingFuture);
 
-    // when
-    producer.publish(message);
+    // when & then
+    assertThatCode(() -> producer.publish(message)).doesNotThrowAnyException();
 
-    // then
     then(objectMapper).should().writeValueAsString(message);
     then(kafkaTemplate)
         .should()
@@ -63,7 +64,7 @@ class NotificationKafkaProducerTest {
   }
 
   @Test
-  @DisplayName("알림 Kafka 메시지 직렬화에 실패하면 예외를 던진다")
+  @DisplayName("알림 Kafka 메시지 직렬화에 실패하면 예외를 던지고 Kafka 발행은 시도하지 않는다")
   void publish_fail_whenSerializationFails() throws Exception {
     // given
     NotificationKafkaProducer producer = new NotificationKafkaProducer(kafkaTemplate, objectMapper);
@@ -83,5 +84,7 @@ class NotificationKafkaProducerTest {
     assertThatThrownBy(() -> producer.publish(message))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("Failed to serialize notification kafka message.");
+
+    verifyNoInteractions(kafkaTemplate);
   }
 }
