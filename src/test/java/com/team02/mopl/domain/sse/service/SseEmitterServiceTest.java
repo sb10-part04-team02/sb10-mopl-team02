@@ -68,15 +68,16 @@ class SseEmitterServiceTest {
   }
 
   @Test
-  @DisplayName("Last-Event-ID가 있으면 SSE 연결 후 누락 알림 복구를 요청한다")
+  @DisplayName("Last-Event-ID가 알림 이벤트이면 SSE 연결 후 누락 알림 복구를 요청한다")
   void connect_withLastEventId_recoversMissedNotifications() {
     UUID userId = UUID.randomUUID();
     UUID lastNotificationId = UUID.randomUUID();
+    String lastEventId = SseEventId.notification(lastNotificationId.toString());
 
     given(sseEmitterRepository.save(eq(userId), any(SseEmitter.class)))
         .willReturn(Optional.empty());
 
-    SseEmitter result = sseEmitterService.connect(userId, lastNotificationId.toString());
+    SseEmitter result = sseEmitterService.connect(userId, lastEventId);
 
     assertThat(result).isNotNull();
     verify(notificationService).resendNotificationsAfter(userId, lastNotificationId);
@@ -91,6 +92,21 @@ class SseEmitterServiceTest {
         .willReturn(Optional.empty());
 
     SseEmitter result = sseEmitterService.connect(userId, null);
+
+    assertThat(result).isNotNull();
+    verify(notificationService, never()).resendNotificationsAfter(any(), any());
+  }
+
+  @Test
+  @DisplayName("Last-Event-ID가 알림 이벤트가 아니면 누락 알림 복구를 건너뛴다")
+  void connect_withNonNotificationLastEventId_skipsRecovery() {
+    UUID userId = UUID.randomUUID();
+    String lastEventId = SseEventId.directMessage(UUID.randomUUID().toString());
+
+    given(sseEmitterRepository.save(eq(userId), any(SseEmitter.class)))
+        .willReturn(Optional.empty());
+
+    SseEmitter result = sseEmitterService.connect(userId, lastEventId);
 
     assertThat(result).isNotNull();
     verify(notificationService, never()).resendNotificationsAfter(any(), any());
@@ -115,6 +131,7 @@ class SseEmitterServiceTest {
   void connect_whenLastNotificationNotFound_doesNotThrow() {
     UUID userId = UUID.randomUUID();
     UUID lastNotificationId = UUID.randomUUID();
+    String lastEventId = SseEventId.notification(lastNotificationId.toString());
 
     given(sseEmitterRepository.save(eq(userId), any(SseEmitter.class)))
         .willReturn(Optional.empty());
@@ -122,7 +139,7 @@ class SseEmitterServiceTest {
         .when(notificationService)
         .resendNotificationsAfter(userId, lastNotificationId);
 
-    SseEmitter result = sseEmitterService.connect(userId, lastNotificationId.toString());
+    SseEmitter result = sseEmitterService.connect(userId, lastEventId);
 
     assertThat(result).isNotNull();
     verify(notificationService).resendNotificationsAfter(userId, lastNotificationId);
@@ -146,7 +163,7 @@ class SseEmitterServiceTest {
   }
 
   @Test
-  @DisplayName("SSE 연결 시 초기 connect 이벤트를 전송한다")
+  @DisplayName("SSE 연결 후 초기 connect 이벤트를 전송한다")
   void connect_sendsConnectEvent() throws Exception {
     UUID userId = UUID.randomUUID();
     SseEmitter emitter = mock(SseEmitter.class);
@@ -262,6 +279,7 @@ class SseEmitterServiceTest {
   void connect_whenRecoverFails_doesNotThrow() {
     UUID userId = UUID.randomUUID();
     UUID lastNotificationId = UUID.randomUUID();
+    String lastEventId = SseEventId.notification(lastNotificationId.toString());
 
     given(sseEmitterRepository.save(eq(userId), any(SseEmitter.class)))
         .willReturn(Optional.empty());
@@ -269,7 +287,7 @@ class SseEmitterServiceTest {
         .when(notificationService)
         .resendNotificationsAfter(userId, lastNotificationId);
 
-    SseEmitter result = sseEmitterService.connect(userId, lastNotificationId.toString());
+    SseEmitter result = sseEmitterService.connect(userId, lastEventId);
 
     assertThat(result).isNotNull();
     verify(notificationService).resendNotificationsAfter(userId, lastNotificationId);

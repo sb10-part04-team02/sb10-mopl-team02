@@ -30,37 +30,49 @@ class SseEventServiceTest {
   @Test
   @DisplayName("연결된 emitter가 있으면 SSE 이벤트를 전송한다")
   void send_connectedEmitter_sendsEvent() throws Exception {
+    // given
     UUID receiverId = UUID.randomUUID();
+    String eventId = UUID.randomUUID().toString();
 
     given(sseEmitterRepository.findByUserId(receiverId)).willReturn(Optional.of(emitter));
 
-    sseEventService.send(receiverId, "notifications", UUID.randomUUID().toString(), "data");
+    // when
+    sseEventService.send(receiverId, "notifications", eventId, "data");
 
+    // then
     verify(emitter).send(any(SseEmitter.SseEventBuilder.class));
   }
 
   @Test
   @DisplayName("연결된 emitter가 없으면 이벤트 전송을 시도하지 않는다")
   void send_noEmitter_doesNothing() {
+    // given
     UUID receiverId = UUID.randomUUID();
+    String eventId = UUID.randomUUID().toString();
 
     given(sseEmitterRepository.findByUserId(receiverId)).willReturn(Optional.empty());
 
-    sseEventService.send(receiverId, "notifications", UUID.randomUUID().toString(), "data");
+    // when
+    sseEventService.send(receiverId, "notifications", eventId, "data");
 
+    // then
     verifyNoInteractions(emitter);
   }
 
   @Test
   @DisplayName("SSE 이벤트 전송에 실패하면 emitter를 제거한다")
   void send_sendFails_deletesEmitter() throws Exception {
+    // given
     UUID receiverId = UUID.randomUUID();
+    String eventId = UUID.randomUUID().toString();
 
     given(sseEmitterRepository.findByUserId(receiverId)).willReturn(Optional.of(emitter));
     doThrow(new IOException()).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
 
-    sseEventService.send(receiverId, "notifications", UUID.randomUUID().toString(), "data");
+    // when
+    sseEventService.send(receiverId, "notifications", eventId, "data");
 
+    // then
     verify(sseEmitterRepository).delete(receiverId, emitter);
   }
 }

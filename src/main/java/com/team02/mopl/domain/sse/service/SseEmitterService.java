@@ -4,6 +4,7 @@ import com.team02.mopl.domain.notification.exception.NotificationNotFoundExcepti
 import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.sse.repository.SseEmitterRepository;
 import java.io.IOException;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,7 +51,7 @@ public class SseEmitterService {
     try {
       emitter.send(
           SseEmitter.event()
-              .id(UUID.randomUUID().toString())
+              .id(SseEventId.connect(UUID.randomUUID()))
               .name(CONNECT_EVENT_NAME)
               .data("SSE 연결 성공"));
     } catch (IOException e) {
@@ -66,8 +67,17 @@ public class SseEmitterService {
     }
 
     try {
-      UUID lastNotificationId = UUID.fromString(lastEventId);
-      notificationService.resendNotificationsAfter(userId, lastNotificationId);
+      Optional<UUID> lastNotificationId = SseEventId.parseNotificationId(lastEventId);
+
+      if (lastNotificationId.isEmpty()) {
+        log.debug(
+            "알림 이벤트가 아닌 Last-Event-ID이므로 알림 복구를 건너뜁니다. userId={}, lastEventId={}",
+            userId,
+            lastEventId);
+        return;
+      }
+
+      notificationService.resendNotificationsAfter(userId, lastNotificationId.get());
     } catch (IllegalArgumentException e) {
       log.warn("잘못된 SSE Last-Event-ID 형식입니다. userId={}, lastEventId={}", userId, lastEventId, e);
     } catch (NotificationNotFoundException e) {
