@@ -1,10 +1,15 @@
+# docker-compose.yml (ELK 스택 - 로컬 개발용)
+#
+# 전체 흐름:
+#   앱 --(TCP 5000, JSON)--> Logstash --(HTTP 9200)--> Elasticsearch <--(조회)-- Kibana <-- 브라우저 :5601
 services:
+  # Elasticsearch - 로그를 실제로 저장하고 검색하는 엔진
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.4
     environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - discovery.type=single-node      # 단일 노드 모드
+      - xpack.security.enabled=false    # 보안 기능 비활성화 - 로컬 전용 설정
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m  # JVM 힙 메모리 설정
     ports:
       - "9200:9200"
     healthcheck:
@@ -14,19 +19,21 @@ services:
       retries: 12
       start_period: 30s
 
+  # Logstash - 앱이 보낸 TCP 로그를 받아 가공하여 ES에 적재하는 파이프라인
   logstash:
     image: docker.elastic.co/logstash/logstash:8.17.4
     environment:
       - LS_JAVA_OPTS=-Xms256m -Xmx256m
-      - XPACK_MONITORING_ENABLED=false
+      - XPACK_MONITORING_ENABLED=false  # Logstash 성능 지표를 ES로 보내는 기능 off - 로컬에서 불필요
     volumes:
-      - ./elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./elk/logstash/pipeline:/usr/share/logstash/pipeline:ro  # 파이프라인 설정 마운트
     ports:
       - "5000:5000"
     depends_on:
       elasticsearch:
         condition: service_healthy
 
+  # Kibana - ES에 쌓인 로그를 브라우저에서 보는 UI
   kibana:
     image: docker.elastic.co/kibana/kibana:8.17.4
     environment:
@@ -45,6 +52,9 @@ services:
       - kibana
     restart: "no"
     entrypoint: ["/bin/sh", "-c"]
+    # Kibana API가 응답할 때까지 3초 간격으로 최대 60번 폴링
+    # mopl-logs-* data view가 이미 있으면 그대로 종료
+    # 없으면 Kibana API에 POST를 날려 data view 생성
     command:
       - |
         i=0

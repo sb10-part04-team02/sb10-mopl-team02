@@ -4,20 +4,21 @@
   <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
   <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
 
+  <!-- 설정값을 로그 컨텍스트로 주입 -->
   <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="mopl"/>
 
-  <!-- dev에서만 로컬 Logstash(TCP 5000)로 JSON 로그 전송. appender가 비동기라
-       Logstash 미기동 시에도 앱은 블로킹 없이 정상 동작한다(버퍼 초과분 드롭). -->
+  <!-- dev에서만 로컬 Logstash(TCP 5000)로 JSON 로그 전송 -->
   <springProfile name="dev">
     <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
       <destination>${LOGSTASH_HOST:-localhost}:${LOGSTASH_PORT:-5000}</destination>
+      <!-- Encoder - 로그를 JSON으로 변환 -->
       <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-        <!-- context 포함 시 appName이 중복 필드로 실려서 customFields의 app만 남긴다 -->
+        <!-- context 포함 시 appName이 중복 필드로 실려서 customFields의 app만 남김 -->
         <includeContext>false</includeContext>
         <customFields>{"app":"${appName}"}</customFields>
       </encoder>
     </appender>
-    <root level="INFO">
+    <root level="DEBUG">
       <appender-ref ref="CONSOLE"/>
       <appender-ref ref="LOGSTASH"/>
     </root>
@@ -29,3 +30,12 @@
     </root>
   </springProfile>
 </configuration>
+
+<!--
+[dev 프로파일]
+  앱 로그 ─ LogstashEncoder(JSON+개행) ─ TCP 5000 ─> Logstash ─> Elasticsearch
+  └─ CONSOLE(사람이 읽는 색상 로그) ─> 터미널
+
+[!dev 프로파일]
+  앱 로그 ─ CONSOLE ─> 터미널만
+-->
