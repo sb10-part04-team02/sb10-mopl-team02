@@ -14,9 +14,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team02.mopl.domain.content.dto.ContentCreateRequest;
 import com.team02.mopl.domain.content.dto.ContentDto;
+import com.team02.mopl.domain.content.dto.ContentSearchRequest;
 import com.team02.mopl.domain.content.dto.ContentUpdateRequest;
 import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.content.exception.ContentNotFoundException;
+import com.team02.mopl.domain.content.exception.InvalidCursorRequestException;
 import com.team02.mopl.domain.content.service.ContentService;
 import com.team02.mopl.global.exception.GlobalExceptionHandler;
 import com.team02.mopl.support.TestSecurityConfiguration;
@@ -110,6 +112,25 @@ class ContentControllerTest {
           .perform(get("/api/contents/{contentId}", contentId))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.exceptionName").value("ContentNotFoundException"));
+    }
+  }
+
+  @Nested
+  class GetContents {
+
+    @Test
+    @DisplayName("cursor만 있고 idAfter가 없는 목록 조회 시 400과 InvalidCursorRequestException 에러 포맷을 반환한다")
+    void fail_shouldReturn400WithErrorFormat_whenHalfCursorGiven() throws Exception {
+      // given
+      given(contentService.getContents(any(ContentSearchRequest.class)))
+          .willThrow(new InvalidCursorRequestException());
+
+      // when & then
+      mockMvc
+          .perform(get("/api/contents").param("cursor", "somecursor"))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.exceptionName").value("InvalidCursorRequestException"))
+          .andExpect(jsonPath("$.details.cursor").exists());
     }
   }
 
