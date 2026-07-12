@@ -12,7 +12,6 @@ spring:
   sql:
     init:
       mode: never
-  #      schema-locations: classpath:01_schema_v8.sql
 
   jpa:
     hibernate:
