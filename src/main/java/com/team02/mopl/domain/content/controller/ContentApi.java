@@ -7,6 +7,7 @@ import com.team02.mopl.domain.content.dto.ContentUpdateRequest;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -63,7 +64,7 @@ public interface ContentApi {
         description = "서버 오류",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   })
-  ResponseEntity<ContentDto> getContent(UUID contentId);
+  ResponseEntity<ContentDto> getContent(@Parameter(description = "콘텐츠 ID") UUID contentId);
 
   // 콘텐츠 목록 조회 (커서 페이지네이션) - /api/contents
   @Operation(summary = "콘텐츠 목록 조회(커서 페이지네이션)", description = "커서 페이지네이션으로 콘텐츠 목록을 조회")
@@ -110,7 +111,9 @@ public interface ContentApi {
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   })
   ResponseEntity<ContentDto> updateContent(
-      UUID contentId, ContentUpdateRequest request, MultipartFile thumbnail);
+      @Parameter(description = "콘텐츠 ID") UUID contentId,
+      ContentUpdateRequest request,
+      MultipartFile thumbnail);
 
   // [어드민] 콘텐츠 삭제 - /api/contents/{contentId}
   @Operation(summary = "[어드민] 콘텐츠 삭제", description = "콘텐츠를 삭제합니다.")
@@ -137,5 +140,5 @@ public interface ContentApi {
         description = "서버 오류",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   })
-  ResponseEntity<Void> deleteContent(UUID contentId);
+  ResponseEntity<Void> deleteContent(@Parameter(description = "콘텐츠 ID") UUID contentId);
 }
