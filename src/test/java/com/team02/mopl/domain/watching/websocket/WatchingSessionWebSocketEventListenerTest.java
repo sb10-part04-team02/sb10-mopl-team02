@@ -2,6 +2,7 @@ package com.team02.mopl.domain.watching.websocket;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -124,6 +125,19 @@ class WatchingSessionWebSocketEventListenerTest {
     verifyNoInteractions(messagingTemplate);
     verify(watchingSessionService).join(contentId, userId);
     verifyNoMoreInteractions(watchingSessionService);
+  }
+
+  @Test
+  @DisplayName("실패 사유 전송 중 예외가 발생해도 전파하지 않는다")
+  void handleSubscribe_errorSendFails_doesNotPropagate() {
+    // given
+    given(watchingSessionService.join(contentId, userId)).willThrow(new ContentNotFoundException());
+    given(clientOutboundChannel.send(any())).willThrow(new RuntimeException("boom"));
+
+    // when & then
+    assertThatCode(
+            () -> listener.handleSubscribe(subscribeEvent("ws1", "sub1", watchDestination())))
+        .doesNotThrowAnyException();
   }
 
   @Test
