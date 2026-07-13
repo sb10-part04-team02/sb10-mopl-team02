@@ -94,6 +94,30 @@ docker compose -f docker-compose-elk.yml down      # 종료 (볼륨 없음 = 로
 > - Linux에서는 Elasticsearch 기동에 `sudo sysctl -w vm.max_map_count=262144`가 필요할 수 있습니다.
 > - macOS에서 포트 5000이 AirPlay Receiver와 충돌하면 `docker-compose-elk.yml`의 매핑을 `5001:5000`으로 바꾸고 `LOGSTASH_PORT=5001`로 실행하세요.
 
+### 3-2. 전체 로컬 QA 절차 (Kafka 포함)
+
+#### 1) 인프라 기동
+```bash
+docker compose -f docker-compose.distributed.yml up -d kafka   # Kafka 브로커 (localhost:9092)
+docker compose --env-file .env up -d --build                   # PostgreSQL + Redis
+docker compose -f docker-compose-elk.yml up -d                 # ELK (선택)
+```
+
+#### 2) 앱 실행
+```bash
+mkdir -p logs/app && set -a && source .env && set +a && ./gradlew bootRun 2>&1 | tee logs/app/$(date +%Y%m%d_%H%M%S).log
+```
+
+#### 3) QA 진행
+Swagger UI(http://localhost:8080/swagger-ui.html) 등에서 기능 테스트
+
+#### 4) 정리
+```bash
+docker compose down                                     # PostgreSQL + Redis 중지 (데이터 보존)
+docker compose -f docker-compose-elk.yml down           # ELK 중지
+docker compose -f docker-compose.distributed.yml down   # Kafka 중지
+```
+
 ### 4. 빌드
 
 ```bash
