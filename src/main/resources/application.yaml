@@ -41,10 +41,15 @@ app:
         interval: 1s
         max-retries: 3
   storage:
+    type: local            # 사용할 스토리지 구현체: local | s3
     local:
       base-path: storage   # 파일이 저장되는 디스크상의 디렉터리 경로
       base-url: /files     # 저장된 파일을 서빙하는 URL 경로 접두사
       public-base-url: ""  # dev에서만 절대 URL로 오버라이드
+    s3:
+      bucket: ""           # S3 버킷 이름 (운영에서 오버라이드)
+      region: ""           # 버킷 리전
+      base-url: ""         # 공개 접근 URL 접두사 (CDN)
     # 썸네일 미제공 시 내려줄 기본 URL. 앱 내장 정적 리소스(static/images/default-thumbnail.svg)를 서빙
     # prod는 상대 경로(동일 origin), dev는 application-dev.yaml에서 절대 URL로 오버라이드
     default-thumbnail-url: /images/default-thumbnail.svg

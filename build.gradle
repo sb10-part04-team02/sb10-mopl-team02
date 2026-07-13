@@ -30,6 +30,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.kafka:spring-kafka'
     implementation 'org.springframework.boot:spring-boot-starter-aop'
 
     // === 보안 / 인증 ===
@@ -39,13 +40,16 @@ dependencies {
     // === 실시간 통신 ===
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
-    // === 메시징 / 재시도 ===
-    implementation 'org.springframework.kafka:spring-kafka'
+    // === 재시도(Retry) ===
     implementation 'org.springframework.retry:spring-retry'
 
     // === 데이터 저장소 ===
     runtimeOnly 'org.postgresql:postgresql'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // === AWS SDK v2 (S3) ===
+    implementation platform('software.amazon.awssdk:bom:2.34.0')
+    implementation 'software.amazon.awssdk:s3'
 
     // === 로깅 ===
     // 로컬 ELK 수집용 JSON 로그 인코더 (logback-spring.xml의 LOGSTASH appender에서 사용)
@@ -76,6 +80,7 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.testcontainers:localstack'
     testImplementation 'org.springframework.kafka:spring-kafka-test'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
