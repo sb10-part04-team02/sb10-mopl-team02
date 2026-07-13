@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -116,6 +118,24 @@ class DirectMessageControllerTest {
         .andExpect(jsonPath("$.data").isEmpty())
         .andExpect(jsonPath("$.hasNext").value(false))
         .andExpect(jsonPath("$.totalCount").value(0));
+  }
+
+  @Test
+  @DisplayName("대화 생성 시 withUserId가 없으면 400을 반환한다")
+  void createConversation_missingWithUserId_returns400() throws Exception {
+    UUID userId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/api/conversations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}")
+                .with(authentication(new TestingAuthenticationToken(userId, null))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.exceptionName").value("MethodArgumentNotValidException"))
+        .andExpect(jsonPath("$.details.withUserId").exists());
+
+    verifyNoInteractions(directMessageService);
   }
 
   @Test
