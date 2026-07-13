@@ -91,6 +91,11 @@ class S3FileStorageTest {
     return url.substring((BASE_URL + "/").length());
   }
 
+  // 유효한 PNG 매직 바이트로 시작하는 페이로드 (매직 바이트 검증 통과용)
+  private static byte[] pngBytes() {
+    return new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+  }
+
   @Nested
   @DisplayName("store")
   class Store {
@@ -98,8 +103,7 @@ class S3FileStorageTest {
     @Test
     @DisplayName("파일을 S3에 업로드하고 baseUrl 접두사가 붙은 URL을 반환한다")
     void success_uploadsAndReturnsUrl() {
-      MockMultipartFile file =
-          new MockMultipartFile("file", "photo.png", "image/png", "hello".getBytes());
+      MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", pngBytes());
 
       String url = storage.store(file);
 
@@ -110,8 +114,7 @@ class S3FileStorageTest {
     @Test
     @DisplayName("업로드된 오브젝트에 장기 캐싱 Cache-Control 메타데이터가 설정된다")
     void success_setsCacheControlMetadata() {
-      MockMultipartFile file =
-          new MockMultipartFile("file", "cached.png", "image/png", "hello".getBytes());
+      MockMultipartFile file = new MockMultipartFile("file", "cached.png", "image/png", pngBytes());
 
       String url = storage.store(file);
 
@@ -157,7 +160,7 @@ class S3FileStorageTest {
     void success_setsContentTypeFromExtension() {
       // 클라이언트가 잘못된/누락된 content-type을 보내도 확장자(.png)로 image/png를 재결정
       MockMultipartFile file =
-          new MockMultipartFile("file", "spoofed.png", "application/octet-stream", "hi".getBytes());
+          new MockMultipartFile("file", "wrongtype.png", "application/octet-stream", pngBytes());
 
       String url = storage.store(file);
 
@@ -173,8 +176,7 @@ class S3FileStorageTest {
     @Test
     @DisplayName("저장된 파일의 URL로 삭제하면 S3에서 오브젝트가 사라진다")
     void success_deletesObject() {
-      MockMultipartFile file =
-          new MockMultipartFile("file", "doc.png", "image/png", "data".getBytes());
+      MockMultipartFile file = new MockMultipartFile("file", "doc.png", "image/png", pngBytes());
       String url = storage.store(file);
       String key = keyOf(url);
       assertThat(objectExists(key)).isTrue();
@@ -210,8 +212,7 @@ class S3FileStorageTest {
           .thenThrow(SdkException.builder().message("network error").build());
       S3FileStorage failing = new S3FileStorage(mockS3, BUCKET, BASE_URL);
 
-      MockMultipartFile file =
-          new MockMultipartFile("file", "photo.png", "image/png", "hello".getBytes());
+      MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", pngBytes());
 
       assertThatThrownBy(() -> failing.store(file)).isInstanceOf(BusinessException.class);
     }
