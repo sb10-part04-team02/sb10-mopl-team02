@@ -3,6 +3,10 @@ package com.team02.mopl.global.storage;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.team02.mopl.global.exception.BusinessException;
 import org.junit.jupiter.api.AfterAll;
@@ -17,11 +21,15 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.exception.SdkException;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 // Testcontainers를 사용해 실제 S3 대신 LocalStack(로컬 AWS 애뮬레이터) 컨테이너를 띄워 테스트
 // 즉 실제 AWS 자격증명/네트워크 없이도 S3 동작을 검증할 수 있는 통합 테스트 구성
@@ -155,6 +163,45 @@ class S3FileStorageTest {
                 storage.delete("https://other.example.com/foo/bar.png");
               })
           .doesNotThrowAnyException();
+    }
+  }
+
+  // S3Client가 SdkException(네트워크/자격증명 등)을 던지는 실패 경로는 LocalStack으로 재현하기 어려우므로 모킹으로 검증
+  @Nested
+  @DisplayName("store (failure)")
+  class StoreFailure {
+
+    @Test
+    @DisplayName("S3 업로드 실패 시 BusinessException으로 전환한다")
+    void fail_whenS3ThrowsSdkException() {
+      S3Client mockS3 = mock(S3Client.class);
+      when(mockS3.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+          .thenThrow(SdkException.builder().message("network error").build());
+      S3FileStorage failing = new S3FileStorage(mockS3, BUCKET, BASE_URL);
+
+      MockMultipartFile file =
+          new MockMultipartFile("file", "photo.png", "image/png", "hello".getBytes());
+
+      assertThatThrownBy(() -> failing.store(file)).isInstanceOf(BusinessException.class);
+    }
+  }
+
+  @Nested
+  @DisplayName("delete (failure)")
+  class DeleteFailure {
+
+    @Test
+    @DisplayName("S3 삭제 실패 시 예외를 전파하지 않고 로그만 남긴다")
+    void fail_whenS3ThrowsSdkException_doesNotPropagate() {
+      S3Client mockS3 = mock(S3Client.class);
+      doThrow(SdkException.builder().message("access denied").build())
+          .when(mockS3)
+          .deleteObject(any(DeleteObjectRequest.class));
+      S3FileStorage failing = new S3FileStorage(mockS3, BUCKET, BASE_URL);
+
+      String url = BASE_URL + "/some-key.png";
+
+      assertThatCode(() -> failing.delete(url)).doesNotThrowAnyException();
     }
   }
 }

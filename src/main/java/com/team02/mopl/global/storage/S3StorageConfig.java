@@ -1,5 +1,6 @@
 package com.team02.mopl.global.storage;
 
+import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -19,6 +20,12 @@ public class S3StorageConfig {
     return S3Client.builder()
         .region(Region.of(region))
         .credentialsProvider(DefaultCredentialsProvider.builder().build())
+        // SDK 기본값은 apiCallTimeout이 무제한이라, 네트워크 지연 시 업로드 요청이 장시간 대기할 수 있어 명시
+        .overrideConfiguration(
+            builder ->
+                builder
+                    .apiCallTimeout(Duration.ofSeconds(30))
+                    .apiCallAttemptTimeout(Duration.ofSeconds(15)))
         .build();
   }
 }

@@ -61,7 +61,8 @@ public class S3FileStorage implements FileStorage {
       return baseUrl + "/" + key;
     } catch (IOException | SdkException e) {
       // SdkException은 S3 서버 응답 오류(S3Exception)와 클라이언트 측 오류(네트워크/자격증명)를 모두 포함
-      throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+      log.error("S3 파일 저장 실패: bucket={}, key={}", bucket, key, e);
+      throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, e);
     }
   }
 
