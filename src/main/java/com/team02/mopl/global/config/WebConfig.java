@@ -1,16 +1,17 @@
 package com.team02.mopl.global.config;
 
-import com.team02.mopl.global.util.StringToEnumConverterFactory;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.format.FormatterRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 // 로컬 디스크에 저장된 업로드 파일을 baseUrl(예: /files) 경로로 서빙
 @Configuration
+// 로컬 정적 서빙은 local 스토리지 모드에서만 필요 (s3 모드에서는 CloudFront가 서빙)
+@ConditionalOnProperty(name = "app.storage.type", havingValue = "local", matchIfMissing = true)
 public class WebConfig implements WebMvcConfigurer {
 
   private final String basePath;
@@ -32,11 +33,5 @@ public class WebConfig implements WebMvcConfigurer {
     }
     // 예: /files/** -> file:///.../storage/
     registry.addResourceHandler(baseUrl + "/**").addResourceLocations(location);
-  }
-
-  @Override
-  public void addFormatters(FormatterRegistry registry) {
-    // Enum Converter 추가
-    registry.addConverterFactory(new StringToEnumConverterFactory());
   }
 }
