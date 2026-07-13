@@ -2,6 +2,7 @@ package com.team02.mopl.global.config;
 
 import com.team02.mopl.domain.notification.redis.NotificationRedisChannels;
 import com.team02.mopl.domain.notification.redis.NotificationSseFanOutSubscriber;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
@@ -20,6 +21,10 @@ public class RedisConfig {
   }
 
   @Bean
+  @ConditionalOnProperty(
+      name = "app.notification.redis-fan-out.enabled",
+      havingValue = "true",
+      matchIfMissing = true)
   public TaskExecutor redisMessageListenerTaskExecutor() {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
     executor.setThreadNamePrefix("redis-listener-");
@@ -31,6 +36,10 @@ public class RedisConfig {
   }
 
   @Bean
+  @ConditionalOnProperty(
+      name = "app.notification.redis-fan-out.enabled",
+      havingValue = "true",
+      matchIfMissing = true)
   public RedisMessageListenerContainer redisMessageListenerContainer(
       RedisConnectionFactory connectionFactory,
       NotificationSseFanOutSubscriber notificationSseFanOutSubscriber,

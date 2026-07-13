@@ -12,6 +12,10 @@ spring:
     show-sql: false
 
 app:
+  notification:
+    redis-fan-out:
+      enabled: false
+
   tmdb:
     access-token: dummy-token-for-testing
   sportsdb:
