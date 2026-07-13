@@ -19,6 +19,15 @@ Client -> CloudFlare -> ALB -> ECS Task(사이드카) -> RDS / ElastiCache
 - 리전: `ap-northeast-2` (서울)
 - 계정 ID: `882321772989`
 - VPC: `vpc-0a10a5fb4abe8967a` (기본 VPC, 4 서브넷 / 4 AZ)
+- 접속 주소: `https://api.mopl2.cloud` (CloudFlare → ALB)
+
+## CloudFlare (10단계)
+
+- 도메인: `mopl2.cloud` (가비아 구매, 네임서버를 CloudFlare로 변경)
+- 네임서버: `alberto.ns.cloudflare.com`, `dee.ns.cloudflare.com`
+- DNS 레코드: `api` CNAME → `mopl-alb-69451351.ap-northeast-2.elb.amazonaws.com` (Proxied, 주황 구름)
+- HTTPS: CloudFlare Universal SSL 자동 발급. 클라이언트↔CloudFlare HTTPS, CloudFlare↔ALB HTTP(80).
+- 프론트는 `VITE_API_BASE_URL=https://api.mopl2.cloud`로 설정 필요.
 
 ## 생성된 리소스
 
@@ -127,7 +136,7 @@ ADMIN_PASSWORD  -> mopl/admin-password
 - [x] 7단계 서비스 기동 확인 (태스크 RUNNING/HEALTHY, 타겟 healthy, ALB 200)
 - [x] 8단계 (사이드카에 통합됨)
 - [x] 9단계 ALB / 타겟 그룹 / 리스너
-- [ ] 10단계 CloudFlare 도메인
+- [x] 10단계 CloudFlare 도메인 / HTTPS (api.mopl2.cloud)
 
 ## 기동 확인 결과 (7단계)
 

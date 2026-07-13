@@ -112,6 +112,25 @@
   - `GET /` → `200`, `GET /api/contents` → `401`(인증 요구, 정상)
 - 결론: 1차 배포 앱이 인터넷에서 정상 동작. 남은 건 CloudFlare 도메인/HTTPS(10단계)뿐.
 
+## 10. CloudFlare 도메인 / HTTPS
+
+- 도메인 `mopl2.cloud`를 가비아에서 구매(첫해 2,750원). CloudFlare Registrar는 국제 도메인만 팔아 `.kr`이 필요없어 가비아 선택. 안전잠금은 네임서버 변경을 막으므로 구매 시 끔.
+- CloudFlare에 사이트 추가(Free) → 네임서버 2개(`alberto.ns.cloudflare.com`, `dee.ns.cloudflare.com`) 발급.
+- 가비아 네임서버를 위 2개로 교체 → 전파 확인(약 3분).
+- DNS 레코드: `api` CNAME → ALB DNS, Proxied(주황 구름). 주황 구름이어야 CloudFlare가 HTTPS를 대신 처리.
+- Universal SSL 인증서 자동 발급(약 2분). 발급 전엔 HTTPS 핸드셰이크 실패(정상 초기 상태), HTTP는 즉시 동작.
+- 암호화 모드: CloudFlare↔ALB는 HTTP(80)이므로 Flexible 필요. 기본값으로 200 통과 확인.
+- 최종: `https://api.mopl2.cloud/actuator/health` → 200 UP.
+
+### 로그인 / 리프레시 토큰 문제 진단 (배포 중 발견)
+
+- 증상: HTTP(ALB 직접 접속)에서 프론트 로그인 안 되고, 새로고침 시 인증 풀림.
+- 원인: 리프레시 토큰 쿠키가 `Secure`(`JwtUtils.java`)라 HTTPS에서만 저장/전송됨. HTTP 접속이라 브라우저가 `REFRESH_TOKEN` 쿠키를 버림 → 로그인 상태 유지 안 됨, `/api/auth/refresh` 실패 → 프론트 자동 로그아웃.
+- 배포 버그 아님. 코드는 정상(프로덕션 HTTPS 전제). 로컬은 어드민 계정 + `localhost`(브라우저가 Secure 쿠키를 HTTP에서도 허용)라 안 드러남.
+- 해결: CloudFlare HTTPS 적용으로 자동 해결. HTTPS에서 회원가입/로그인/리프레시 전 과정 검증 완료(REFRESH_TOKEN Secure 쿠키 정상 저장, 리프레시 토큰 rotation 동작).
+- 참고: 로그인 파라미터명은 `username`(Spring formLogin 기본값). 프론트도 `username`으로 이메일을 보냄(정상). `email`로 보내면 실패.
+- 참고: 프론트/API가 같은 루트 도메인이어야 `SameSite=Lax` 쿠키가 실림. `api.*` 서브도메인 구성이라 프론트를 같은 루트 도메인에 배포하면 코드 변경 불필요.
+
 ## 진행 상태
 
 - [x] 0. IAM 사용자/권한 (`mopl-jiho`, 임시 Admin)
@@ -123,7 +142,7 @@
 - [x] 6. IAM 역할 / Secrets / ECS 클러스터 / Task Definition / 서비스
 - [x] 7. 서비스 기동 확인 (`/actuator/health` UP, ALB 200)
 - [x] 9. ALB 연결
-- [ ] 10. CloudFlare 도메인 / HTTPS
+- [x] 10. CloudFlare 도메인 / HTTPS (`https://api.mopl2.cloud`)
 
 ## 후속 이슈
 
