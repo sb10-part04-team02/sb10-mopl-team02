@@ -7,9 +7,9 @@ import com.team02.mopl.domain.notification.entity.Notification;
 import com.team02.mopl.domain.notification.enums.NotificationSortBy;
 import com.team02.mopl.domain.notification.exception.NotificationForbiddenException;
 import com.team02.mopl.domain.notification.exception.NotificationNotFoundException;
+import com.team02.mopl.domain.notification.redis.NotificationSseFanOutPublisher;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
 import com.team02.mopl.domain.notification.util.NotificationCursorConverter;
-import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.dto.CursorPageRequest;
@@ -37,11 +37,9 @@ import org.springframework.validation.annotation.Validated;
 @Transactional(readOnly = true)
 public class NotificationService {
 
-  private static final String NOTIFICATION_EVENT_NAME = "notifications";
-
   private final NotificationRepository notificationRepository;
   private final UserRepository userRepository;
-  private final SseEventService sseEventService;
+  private final NotificationSseFanOutPublisher notificationSseFanOutPublisher;
 
   @Transactional
   public NotificationDto createNotification(@Valid NotificationCreateCommand command) {
@@ -161,14 +159,10 @@ public class NotificationService {
 
   private void sendNotification(NotificationDto notificationDto) {
     try {
-      sseEventService.send(
-          notificationDto.receiverId(),
-          NOTIFICATION_EVENT_NAME,
-          notificationDto.id().toString(),
-          notificationDto);
+      notificationSseFanOutPublisher.publish(notificationDto);
     } catch (RuntimeException e) {
       log.warn(
-          "알림 SSE event 전송 실패. notificationId={}, receiverId={}",
+          "알림 Redis Pub/Sub fan-out 발행 실패. notificationId={}, receiverId={}",
           notificationDto.id(),
           notificationDto.receiverId(),
           e);

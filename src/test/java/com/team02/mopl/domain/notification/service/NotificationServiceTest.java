@@ -20,8 +20,8 @@ import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.enums.NotificationSortBy;
 import com.team02.mopl.domain.notification.exception.NotificationNotFoundException;
+import com.team02.mopl.domain.notification.redis.NotificationSseFanOutPublisher;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
-import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -36,6 +36,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -50,7 +51,7 @@ class NotificationServiceTest {
 
   @Mock private UserRepository userRepository;
 
-  @Mock private SseEventService sseEventService;
+  @Mock private NotificationSseFanOutPublisher notificationSseFanOutPublisher;
 
   @InjectMocks private NotificationService notificationService;
 
@@ -86,8 +87,8 @@ class NotificationServiceTest {
   }
 
   @Test
-  @DisplayName("알림 생성 후 notifications SSE 이벤트를 전송한다")
-  void createNotification_sendsSseEvent() {
+  @DisplayName("알림 생성 후 Redis Pub/Sub fan-out 이벤트를 발행한다")
+  void createNotification_publishesFanOutEvent() {
     UUID receiverId = UUID.randomUUID();
     UUID notificationId = UUID.randomUUID();
     User receiver = mockUser(receiverId);
@@ -106,8 +107,7 @@ class NotificationServiceTest {
 
     NotificationDto result = notificationService.createNotification(command);
 
-    verify(sseEventService)
-        .send(eq(receiverId), eq("notifications"), eq(notificationId.toString()), eq(result));
+    verify(notificationSseFanOutPublisher).publish(result);
   }
 
   @Test
@@ -326,8 +326,8 @@ class NotificationServiceTest {
   }
 
   @Test
-  @DisplayName("트랜잭션 동기화가 활성화되어 있으면 커밋 이후 SSE 이벤트를 전송한다")
-  void createNotification_transactionActive_sendsSseAfterCommit() {
+  @DisplayName("트랜잭션 동기화가 활성화되어 있으면 커밋 이후 Redis Pub/Sub fan-out 이벤트를 발행한다")
+  void createNotification_transactionActive_publishesFanOutAfterCommit() {
     UUID receiverId = UUID.randomUUID();
     UUID notificationId = UUID.randomUUID();
     User receiver = mockUser(receiverId);
@@ -349,22 +349,20 @@ class NotificationServiceTest {
     try {
       NotificationDto result = notificationService.createNotification(command);
 
-      verify(sseEventService, never())
-          .send(any(UUID.class), any(String.class), any(String.class), any(NotificationDto.class));
+      verify(notificationSseFanOutPublisher, never()).publish(any(NotificationDto.class));
 
       TransactionSynchronizationManager.getSynchronizations()
           .forEach(TransactionSynchronization::afterCommit);
 
-      verify(sseEventService)
-          .send(eq(receiverId), eq("notifications"), eq(notificationId.toString()), eq(result));
+      verify(notificationSseFanOutPublisher).publish(result);
     } finally {
       TransactionSynchronizationManager.clearSynchronization();
     }
   }
 
   @Test
-  @DisplayName("SSE 전송에 실패해도 알림 생성 결과를 반환한다")
-  void createNotification_sseSendFails_stillReturnsNotificationDto() {
+  @DisplayName("Redis Pub/Sub fan-out 발행에 실패해도 알림 생성 결과를 반환한다")
+  void createNotification_fanOutPublishFails_stillReturnsNotificationDto() {
     UUID receiverId = UUID.randomUUID();
     UUID notificationId = UUID.randomUUID();
     User receiver = mockUser(receiverId);
@@ -381,13 +379,9 @@ class NotificationServiceTest {
               return notification;
             });
 
-    doThrow(new RuntimeException("SSE 전송 실패"))
-        .when(sseEventService)
-        .send(
-            eq(receiverId),
-            eq("notifications"),
-            eq(notificationId.toString()),
-            any(NotificationDto.class));
+    doThrow(new RuntimeException("Redis publish failed"))
+        .when(notificationSseFanOutPublisher)
+        .publish(any(NotificationDto.class));
 
     NotificationDto result = notificationService.createNotification(command);
 
@@ -396,18 +390,12 @@ class NotificationServiceTest {
     assertThat(result.title()).isEqualTo("알림 제목");
 
     verify(notificationRepository).save(any(Notification.class));
-    verify(sseEventService)
-        .send(
-            eq(receiverId),
-            eq("notifications"),
-            eq(notificationId.toString()),
-            any(NotificationDto.class));
+    verify(notificationSseFanOutPublisher).publish(any(NotificationDto.class));
   }
 
   @Test
-  @DisplayName("Last-Event-ID 이후 알림들을 SSE로 재전송한다")
-  void resendNotificationsAfter_sendsMissedNotifications() {
-    // given
+  @DisplayName("Last-Event-ID 이후 알림들을 Redis Pub/Sub fan-out으로 재전송한다")
+  void resendNotificationsAfter_publishesMissedNotifications() {
     UUID receiverId = UUID.randomUUID();
     UUID lastNotificationId = UUID.randomUUID();
 
@@ -455,51 +443,39 @@ class NotificationServiceTest {
                 receiverId, lastNotification.getCreatedAt(), lastNotificationId))
         .willReturn(List.of(missedNotification1, missedNotification2));
 
-    // when
     notificationService.resendNotificationsAfter(receiverId, lastNotificationId);
 
-    // then
-    then(sseEventService)
-        .should(times(1))
-        .send(
-            eq(receiverId),
-            eq("notifications"),
-            eq(missedNotification1.getId().toString()),
-            any(NotificationDto.class));
+    ArgumentCaptor<NotificationDto> notificationCaptor =
+        ArgumentCaptor.forClass(NotificationDto.class);
 
-    then(sseEventService)
-        .should(times(1))
-        .send(
-            eq(receiverId),
-            eq("notifications"),
-            eq(missedNotification2.getId().toString()),
-            any(NotificationDto.class));
+    then(notificationSseFanOutPublisher).should(times(2)).publish(notificationCaptor.capture());
+
+    assertThat(notificationCaptor.getAllValues())
+        .extracting(NotificationDto::id)
+        .containsExactly(missedNotification1.getId(), missedNotification2.getId());
   }
 
   @Test
   @DisplayName("Last-Event-ID에 해당하는 알림이 없으면 NotificationNotFoundException을 던진다")
   void resendNotificationsAfter_throwsException_whenLastNotificationNotFound() {
-    // given
     UUID receiverId = UUID.randomUUID();
     UUID lastNotificationId = UUID.randomUUID();
 
     given(notificationRepository.findByIdAndReceiver_Id(lastNotificationId, receiverId))
         .willReturn(Optional.empty());
 
-    // when & then
     assertThatThrownBy(
             () -> notificationService.resendNotificationsAfter(receiverId, lastNotificationId))
         .isInstanceOf(NotificationNotFoundException.class);
 
     then(notificationRepository).should().findByIdAndReceiver_Id(lastNotificationId, receiverId);
     then(notificationRepository).should(never()).findUnreadNotificationsAfter(any(), any(), any());
-    then(sseEventService).shouldHaveNoInteractions();
+    then(notificationSseFanOutPublisher).shouldHaveNoInteractions();
   }
 
   @Test
-  @DisplayName("Last-Event-ID 이후 누락 알림이 없으면 SSE를 전송하지 않는다")
-  void resendNotificationsAfter_doesNotSend_whenNoMissedNotifications() {
-    // given
+  @DisplayName("Last-Event-ID 이후 누락 알림이 없으면 fan-out 이벤트를 발행하지 않는다")
+  void resendNotificationsAfter_doesNotPublish_whenNoMissedNotifications() {
     UUID receiverId = UUID.randomUUID();
     UUID lastNotificationId = UUID.randomUUID();
 
@@ -525,15 +501,13 @@ class NotificationServiceTest {
                 receiverId, lastNotification.getCreatedAt(), lastNotificationId))
         .willReturn(List.of());
 
-    // when
     notificationService.resendNotificationsAfter(receiverId, lastNotificationId);
 
-    // then
     then(notificationRepository)
         .should()
         .findUnreadNotificationsAfter(
             receiverId, lastNotification.getCreatedAt(), lastNotificationId);
-    then(sseEventService).shouldHaveNoInteractions();
+    then(notificationSseFanOutPublisher).shouldHaveNoInteractions();
   }
 
   private Notification createNotificationWithIdAndCreatedAt(
