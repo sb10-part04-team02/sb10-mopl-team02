@@ -1,5 +1,9 @@
 package com.team02.mopl.global.storage;
 
+import static com.team02.mopl.global.storage.FileStorageUtils.extractExtension;
+import static com.team02.mopl.global.storage.FileStorageUtils.stripTrailingSlash;
+import static com.team02.mopl.global.storage.FileStorageUtils.validateImage;
+
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import java.io.IOException;
@@ -42,10 +46,8 @@ public class S3FileStorage implements FileStorage {
   // 업로드된 파일을 S3에 저장하고 접근 가능한 URL을 반환
   @Override
   public String store(MultipartFile file) {
-    if (file == null || file.isEmpty()) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
-    // TODO: 허용 확장자 타입 화이트리스트 검증 추가
+    // 확장자 화이트리스트 검증 후 확장자 기준의 정식 image content-type을 사용 (클라이언트 값 스푸핑/누락 방지)
+    String contentType = validateImage(file);
     // 파일명 충돌 방지 - UUID + 원본확장자를 오브젝트 key로 사용
     String key = UUID.randomUUID() + extractExtension(file.getOriginalFilename());
     try {
@@ -53,7 +55,7 @@ public class S3FileStorage implements FileStorage {
           PutObjectRequest.builder()
               .bucket(bucket)
               .key(key)
-              .contentType(file.getContentType())
+              .contentType(contentType)
               .cacheControl(CACHE_CONTROL)
               .build();
       s3.putObject(request, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
@@ -84,22 +86,5 @@ public class S3FileStorage implements FileStorage {
       // 서버 응답 오류뿐 아니라 네트워크/자격증명 등 클라이언트 측 오류도 삼켜, 삭제 실패가 호출자에게 전파되지 않도록 한다
       log.warn("S3 파일 삭제 실패: {}", url, e); // 삭제 실패는 로그만 남김
     }
-  }
-
-  // 원본 파일명에서 확장자를 추출
-  private String extractExtension(String originalFilename) {
-    if (!StringUtils.hasText(originalFilename)) {
-      return "";
-    }
-    int dot = originalFilename.lastIndexOf('.'); // 마지막 . 의 위치 찾아서
-    return dot >= 0 ? originalFilename.substring(dot) : ""; // . 있으면 그 위치부터 끝까지를 확장자로 반환
-  }
-
-  // baseUrl 끝의 슬래시를 제거 (key와 결합 시 슬래시 중복 방지)
-  private String stripTrailingSlash(String value) {
-    if (!StringUtils.hasText(value)) {
-      return "";
-    }
-    return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
   }
 }

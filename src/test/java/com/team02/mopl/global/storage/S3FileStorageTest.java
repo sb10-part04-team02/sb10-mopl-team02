@@ -133,6 +133,37 @@ class S3FileStorageTest {
 
       assertThatThrownBy(() -> storage.store(empty)).isInstanceOf(BusinessException.class);
     }
+
+    @Test
+    @DisplayName("허용되지 않는 확장자면 BusinessException을 던진다")
+    void fail_whenExtensionNotAllowed() {
+      MockMultipartFile txt =
+          new MockMultipartFile("file", "note.txt", "text/plain", "hello".getBytes());
+
+      assertThatThrownBy(() -> storage.store(txt)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    @DisplayName("확장자가 없으면 BusinessException을 던진다")
+    void fail_whenNoExtension() {
+      MockMultipartFile noExt =
+          new MockMultipartFile("file", "photo", "image/png", "hello".getBytes());
+
+      assertThatThrownBy(() -> storage.store(noExt)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    @DisplayName("클라이언트 content-type이 잘못돼도 확장자 기준으로 정식 content-type을 지정한다")
+    void success_setsContentTypeFromExtension() {
+      // 클라이언트가 잘못된/누락된 content-type을 보내도 확장자(.png)로 image/png를 재결정
+      MockMultipartFile file =
+          new MockMultipartFile("file", "spoofed.png", "application/octet-stream", "hi".getBytes());
+
+      String url = storage.store(file);
+
+      var head = s3.headObject(HeadObjectRequest.builder().bucket(BUCKET).key(keyOf(url)).build());
+      assertThat(head.contentType()).isEqualTo("image/png");
+    }
   }
 
   @Nested
@@ -143,7 +174,7 @@ class S3FileStorageTest {
     @DisplayName("저장된 파일의 URL로 삭제하면 S3에서 오브젝트가 사라진다")
     void success_deletesObject() {
       MockMultipartFile file =
-          new MockMultipartFile("file", "doc.txt", "text/plain", "data".getBytes());
+          new MockMultipartFile("file", "doc.png", "image/png", "data".getBytes());
       String url = storage.store(file);
       String key = keyOf(url);
       assertThat(objectExists(key)).isTrue();
