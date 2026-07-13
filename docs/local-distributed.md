@@ -27,15 +27,70 @@ cp .env.example .env
 
 필수 환경변수는 다음과 같습니다.
 
-```text
-DB_NAME
-DB_USERNAME
-DB_PASSWORD
-JWT_SECRET_KEY
-ADMIN_EMAIL
-ADMIN_NAME
-ADMIN_PASSWORD
-```
+## AWS 배포 시 환경변수 매핑
+
+로컬 `.env`에는 Docker Compose 실행에 필요한 최소값만 작성합니다.
+일부 값은 `docker-compose.distributed.yml`에서 컨테이너 환경변수로 직접 주입합니다.
+
+AWS ECS 배포 시에는 아래 값들을 Task Definition의 environment 또는 secrets로 매핑해야 합니다.
+
+### 로컬 `.env`에 필요한 값
+
+- `DB_NAME`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `JWT_SECRET_KEY`
+- `ADMIN_EMAIL`
+- `ADMIN_NAME`
+- `ADMIN_PASSWORD`
+
+### AWS ECS에서 매핑해야 하는 값
+
+- `DB_URL`
+    - 로컬: `jdbc:postgresql://db:5432/${DB_NAME:-mopl}`
+    - AWS: RDS PostgreSQL JDBC URL
+
+- `DB_USERNAME`
+    - AWS: RDS 사용자명
+
+- `DB_PASSWORD`
+    - AWS: RDS 비밀번호
+    - Secrets Manager 또는 ECS Secret 권장
+
+- `REDIS_HOST`
+    - 로컬: `redis`
+    - AWS: ElastiCache Redis endpoint
+
+- `REDIS_PORT`
+    - 로컬: `6379`
+    - AWS: ElastiCache Redis port
+
+- `KAFKA_BOOTSTRAP_SERVERS`
+    - 로컬: `kafka:29092`
+    - AWS/운영: Confluent Cloud bootstrap server
+
+- `KAFKA_CONSUMER_GROUP_ID`
+    - 로컬: `mopl-local`
+    - AWS/운영: 환경별 consumer group id
+
+- `TMDB_ACCESS_TOKEN`
+    - 영화/드라마 콘텐츠 수집용 TMDB API access token
+    - 운영 환경에서는 ECS Secret 또는 Secrets Manager 관리 권장
+    - 수집 기능을 사용하지 않는 환경에서는 비워둘 수 있음
+
+- `SPORTSDB_API_KEY`
+    - 스포츠 콘텐츠 수집용 The Sports DB API key
+    - 운영 환경에서는 ECS Secret 또는 Secrets Manager 관리 권장
+    - 수집 기능을 사용하지 않는 환경에서는 비워둘 수 있음
+
+- `JWT_SECRET_KEY`
+    - Secrets Manager 또는 ECS Secret 권장
+
+- `ADMIN_EMAIL`
+- `ADMIN_NAME`
+- `ADMIN_PASSWORD`
+    - 초기 관리자 계정 설정
+    - `ADMIN_PASSWORD`는 secret으로 관리 권장
 
 `.env` 파일은 비밀값을 포함할 수 있으므로 Git에 커밋하지 않습니다.
 
