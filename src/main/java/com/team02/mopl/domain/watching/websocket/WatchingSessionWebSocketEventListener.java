@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team02.mopl.domain.watching.dto.WatchingSessionChange;
 import com.team02.mopl.domain.watching.service.WatchingSessionService;
 import com.team02.mopl.domain.watching.websocket.WatchingSubscriptionRegistry.WatchingSubscription;
+import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorResponse;
 import java.security.Principal;
 import java.util.Map;
@@ -135,9 +136,19 @@ public class WatchingSessionWebSocketEventListener {
       accessor.setDestination(destination);
       accessor.setContentType(MimeTypeUtils.APPLICATION_JSON);
       accessor.setLeaveMutable(true);
-      byte[] payload =
-          objectMapper.writeValueAsBytes(
-              new ErrorResponse(e.getClass().getSimpleName(), e.getMessage(), Map.of()));
+      // GlobalExceptionHandler와 동일한 노출 정책: 비즈니스 예외만 메시지를 노출하고,
+      // 그 외 시스템 예외는 내부 정보가 새지 않도록 일반 메시지로 감춘다.
+      ErrorResponse errorResponse =
+          e instanceof BusinessException businessException
+              ? new ErrorResponse(
+                  businessException.getClass().getSimpleName(),
+                  businessException.getErrorCode().getMessage(),
+                  businessException.getDetails())
+              : new ErrorResponse(
+                  "InternalServerException",
+                  "서버 내부 오류가 발생했습니다.",
+                  Map.of("reason", "관리자에게 문의해주세요."));
+      byte[] payload = objectMapper.writeValueAsBytes(errorResponse);
       clientOutboundChannel.send(
           MessageBuilder.createMessage(payload, accessor.getMessageHeaders()));
     } catch (Exception sendError) {

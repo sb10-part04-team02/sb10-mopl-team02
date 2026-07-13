@@ -128,6 +128,22 @@ class WatchingSessionWebSocketEventListenerTest {
   }
 
   @Test
+  @DisplayName("join이 시스템 예외로 실패하면 내부 오류 메시지를 감추고 일반 오류로 전송한다")
+  void handleSubscribe_joinFailsWithSystemException_masksInternalMessage() {
+    // given
+    given(watchingSessionService.join(contentId, userId))
+        .willThrow(new RuntimeException("내부 구현 정보"));
+
+    // when
+    listener.handleSubscribe(subscribeEvent("ws1", "sub1", watchDestination()));
+
+    // then
+    verify(clientOutboundChannel).send(errorMessageCaptor.capture());
+    String payload = new String(errorMessageCaptor.getValue().getPayload(), StandardCharsets.UTF_8);
+    assertThat(payload).contains("InternalServerException").doesNotContain("내부 구현 정보");
+  }
+
+  @Test
   @DisplayName("실패 사유 전송 중 예외가 발생해도 전파하지 않는다")
   void handleSubscribe_errorSendFails_doesNotPropagate() {
     // given
