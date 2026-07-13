@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./src/main/resources/01_schema_v8.sql:/docker-entrypoint-initdb.d/01_schema_v8.sql:ro
+      - ./src/main/resources/01_schema_v9.sql:/docker-entrypoint-initdb.d/01_schema_v9.sql:ro
     ports:
       - "5432:5432"
     healthcheck:

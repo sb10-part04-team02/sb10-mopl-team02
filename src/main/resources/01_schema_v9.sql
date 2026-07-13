@@ -8,6 +8,7 @@ CREATE COLLATION IF NOT EXISTS ko_icu (
 -- users
 -- watching_sessions, playlists, notifications, follows, reviews, tags, direct_messages, conversation_members, social_accounts
 -- playlist_subscriptions, playlist_contents
+-- redis_outboxes(인프라용)
 --==================================================================================================
 
 CREATE TABLE contents
@@ -229,7 +230,6 @@ CREATE TABLE redis_outboxes
     target          VARCHAR(20) NOT NULL,
     command_type    VARCHAR(50) NOT NULL
 );
-
 
 --==================================================================================================
 -- Partial unique indexes (활성 행만 유니크: deleted_at IS NULL)
