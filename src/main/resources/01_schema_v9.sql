@@ -218,6 +218,18 @@ CREATE TABLE playlist_contents
     CONSTRAINT fk_playlist_contents_playlists FOREIGN KEY (playlist_id) REFERENCES playlists (id) ON DELETE CASCADE
 );
 
+--==================================================================================================
+
+CREATE TABLE redis_outboxes
+(
+    id              UUID PRIMARY KEY,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at      TIMESTAMPTZ NULL,
+    target_id       UUID        NOT NULL,
+    target          VARCHAR(20) NOT NULL,
+    command_type    VARCHAR(50) NOT NULL
+);
+
 
 --==================================================================================================
 -- Partial unique indexes (활성 행만 유니크: deleted_at IS NULL)
@@ -279,3 +291,11 @@ CREATE INDEX ix_direct_messages_conversation_created_id
 
 CREATE INDEX ix_watching_sessions_content_created_id
     ON watching_sessions (content_id, created_at, id) WHERE exited_at IS NULL AND deleted_at IS NULL;
+
+--==================================================================================================
+-- 재시도와 청소 스케줄러를 위한 복합 인덱스
+--==================================================================================================
+CREATE INDEX ix_redis_outboxes_retry
+    ON redis_outboxes (deleted_at, created_at) WHERE deleted_at IS NULL;
+CREATE INDEX ix_redis_outboxes_cleanup
+    ON redis_outboxes (deleted_at) WHERE deleted_at IS NOT NULL;
