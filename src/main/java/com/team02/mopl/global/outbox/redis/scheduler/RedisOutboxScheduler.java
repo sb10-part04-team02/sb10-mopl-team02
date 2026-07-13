@@ -35,7 +35,11 @@ public class RedisOutboxScheduler {
 
     try {
       List<RedisCommandOutbox> outboxes =
-          outboxRepository.findAllByDeletedAtIsNullOrderByCreatedAtAsc();
+          outboxRepository
+              // 5회 이하의 retryCount, processed가 false, deleted_at이 null인 1000개 항목
+              // 5회 초과해서 softDeleted된 항목들은 로그를 확인하고 수동으로 삭제 필요
+              .findTop1000ByProcessedFalseAndDeletedAtIsNullAndRetryCountLessThanEqualOrderByCreatedAtAsc(
+              outboxService.getRetryCountThreshold());
 
       for (RedisCommandOutbox outbox : outboxes) {
         try {
@@ -47,11 +51,24 @@ public class RedisOutboxScheduler {
               outbox.getCommandType(),
               e.getMessage());
           // 재시도 실패시 retryCount 추가
-          outboxService.increaseRetryCount(outbox);
+          executeRetryCountIncrease(outbox);
         }
       }
     } finally {
       lockManager.releaseLock(RETRY_FAIL_COMMAND_KEY, lockValue);
+    }
+  }
+
+  private void executeRetryCountIncrease(RedisCommandOutbox outbox) {
+    try {
+      outboxService.increaseRetryCount(outbox);
+    } catch (Exception e) {
+      log.error(
+          "[Outbox] 재시도 카운트 증가 실패: outboxId={}, target={}, commandType={}, reason={}",
+          outbox.getId(),
+          outbox.getTarget(),
+          outbox.getCommandType(),
+          e.getMessage());
     }
   }
 

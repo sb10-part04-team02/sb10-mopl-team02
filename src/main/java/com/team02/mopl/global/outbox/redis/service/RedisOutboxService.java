@@ -4,11 +4,14 @@ import com.team02.mopl.global.outbox.redis.entity.RedisCommandOutbox;
 import com.team02.mopl.global.outbox.redis.entity.RedisOutBoxProcessor;
 import com.team02.mopl.global.outbox.redis.repository.RedisCommandOutboxRepository;
 import java.util.List;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RedisOutboxService {
@@ -16,6 +19,7 @@ public class RedisOutboxService {
   private final List<RedisOutBoxProcessor> processors;
   private static final Integer DELETE_LIMIT_COUNT = 1000;
 
+  @Getter
   @Value("${app.redis.outbox.maximum-retry-threshold}")
   private int retryCountThreshold;
 
@@ -47,6 +51,7 @@ public class RedisOutboxService {
 
     if (outbox.isFailedPermanently(retryCountThreshold)) {
       outbox.delete();
+      log.warn("[Outbox] outbox 임계값 초과로 softDeleted가 진행되었습니다: outboxId={}", outbox.getId());
     }
     outboxRepository.save(outbox); // 준영속 상태라 명시적 save 진행
   }

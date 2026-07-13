@@ -8,7 +8,6 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
 import com.team02.mopl.global.outbox.redis.entity.RedisCommandOutbox;
@@ -43,8 +42,13 @@ class RedisOutboxSchedulerTest {
       String lockValue = "lockValue";
       given(lockManager.acquireLock(anyString(), any(Duration.class))).willReturn(lockValue);
 
+      int retryCountThreshold = 5;
+      given(outboxService.getRetryCountThreshold()).willReturn(retryCountThreshold);
       RedisCommandOutbox mockOutbox = mock(RedisCommandOutbox.class);
-      given(outboxRepository.findAllByDeletedAtIsNullOrderByCreatedAtAsc())
+      given(
+              outboxRepository
+                  .findTop1000ByProcessedFalseAndDeletedAtIsNullAndRetryCountLessThanEqualOrderByCreatedAtAsc(
+                      retryCountThreshold))
           .willReturn(List.of(mockOutbox));
 
       // when
@@ -65,7 +69,35 @@ class RedisOutboxSchedulerTest {
       outboxScheduler.retryFailRedisCommands();
 
       // then
-      then(outboxRepository).should(never()).findAllByDeletedAtIsNullOrderByCreatedAtAsc();
+      then(outboxRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("재시도 카운트 증가 도중 예외가 발생해도 스케줄러를 차단하지 않고 다음 outbox를 처리한다")
+    void success_shouldContinueProcessingNextOutbox_whenRetryCountIncrementFails() {
+      // given
+      String lockValue = "lockValue";
+      given(lockManager.acquireLock(anyString(), any(Duration.class))).willReturn(lockValue);
+
+      int retryCountThreshold = 5;
+      given(outboxService.getRetryCountThreshold()).willReturn(retryCountThreshold);
+      RedisCommandOutbox mockOutbox = mock(RedisCommandOutbox.class);
+      given(
+              outboxRepository
+                  .findTop1000ByProcessedFalseAndDeletedAtIsNullAndRetryCountLessThanEqualOrderByCreatedAtAsc(
+                      retryCountThreshold))
+          .willReturn(List.of(mockOutbox));
+
+      willThrow(IllegalArgumentException.class).given(outboxService).processOutbox(mockOutbox);
+      willThrow(RuntimeException.class).given(outboxService).increaseRetryCount(mockOutbox);
+
+      // when
+      outboxScheduler.retryFailRedisCommands();
+
+      // then
+      then(outboxService).should().processOutbox(mockOutbox);
+      then(outboxService).should().increaseRetryCount(mockOutbox);
+      then(lockManager).should(times(1)).releaseLock(anyString(), eq(lockValue));
     }
 
     @Test
@@ -75,8 +107,13 @@ class RedisOutboxSchedulerTest {
       String lockValue = "lockValue";
       given(lockManager.acquireLock(anyString(), any(Duration.class))).willReturn(lockValue);
 
+      int retryCountThreshold = 5;
+      given(outboxService.getRetryCountThreshold()).willReturn(retryCountThreshold);
       RedisCommandOutbox mockOutbox = mock(RedisCommandOutbox.class);
-      given(outboxRepository.findAllByDeletedAtIsNullOrderByCreatedAtAsc())
+      given(
+              outboxRepository
+                  .findTop1000ByProcessedFalseAndDeletedAtIsNullAndRetryCountLessThanEqualOrderByCreatedAtAsc(
+                      retryCountThreshold))
           .willReturn(List.of(mockOutbox));
 
       willThrow(IllegalArgumentException.class).given(outboxService).processOutbox(mockOutbox);

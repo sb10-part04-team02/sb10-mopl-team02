@@ -9,9 +9,17 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface RedisCommandOutboxRepository extends JpaRepository<RedisCommandOutbox, UUID> {
 
-  List<RedisCommandOutbox> findAllByDeletedAtIsNullOrderByCreatedAtAsc();
+  List<RedisCommandOutbox>
+      findTop1000ByProcessedFalseAndDeletedAtIsNullAndRetryCountLessThanEqualOrderByCreatedAtAsc(
+          int count);
 
   @Modifying
-  @Query("DELETE FROM RedisCommandOutbox o WHERE o.processed = true")
+  @Query(
+      value =
+          """
+  DELETE FROM redis_outboxes
+   WHERE id IN (SELECT id FROM redis_outboxes WHERE processed = true ORDER BY id LIMIT 1000)
+""",
+      nativeQuery = true)
   int deleteTop1000ByProcessedTrue();
 }

@@ -110,6 +110,7 @@ class RedisOutboxServiceTest {
       outboxService.increaseRetryCount(mockOutbox);
 
       // then
+      then(mockOutbox).should(times(1)).incrementRetryCount();
       then(mockOutbox).should(times(1)).delete();
       then(outboxRepository).should().save(mockOutbox);
     }
