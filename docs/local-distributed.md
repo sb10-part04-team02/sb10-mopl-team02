@@ -9,6 +9,7 @@ Docker Compose로 로컬에서 다음 컨테이너를 실행합니다.
 - `app-2`: Spring Boot 인스턴스 2, 직접 접근 `localhost:8082`
 - `db`: PostgreSQL
 - `redis`: Redis
+- `kafka`: Kafka broker, 로컬 접근 `localhost:9092`
 
 요청 흐름은 다음과 같습니다.
 
@@ -26,15 +27,70 @@ cp .env.example .env
 
 필수 환경변수는 다음과 같습니다.
 
-```text
-DB_NAME
-DB_USERNAME
-DB_PASSWORD
-JWT_SECRET_KEY
-ADMIN_EMAIL
-ADMIN_NAME
-ADMIN_PASSWORD
-```
+## AWS 배포 시 환경변수 매핑
+
+로컬 `.env`에는 Docker Compose 실행에 필요한 최소값만 작성합니다.
+일부 값은 `docker-compose.distributed.yml`에서 컨테이너 환경변수로 직접 주입합니다.
+
+AWS ECS 배포 시에는 아래 값들을 Task Definition의 environment 또는 secrets로 매핑해야 합니다.
+
+### 로컬 `.env`에 필요한 값
+
+- `DB_NAME`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `JWT_SECRET_KEY`
+- `ADMIN_EMAIL`
+- `ADMIN_NAME`
+- `ADMIN_PASSWORD`
+
+### AWS ECS에서 매핑해야 하는 값
+
+- `DB_URL`
+    - 로컬: `jdbc:postgresql://db:5432/${DB_NAME:-mopl}`
+    - AWS: RDS PostgreSQL JDBC URL
+
+- `DB_USERNAME`
+    - AWS: RDS 사용자명
+
+- `DB_PASSWORD`
+    - AWS: RDS 비밀번호
+    - Secrets Manager 또는 ECS Secret 권장
+
+- `REDIS_HOST`
+    - 로컬: `redis`
+    - AWS: ElastiCache Redis endpoint
+
+- `REDIS_PORT`
+    - 로컬: `6379`
+    - AWS: ElastiCache Redis port
+
+- `KAFKA_BOOTSTRAP_SERVERS`
+    - 로컬: `kafka:29092`
+    - AWS/운영: Confluent Cloud bootstrap server
+
+- `KAFKA_CONSUMER_GROUP_ID`
+    - 로컬: `mopl-local`
+    - AWS/운영: 환경별 consumer group id
+
+- `TMDB_ACCESS_TOKEN`
+    - 영화/드라마 콘텐츠 수집용 TMDB API access token
+    - 운영 환경에서는 ECS Secret 또는 Secrets Manager 관리 권장
+    - 수집 기능을 사용하지 않는 환경에서는 비워둘 수 있음
+
+- `SPORTSDB_API_KEY`
+    - 스포츠 콘텐츠 수집용 The Sports DB API key
+    - 운영 환경에서는 ECS Secret 또는 Secrets Manager 관리 권장
+    - 수집 기능을 사용하지 않는 환경에서는 비워둘 수 있음
+
+- `JWT_SECRET_KEY`
+    - Secrets Manager 또는 ECS Secret 권장
+
+- `ADMIN_EMAIL`
+- `ADMIN_NAME`
+- `ADMIN_PASSWORD`
+    - 초기 관리자 계정 설정
+    - `ADMIN_PASSWORD`는 secret으로 관리 권장
 
 `.env` 파일은 비밀값을 포함할 수 있으므로 Git에 커밋하지 않습니다.
 
@@ -50,7 +106,7 @@ docker compose -f docker-compose.distributed.yml --env-file .env up -d --build
 docker compose -f docker-compose.distributed.yml --env-file .env ps
 ```
 
-`app-1`, `app-2`, `db`, `redis`가 `healthy` 또는 `Up` 상태이고, `nginx`가 `Up` 상태이면 정상입니다.
+`app-1`, `app-2`, `db`, `redis`, `kafka`가 `healthy` 또는 `Up` 상태이고, `nginx`가 `Up` 상태이면 정상입니다.
 
 ## 접속 주소
 
@@ -102,3 +158,5 @@ docker compose -f docker-compose.distributed.yml --env-file .env down -v
 
 `down -v`를 사용하면 PostgreSQL/Redis 볼륨 데이터도 삭제됩니다.  
 일반적인 종료는 `down`만 사용합니다.
+
+- [로컬 Redis/Kafka 검증 방법](local-redis-kafka.md)

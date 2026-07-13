@@ -97,6 +97,26 @@ public class NotificationService {
         data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.name(), direction.name());
   }
 
+  // 알림 재연결
+  public void resendNotificationsAfter(UUID receiverId, UUID lastNotificationId) {
+    Notification lastNotification =
+        notificationRepository
+            .findByIdAndReceiver_Id(lastNotificationId, receiverId)
+            .orElseThrow(NotificationNotFoundException::new);
+
+    List<NotificationDto> missedNotifications =
+        notificationRepository
+            .findUnreadNotificationsAfter(
+                receiverId, lastNotification.getCreatedAt(), lastNotificationId)
+            .stream()
+            .map(NotificationDto::from)
+            .toList();
+
+    for (NotificationDto notificationDto : missedNotifications) {
+      sendNotificationAfterCommit(notificationDto);
+    }
+  }
+
   // 읽음 처리
   @Transactional
   public void markAsRead(UUID notificationId, UUID receiverId) {

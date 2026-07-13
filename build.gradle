@@ -30,6 +30,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.kafka:spring-kafka'
     implementation 'org.springframework.boot:spring-boot-starter-aop'
 
     // === 보안 / 인증 ===
@@ -76,6 +77,7 @@ dependencies {
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:localstack'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -92,9 +94,9 @@ jacoco {
 
 // 커버리지 측정에서 제외할 자동 생성·측정 불가 코드
 def jacocoExcludes = [
-    '**/entity/Q*.class',       // QueryDSL 자동생성
-    '**/*MapperImpl.class',     // MapStruct 자동생성(@Generated가 SOURCE 유지라 자동제외 안 됨)
-    '**/MoplApplication.class'  // 부트스트랩(main 메서드만 존재)
+        '**/entity/Q*.class',       // QueryDSL 자동생성
+        '**/*MapperImpl.class',     // MapStruct 자동생성(@Generated가 SOURCE 유지라 자동제외 안 됨)
+        '**/MoplApplication.class'  // 부트스트랩(main 메서드만 존재)
 ]
 
 jacocoTestReport {

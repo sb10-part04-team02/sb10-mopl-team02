@@ -28,3 +28,7 @@ app:
       bucket: ${AWS_S3_BUCKET}
       region: ${AWS_S3_REGION}
       base-url: ${AWS_S3_BASE_URL}
+  ingestion:
+    scheduler:
+      enabled: ${INGESTION_SCHEDULER_ENABLED:true}
+      cron: ${INGESTION_SCHEDULER_CRON:0 0 4 * * *}
