@@ -8,11 +8,12 @@
     "cpuArchitecture": "ARM64",
     "operatingSystemFamily": "LINUX"
   },
-  "executionRoleArn": "arn:aws:iam::882321772989:role/moplEcsTaskExecutionRole",
+  "executionRoleArn": "${EXECUTION_ROLE_ARN}",
+  "taskRoleArn": "${TASK_ROLE_ARN}",
   "containerDefinitions": [
     {
       "name": "app",
-      "image": "882321772989.dkr.ecr.ap-northeast-2.amazonaws.com/mopl-app:v1",
+      "image": "${ECR_REGISTRY}/mopl-app:${APP_IMAGE_TAG}",
       "essential": true,
       "portMappings": [
         { "containerPort": 8080, "protocol": "tcp" }
@@ -20,18 +21,21 @@
       "environment": [
         { "name": "SPRING_PROFILES_ACTIVE", "value": "prod" },
         { "name": "SERVER_PORT", "value": "8080" },
-        { "name": "DB_URL", "value": "jdbc:postgresql://mopl-db.cb8u426m4qh3.ap-northeast-2.rds.amazonaws.com:5432/mopl" },
-        { "name": "DB_USERNAME", "value": "mopl" },
-        { "name": "REDIS_HOST", "value": "mopl-redis.gx6t57.ng.0001.apn2.cache.amazonaws.com" },
+        { "name": "DB_URL", "value": "${DB_URL}" },
+        { "name": "DB_USERNAME", "value": "${DB_USERNAME}" },
+        { "name": "REDIS_HOST", "value": "${REDIS_HOST}" },
         { "name": "REDIS_PORT", "value": "6379" },
-        { "name": "ADMIN_EMAIL", "value": "admin@mopl.com" },
-        { "name": "ADMIN_NAME", "value": "admin" },
-        { "name": "INGESTION_SCHEDULER_ENABLED", "value": "false" }
+        { "name": "ADMIN_EMAIL", "value": "${ADMIN_EMAIL}" },
+        { "name": "ADMIN_NAME", "value": "${ADMIN_NAME}" },
+        { "name": "INGESTION_SCHEDULER_ENABLED", "value": "false" },
+        { "name": "AWS_S3_BUCKET", "value": "${AWS_S3_BUCKET}" },
+        { "name": "AWS_S3_REGION", "value": "${AWS_S3_REGION}" },
+        { "name": "AWS_S3_BASE_URL", "value": "${AWS_S3_BASE_URL}" }
       ],
       "secrets": [
-        { "name": "DB_PASSWORD", "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:882321772989:secret:mopl/db-password-Dn23SU" },
-        { "name": "JWT_SECRET_KEY", "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:882321772989:secret:mopl/jwt-secret-NeCyJ6" },
-        { "name": "ADMIN_PASSWORD", "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:882321772989:secret:mopl/admin-password-65ebE8" }
+        { "name": "DB_PASSWORD", "valueFrom": "${DB_PASSWORD_SECRET_ARN}" },
+        { "name": "JWT_SECRET_KEY", "valueFrom": "${JWT_SECRET_ARN}" },
+        { "name": "ADMIN_PASSWORD", "valueFrom": "${ADMIN_PASSWORD_SECRET_ARN}" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"],
@@ -44,14 +48,14 @@
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/mopl",
-          "awslogs-region": "ap-northeast-2",
+          "awslogs-region": "${AWS_REGION}",
           "awslogs-stream-prefix": "app"
         }
       }
     },
     {
       "name": "nginx",
-      "image": "882321772989.dkr.ecr.ap-northeast-2.amazonaws.com/mopl-nginx:v1",
+      "image": "${ECR_REGISTRY}/mopl-nginx:${NGINX_IMAGE_TAG}",
       "essential": true,
       "portMappings": [
         { "containerPort": 80, "protocol": "tcp" }
@@ -63,7 +67,7 @@
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/mopl",
-          "awslogs-region": "ap-northeast-2",
+          "awslogs-region": "${AWS_REGION}",
           "awslogs-stream-prefix": "nginx"
         }
       }
