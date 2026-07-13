@@ -5,11 +5,13 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 
 public interface RedisCommandOutboxRepository extends JpaRepository<RedisCommandOutbox, UUID> {
 
   List<RedisCommandOutbox> findAllByDeletedAtIsNullOrderByCreatedAtAsc();
 
   @Modifying
-  int deleteTop1000ByDeletedAtIsNotNull();
+  @Query("DELETE FROM RedisCommandOutbox o WHERE o.processed = true")
+  int deleteTop1000ByProcessedTrue();
 }

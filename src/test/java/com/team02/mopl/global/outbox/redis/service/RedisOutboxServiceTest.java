@@ -2,9 +2,11 @@ package com.team02.mopl.global.outbox.redis.service;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
 import com.team02.mopl.global.outbox.redis.entity.RedisCommandOutbox;
@@ -45,7 +47,7 @@ class RedisOutboxServiceTest {
 
       // then
       then(mockProcessor).should(times(1)).process(mockOutbox);
-      then(mockOutbox).should(times(1)).delete();
+      then(mockOutbox).should(times(1)).markProcessed();
       then(outboxRepository).should(times(1)).save(mockOutbox);
     }
 
@@ -61,7 +63,7 @@ class RedisOutboxServiceTest {
       given(mockOutbox.getCommandType()).willReturn(CommandType.DELETE_ALL_REFRESH_TOKEN);
 
       // when & then
-      assertThrows(IllegalArgumentException.class, () -> outboxService.processOutbox(mockOutbox));
+      assertThrows(IllegalStateException.class, () -> outboxService.processOutbox(mockOutbox));
     }
   }
 
@@ -72,26 +74,59 @@ class RedisOutboxServiceTest {
     @DisplayName("삭제된 건수가 제한 개수 이하면 한번만 쿼리 실행하고 종료한다")
     void success_shouldExecuteDeleteOnlyOnce_whenDeletedCountIsLessThanLimit() {
       // given
-      given(outboxRepository.deleteTop1000ByDeletedAtIsNotNull()).willReturn(400);
+      given(outboxRepository.deleteTop1000ByProcessedTrue()).willReturn(400);
 
       // when
-      outboxService.deleteAllOutboxDeletedAtIsNotNull();
+      outboxService.deleteAllOutboxProcessedIsTrue();
 
       // then
-      then(outboxRepository).should(times(1)).deleteTop1000ByDeletedAtIsNotNull();
+      then(outboxRepository).should(times(1)).deleteTop1000ByProcessedTrue();
     }
 
     @Test
     @DisplayName("삭제된 건수가 제한 개수보다 많으면 다 삭제할때까지 반복실행하고 종료한다")
     void success_shouldExecuteDeleteUntilRepeatedly_whenNoMoreDataToClean() {
       // given
-      given(outboxRepository.deleteTop1000ByDeletedAtIsNotNull()).willReturn(1000, 300);
+      given(outboxRepository.deleteTop1000ByProcessedTrue()).willReturn(1000, 300);
 
       // when
-      outboxService.deleteAllOutboxDeletedAtIsNotNull();
+      outboxService.deleteAllOutboxProcessedIsTrue();
 
       // then
-      then(outboxRepository).should(times(2)).deleteTop1000ByDeletedAtIsNotNull();
+      then(outboxRepository).should(times(2)).deleteTop1000ByProcessedTrue();
+    }
+  }
+
+  @Nested
+  class IncreateRetryCount {
+    @Test
+    @DisplayName("재시도횟수가 임계값을 초과하면 softDelete를 진행한다")
+    void success_shouldSoftDeleteOutbox_whenRetryCountExceedsThreshold() {
+      // given
+      RedisCommandOutbox mockOutbox = mock(RedisCommandOutbox.class);
+      given(mockOutbox.isFailedPermanently(anyInt())).willReturn(true);
+
+      // when
+      outboxService.increaseRetryCount(mockOutbox);
+
+      // then
+      then(mockOutbox).should(times(1)).delete();
+      then(outboxRepository).should().save(mockOutbox);
+    }
+
+    @Test
+    @DisplayName("재시도횟수가 임계값을 넘기지 않으면 softDelete를 진행하지 않는다")
+    void success_shouldNotDontDelete_whenRetryCountDoesNotExceedThreshold() {
+      // given
+      RedisCommandOutbox mockOutbox = mock(RedisCommandOutbox.class);
+      given(mockOutbox.isFailedPermanently(anyInt())).willReturn(false);
+
+      // when
+      outboxService.increaseRetryCount(mockOutbox);
+
+      // then
+      then(mockOutbox).should(never()).delete();
+      then(outboxRepository).should().save(mockOutbox);
     }
   }
 }

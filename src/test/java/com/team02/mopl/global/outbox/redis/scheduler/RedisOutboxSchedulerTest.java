@@ -51,6 +51,7 @@ class RedisOutboxSchedulerTest {
       outboxScheduler.retryFailRedisCommands();
 
       // then
+      then(outboxService).should(times(1)).processOutbox(mockOutbox);
       then(lockManager).should(times(1)).releaseLock(anyString(), eq(lockValue));
     }
 
@@ -84,6 +85,7 @@ class RedisOutboxSchedulerTest {
       assertDoesNotThrow(() -> outboxScheduler.retryFailRedisCommands());
 
       // then
+      then(outboxService).should(times(1)).increaseRetryCount(mockOutbox);
       then(lockManager).should(times(1)).releaseLock(anyString(), eq(lockValue));
     }
   }
@@ -102,7 +104,7 @@ class RedisOutboxSchedulerTest {
       outboxScheduler.cleanUp();
 
       // then
-      then(outboxService).should(times(1)).deleteAllOutboxDeletedAtIsNotNull();
+      then(outboxService).should(times(1)).deleteAllOutboxProcessedIsTrue();
       then(lockManager).should(times(1)).releaseLock(anyString(), eq(lockValue));
     }
 

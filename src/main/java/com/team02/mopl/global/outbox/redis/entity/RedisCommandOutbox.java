@@ -30,9 +30,27 @@ public class RedisCommandOutbox extends BaseEntity {
   @Column(nullable = false, length = 50)
   private CommandType commandType;
 
+  @Column(nullable = false)
+  private int retryCount = 0;
+
+  @Column(nullable = false)
+  private boolean processed = false;
+
   public RedisCommandOutbox(CommandType commandType, UUID targetId, OutboxTarget target) {
     this.commandType = Objects.requireNonNull(commandType, "commandType은 null일 수 없습니다.");
     this.targetId = Objects.requireNonNull(targetId, "targetId는 null일 수 없습니다.");
     this.target = Objects.requireNonNull(target, "target은 null일 수 없습니다.");
+  }
+
+  public void markProcessed() {
+    this.processed = true;
+  }
+
+  public void incrementRetryCount() {
+    this.retryCount += 1;
+  }
+
+  public boolean isFailedPermanently(int retryCountThreshold) {
+    return this.retryCount > retryCountThreshold;
   }
 }

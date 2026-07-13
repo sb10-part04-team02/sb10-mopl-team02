@@ -228,7 +228,9 @@ CREATE TABLE redis_outboxes
     deleted_at      TIMESTAMPTZ NULL,
     target_id       UUID        NOT NULL,
     target          VARCHAR(20) NOT NULL,
-    command_type    VARCHAR(50) NOT NULL
+    command_type    VARCHAR(50) NOT NULL,
+    retry_count     INT         NOT NULL DEFAULT 0,
+    processed       BOOLEAN     NOT NULL DEFAULT FALSE
 );
 
 --==================================================================================================
@@ -296,6 +298,6 @@ CREATE INDEX ix_watching_sessions_content_created_id
 -- 재시도와 청소 스케줄러를 위한 복합 인덱스
 --==================================================================================================
 CREATE INDEX ix_redis_outboxes_retry
-    ON redis_outboxes (deleted_at, created_at) WHERE deleted_at IS NULL;
+    ON redis_outboxes (created_at) WHERE processed = FALSE AND deleted_at IS NULL;
 CREATE INDEX ix_redis_outboxes_cleanup
-    ON redis_outboxes (deleted_at) WHERE deleted_at IS NOT NULL;
+    ON redis_outboxes (id) WHERE processed = TRUE;

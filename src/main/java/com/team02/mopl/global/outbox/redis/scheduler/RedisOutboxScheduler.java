@@ -27,7 +27,7 @@ public class RedisOutboxScheduler {
   public void retryFailRedisCommands() {
     log.debug("[Outbox] Fail RedisCommand 재시작");
 
-    String lockValue = lockManager.acquireLock(RETRY_FAIL_COMMAND_KEY, Duration.ofMinutes(1));
+    String lockValue = lockManager.acquireLock(RETRY_FAIL_COMMAND_KEY, Duration.ofMinutes(5));
     if (lockValue == null) {
       log.debug("락 획득에 실패했습니다. 다른 앱이 진행중이므로 패스합니다.");
       return;
@@ -46,6 +46,8 @@ public class RedisOutboxScheduler {
               outbox.getTarget(),
               outbox.getCommandType(),
               e.getMessage());
+          // 재시도 실패시 retryCount 추가
+          outboxService.increaseRetryCount(outbox);
         }
       }
     } finally {
@@ -55,7 +57,7 @@ public class RedisOutboxScheduler {
 
   @Scheduled(cron = "${app.redis.outbox.clean-up}")
   public void cleanUp() {
-    log.debug("[Outbox] 소프트삭제 데이터 물리청소 스케줄러 시작");
+    log.debug("[Outbox] 처리된 outbox 물리청소 스케줄러 시작");
 
     String lockValue = lockManager.acquireLock(OUTBOX_CLEANUP_KEY, Duration.ofMinutes(10));
     if (lockValue == null) {
@@ -64,8 +66,8 @@ public class RedisOutboxScheduler {
     }
 
     try {
-      outboxService.deleteAllOutboxDeletedAtIsNotNull();
-      log.info("[Outbox] 소프트삭제된 outbox 물리삭제 성공");
+      outboxService.deleteAllOutboxProcessedIsTrue();
+      log.info("[Outbox] 처리된 outbox 물리삭제 성공");
     } finally {
       lockManager.releaseLock(OUTBOX_CLEANUP_KEY, lockValue);
     }

@@ -37,7 +37,8 @@ app:
     name: ${ADMIN_NAME}
   redis:
     outbox:
-      retry-delay: 5m
+      maximum-retry-threshold: 5
+      retry-delay: 10m
       clean-up: "0 0 3 * * *"
   kafka:
     consumer:
