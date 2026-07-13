@@ -43,7 +43,7 @@ Client -> CloudFlare -> ALB -> ECS Task(사이드카) -> RDS / ElastiCache
 - DB 이름: `mopl` / 사용자: `mopl`
 - 엔진: PostgreSQL 16, `db.t4g.micro`, 단일 AZ
 - 스키마: `src/main/resources/01_schema_v8.sql` 수동 주입 완료 (테이블 14개). `ddl-auto=validate`.
-- 후속: Flyway 도입 예정 (이슈 #363)
+- 후속: Flyway 도입 예정 (스키마 마이그레이션 자동화)
 
 ### ElastiCache Redis
 - 엔진: Redis OSS 7.1, `cache.t4g.micro`, 클러스터 모드 비활성화, 복제본 0
@@ -52,7 +52,7 @@ Client -> CloudFlare -> ALB -> ECS Task(사이드카) -> RDS / ElastiCache
 
 ### Confluent Kafka — 1차 배포에서 스킵
 - 앱은 Kafka 브로커 없이도 정상 기동함(검증 완료). 팔로우 알림만 미동작.
-- SASL_SSL 설정 추가 후속: 이슈 #365
+- SASL_SSL 설정 추가는 후속 작업으로 진행 예정.
 
 ### ECR 이미지 (멀티아키 amd64 + arm64)
 - 앱: `<ECR_REGISTRY>/mopl-app:<tag>`
@@ -96,8 +96,8 @@ ADMIN_PASSWORD  -> mopl/admin-password
 ### IAM
 - Task 실행 역할: `moplEcsTaskExecutionRole`
   - `AmazonECSTaskExecutionRolePolicy`(관리형) + `moplReadSecrets`(인라인, 시크릿 3개만 읽기)
-- Task 역할: `moplEcsTaskRole` (사전 프로비저닝, #238 이후 활용 예정)
-  - 인라인 `moplS3Write`(`s3:PutObject`/`s3:DeleteObject`만) — S3 파일 스토리지(#238)용
+- Task 역할: `moplEcsTaskRole` (사전 프로비저닝, S3 파일 스토리지 도입 후 활용 예정)
+  - 인라인 `moplS3Write`(`s3:PutObject`/`s3:DeleteObject`만) — S3 파일 스토리지용
   - 현재 배포된 앱(v1, 로컬 저장)은 미사용. task-definition에는 `taskRoleArn`로 선언돼 있음.
 
 ### Secrets Manager
@@ -125,7 +125,7 @@ ADMIN_PASSWORD  -> mopl/admin-password
 - [x] 1단계 VPC / 보안그룹
 - [x] 2단계 RDS + 스키마 주입
 - [x] 3단계 ElastiCache Redis
-- [x] 4단계 Confluent — 스킵 (이슈 #365)
+- [x] 4단계 Confluent — 스킵 (SASL_SSL 설정 후속)
 - [x] 5단계 ECR 이미지 (app + nginx 멀티아키)
 - [x] 6단계 IAM 역할 / Secrets / 클러스터 / Task Definition / 서비스
 - [x] 7단계 서비스 기동 확인 (태스크 RUNNING/HEALTHY, 타겟 healthy, ALB 200)
@@ -142,8 +142,8 @@ ALB DNS로 직접 확인:
 
 app 컨테이너 HEALTHY, nginx RUNNING, 타겟 그룹 `healthy` 등록 확인.
 
-## 후속 이슈
+## 후속 작업
 
-- #363 Flyway 도입 (스키마 마이그레이션 자동화)
-- #365 Confluent SASL_SSL 설정 (팔로우 알림 Kafka 연동)
+- Flyway 도입 (스키마 마이그레이션 자동화)
+- Confluent SASL_SSL 설정 (팔로우 알림 Kafka 연동)
 - IAM 최소 권한 조정 (배포용 임시 AdministratorAccess → 최소 권한)
