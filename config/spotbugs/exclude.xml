@@ -61,4 +61,10 @@
         <Class name="com.team02.mopl.global.kafka.KafkaSmokeTestController"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
+
+    <!-- Spring 관리 빈 생성자 주입으로 발생하는 EI_EXPOSE_REP2 오탐 제외 -->
+    <Match>
+        <Class name="~com\.team02\.mopl\.domain\.notification\.kafka\..*"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>

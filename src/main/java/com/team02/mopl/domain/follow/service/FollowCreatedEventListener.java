@@ -1,15 +1,13 @@
 package com.team02.mopl.domain.follow.service;
 
 import com.team02.mopl.domain.follow.event.FollowCreatedEvent;
-import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
-import com.team02.mopl.domain.notification.service.NotificationService;
+import com.team02.mopl.domain.notification.kafka.NotificationKafkaMessage;
+import com.team02.mopl.domain.notification.kafka.NotificationKafkaProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -18,14 +16,13 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class FollowCreatedEventListener {
 
-  private final NotificationService notificationService;
+  private final NotificationKafkaProducer notificationKafkaProducer;
 
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onFollowCreated(FollowCreatedEvent event) {
     try {
-      notificationService.createNotification(
-          new NotificationCreateCommand(
+      notificationKafkaProducer.publish(
+          new NotificationKafkaMessage(
               event.followeeId(),
               "새 팔로워 알림",
               event.followerName() + "님이 팔로우했습니다.",
@@ -33,7 +30,10 @@ public class FollowCreatedEventListener {
               NotificationType.USER_FOLLOWED));
     } catch (RuntimeException e) {
       log.warn(
-          "팔로우 알림 생성 실패. followerId={}, followeeId={}", event.followerId(), event.followeeId(), e);
+          "팔로우 알림 Kafka 발행 실패. followerId={}, followeeId={}",
+          event.followerId(),
+          event.followeeId(),
+          e);
     }
   }
 }
