@@ -31,7 +31,7 @@ import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
+import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -168,7 +168,7 @@ public class DirectMessageService {
     SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
 
     if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new InvalidCursorRequestException();
     }
 
     Instant cursor =
@@ -215,7 +215,7 @@ public class DirectMessageService {
     SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
 
     if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new InvalidCursorRequestException();
     }
 
     Instant cursor =

@@ -496,21 +496,21 @@ class PlaylistServiceTest {
     }
 
     @Test
-    @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_REQUEST 예외가 발생한다")
+    @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_CURSOR_REQUEST 예외가 발생한다")
     void partialCursor_throwsInvalidRequest() {
       PlaylistSearchRequest cursorOnly =
           new PlaylistSearchRequest(null, "2026-06-29T00:00:00Z", null, 20, null, null, null, null);
       assertThatThrownBy(() -> playlistService.getPlaylists(cursorOnly, requesterId))
           .isInstanceOfSatisfying(
               BusinessException.class,
-              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST));
 
       PlaylistSearchRequest idAfterOnly =
           new PlaylistSearchRequest(null, null, UUID.randomUUID(), 20, null, null, null, null);
       assertThatThrownBy(() -> playlistService.getPlaylists(idAfterOnly, requesterId))
           .isInstanceOfSatisfying(
               BusinessException.class,
-              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST));
     }
 
     @Test

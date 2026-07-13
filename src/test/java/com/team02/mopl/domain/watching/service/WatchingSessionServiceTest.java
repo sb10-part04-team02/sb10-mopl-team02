@@ -28,13 +28,13 @@ import com.team02.mopl.domain.watching.entity.WatchingSession;
 import com.team02.mopl.domain.watching.enums.ChangeType;
 import com.team02.mopl.domain.watching.enums.WatchingSessionSortBy;
 import com.team02.mopl.domain.watching.event.WatchingSessionJoinedEvent;
-import com.team02.mopl.domain.watching.exception.InvalidWatchingCursorException;
-import com.team02.mopl.domain.watching.exception.InvalidWatchingCursorRequestException;
 import com.team02.mopl.domain.watching.exception.WatchingSessionForbiddenException;
 import com.team02.mopl.domain.watching.mapper.WatchingSessionMapper;
 import com.team02.mopl.domain.watching.repository.WatchingSessionRepository;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
+import com.team02.mopl.global.exception.InvalidCursorException;
+import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -209,7 +209,7 @@ class WatchingSessionServiceTest {
   }
 
   @Test
-  @DisplayName("cursor만 있고 idAfter가 없으면 InvalidWatchingCursorRequestException이 발생한다")
+  @DisplayName("cursor만 있고 idAfter가 없으면 InvalidCursorRequestException이 발생한다")
   void getWatchingSessionsByContent_cursorWithoutIdAfter_throwsInvalidRequest() {
     // given
     UUID contentId = UUID.randomUUID();
@@ -220,12 +220,12 @@ class WatchingSessionServiceTest {
     // when & then
     assertThatThrownBy(
             () -> watchingSessionService.getWatchingSessionsByContent(contentId, request))
-        .isInstanceOf(InvalidWatchingCursorRequestException.class);
+        .isInstanceOf(InvalidCursorRequestException.class);
     verifyNoInteractions(watchingSessionRepository);
   }
 
   @Test
-  @DisplayName("잘못된 cursor 형식이면 InvalidWatchingCursorException이 발생한다")
+  @DisplayName("잘못된 cursor 형식이면 InvalidCursorException이 발생한다")
   void getWatchingSessionsByContent_invalidCursorFormat_throwsInvalidRequest() {
     // given
     UUID contentId = UUID.randomUUID();
@@ -236,7 +236,7 @@ class WatchingSessionServiceTest {
     // when & then
     assertThatThrownBy(
             () -> watchingSessionService.getWatchingSessionsByContent(contentId, request))
-        .isInstanceOf(InvalidWatchingCursorException.class);
+        .isInstanceOf(InvalidCursorException.class);
     verifyNoInteractions(watchingSessionRepository);
   }
 

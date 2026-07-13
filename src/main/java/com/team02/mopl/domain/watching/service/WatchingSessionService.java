@@ -16,7 +16,6 @@ import com.team02.mopl.domain.watching.entity.WatchingSession;
 import com.team02.mopl.domain.watching.enums.ChangeType;
 import com.team02.mopl.domain.watching.enums.WatchingSessionSortBy;
 import com.team02.mopl.domain.watching.event.WatchingSessionJoinedEvent;
-import com.team02.mopl.domain.watching.exception.InvalidWatchingCursorRequestException;
 import com.team02.mopl.domain.watching.exception.WatchingSessionForbiddenException;
 import com.team02.mopl.domain.watching.mapper.WatchingSessionMapper;
 import com.team02.mopl.domain.watching.repository.WatchingSessionRepository;
@@ -24,6 +23,7 @@ import com.team02.mopl.domain.watching.util.WatchingSessionCursorConverter;
 import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
+import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -156,7 +156,7 @@ public class WatchingSessionService {
 
     // 커서와 idAfter는 함께 제공되거나 모두 생략되어야 한다.
     if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
-      throw new InvalidWatchingCursorRequestException();
+      throw new InvalidCursorRequestException();
     }
     // 커서 문자열 형식 검증 및 정렬 키(Instant) 변환
     Instant cursor = WatchingSessionCursorConverter.toSortKey(request.cursor());

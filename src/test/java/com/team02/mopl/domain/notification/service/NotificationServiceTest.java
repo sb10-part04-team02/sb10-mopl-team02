@@ -239,7 +239,7 @@ class NotificationServiceTest {
   }
 
   @Test
-  @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_REQUEST 예외가 발생한다")
+  @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_CURSOR_REQUEST 예외가 발생한다")
   void getNotifications_partialCursor_throwsInvalidRequest() {
     UUID receiverId = UUID.randomUUID();
 
@@ -248,14 +248,14 @@ class NotificationServiceTest {
     assertThatThrownBy(() -> notificationService.getNotifications(receiverId, cursorOnly))
         .isInstanceOfSatisfying(
             BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST));
 
     NotificationSearchRequest idAfterOnly =
         new NotificationSearchRequest(null, UUID.randomUUID(), null, null, null);
     assertThatThrownBy(() -> notificationService.getNotifications(receiverId, idAfterOnly))
         .isInstanceOfSatisfying(
             BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST));
   }
 
   @Test

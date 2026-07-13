@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
-import com.team02.mopl.domain.user.exception.UserInvalidCursorException;
+import com.team02.mopl.global.exception.InvalidCursorException;
 import java.time.Instant;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
@@ -77,7 +77,7 @@ class UserCursorConverterTest {
     void fail_shouldThrowException_whenInvalidCursorIsProvided(UserSortBy sortBy, String cursor) {
       // when & then
       assertThrows(
-          UserInvalidCursorException.class, () -> UserCursorConverter.toSortKey(sortBy, cursor));
+          InvalidCursorException.class, () -> UserCursorConverter.toSortKey(sortBy, cursor));
     }
   }
 
