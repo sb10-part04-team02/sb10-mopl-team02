@@ -3,7 +3,9 @@ package com.team02.mopl.domain.watching.websocket;
 import com.team02.mopl.domain.watching.dto.WatchingSessionChange;
 import com.team02.mopl.domain.watching.service.WatchingSessionService;
 import com.team02.mopl.domain.watching.websocket.WatchingSubscriptionRegistry.WatchingSubscription;
+import com.team02.mopl.global.exception.ErrorResponse;
 import java.security.Principal;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -63,7 +65,8 @@ public class WatchingSessionWebSocketEventListener {
       return;
     }
 
-    // 구독 자체는 이미 성립한 뒤라 예외를 던져도 거부할 수 없으므로, 실패 시 로그만 남긴다.
+    // 구독 자체는 이미 성립한 뒤라 예외를 던져도 거부할 수 없으므로,
+    // 실패 시 로그를 남기고 구독자에게 /user/queue/errors로 실패 사유를 전달한다.
     try {
       WatchingSessionChange change = watchingSessionService.join(contentId, userId);
       subscriptionRegistry.register(
@@ -74,6 +77,10 @@ public class WatchingSessionWebSocketEventListener {
       log.debug("시청 세션 JOIN. contentId={}, userId={}", contentId, userId);
     } catch (Exception e) {
       log.warn("시청 세션 JOIN 처리 실패. contentId={}, userId={}", contentId, userId, e);
+      messagingTemplate.convertAndSendToUser(
+          user.getName(),
+          "/queue/errors",
+          new ErrorResponse(e.getClass().getSimpleName(), e.getMessage(), Map.of()));
     }
   }
 

@@ -1,6 +1,8 @@
 package com.team02.mopl.domain.watching.websocket;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -14,6 +16,7 @@ import com.team02.mopl.domain.watching.dto.WatchingSessionChange;
 import com.team02.mopl.domain.watching.dto.WatchingSessionDto;
 import com.team02.mopl.domain.watching.enums.ChangeType;
 import com.team02.mopl.domain.watching.service.WatchingSessionService;
+import com.team02.mopl.global.exception.ErrorResponse;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.List;
@@ -23,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.Message;
@@ -92,8 +96,8 @@ class WatchingSessionWebSocketEventListenerTest {
   }
 
   @Test
-  @DisplayName("join이 실패하면 브로드캐스트하지 않고, 이후 연결 종료 시에도 leave하지 않는다")
-  void handleSubscribe_joinFails_noBroadcastNoTracking() {
+  @DisplayName("join이 실패하면 구독자에게 에러를 전송하고, 브로드캐스트나 세션 추적은 하지 않는다")
+  void handleSubscribe_joinFails_sendsErrorNoBroadcastNoTracking() {
     // given
     given(watchingSessionService.join(contentId, userId)).willThrow(new ContentNotFoundException());
 
@@ -102,7 +106,11 @@ class WatchingSessionWebSocketEventListenerTest {
     listener.handleDisconnect(disconnectEvent("ws1"));
 
     // then
-    verifyNoInteractions(messagingTemplate);
+    ArgumentCaptor<ErrorResponse> errorCaptor = ArgumentCaptor.forClass(ErrorResponse.class);
+    verify(messagingTemplate)
+        .convertAndSendToUser(eq(userId.toString()), eq("/queue/errors"), errorCaptor.capture());
+    assertThat(errorCaptor.getValue().exceptionName()).isEqualTo("ContentNotFoundException");
+    verifyNoMoreInteractions(messagingTemplate);
     verify(watchingSessionService).join(contentId, userId);
     verifyNoMoreInteractions(watchingSessionService);
   }
