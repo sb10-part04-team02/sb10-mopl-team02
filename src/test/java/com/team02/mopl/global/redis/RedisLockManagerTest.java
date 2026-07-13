@@ -28,7 +28,7 @@ class RedisLockManagerTest {
   @Mock private StringRedisTemplate redisTemplate;
   @InjectMocks private RedisLockManager lockManager;
 
-  private final String key = "key";
+  private static final String key = "key";
   private final Duration duration = Duration.ofSeconds(5);
 
   @Nested
