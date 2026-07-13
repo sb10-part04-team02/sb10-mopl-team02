@@ -2,7 +2,7 @@ package com.team02.mopl.domain.review.util;
 
 import com.team02.mopl.domain.review.entity.Review;
 import com.team02.mopl.domain.review.enums.ReviewSortBy;
-import com.team02.mopl.domain.review.exception.ReviewInvalidCursorException;
+import com.team02.mopl.global.exception.InvalidCursorException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 
@@ -23,7 +23,7 @@ public final class ReviewCursorConverter {
         case RATING -> parseRating(cursor);
       };
     } catch (DateTimeParseException | NumberFormatException e) {
-      throw new ReviewInvalidCursorException(sortBy, cursor, e);
+      throw new InvalidCursorException(sortBy.name(), cursor, e);
     }
   }
 

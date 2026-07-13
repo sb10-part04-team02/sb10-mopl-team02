@@ -28,4 +28,11 @@ public class WatchingSessionController implements WatchingSessionApi {
     return ResponseEntity.ok(
         watchingSessionService.getWatchingSessionsByContent(contentId, request));
   }
+
+  @Override
+  @GetMapping("/api/users/{watcherId}/watching-sessions")
+  public ResponseEntity<WatchingSessionDto> getWatchingSessionByWatcher(
+      @PathVariable UUID watcherId) {
+    return ResponseEntity.ok(watchingSessionService.getWatchingSessionByWatcher(watcherId));
+  }
 }

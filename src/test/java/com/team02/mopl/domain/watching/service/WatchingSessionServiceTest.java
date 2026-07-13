@@ -28,12 +28,13 @@ import com.team02.mopl.domain.watching.entity.WatchingSession;
 import com.team02.mopl.domain.watching.enums.ChangeType;
 import com.team02.mopl.domain.watching.enums.WatchingSessionSortBy;
 import com.team02.mopl.domain.watching.event.WatchingSessionJoinedEvent;
+import com.team02.mopl.domain.watching.exception.WatchingSessionForbiddenException;
 import com.team02.mopl.domain.watching.mapper.WatchingSessionMapper;
 import com.team02.mopl.domain.watching.repository.WatchingSessionRepository;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
+import com.team02.mopl.global.exception.InvalidCursorException;
+import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -208,7 +209,7 @@ class WatchingSessionServiceTest {
   }
 
   @Test
-  @DisplayName("cursor만 있고 idAfter가 없으면 INVALID_REQUEST 예외가 발생한다")
+  @DisplayName("cursor만 있고 idAfter가 없으면 InvalidCursorRequestException이 발생한다")
   void getWatchingSessionsByContent_cursorWithoutIdAfter_throwsInvalidRequest() {
     // given
     UUID contentId = UUID.randomUUID();
@@ -219,14 +220,12 @@ class WatchingSessionServiceTest {
     // when & then
     assertThatThrownBy(
             () -> watchingSessionService.getWatchingSessionsByContent(contentId, request))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+        .isInstanceOf(InvalidCursorRequestException.class);
     verifyNoInteractions(watchingSessionRepository);
   }
 
   @Test
-  @DisplayName("잘못된 cursor 형식이면 INVALID_REQUEST 예외가 발생한다")
+  @DisplayName("잘못된 cursor 형식이면 InvalidCursorException이 발생한다")
   void getWatchingSessionsByContent_invalidCursorFormat_throwsInvalidRequest() {
     // given
     UUID contentId = UUID.randomUUID();
@@ -237,9 +236,7 @@ class WatchingSessionServiceTest {
     // when & then
     assertThatThrownBy(
             () -> watchingSessionService.getWatchingSessionsByContent(contentId, request))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+        .isInstanceOf(InvalidCursorException.class);
     verifyNoInteractions(watchingSessionRepository);
   }
 
@@ -380,7 +377,7 @@ class WatchingSessionServiceTest {
   }
 
   @Test
-  @DisplayName("leave 시 요청자가 세션 소유자가 아니면 FORBIDDEN 예외가 발생한다")
+  @DisplayName("leave 시 요청자가 세션 소유자가 아니면 WatchingSessionForbiddenException이 발생한다")
   void leave_notOwner_throwsForbidden() {
     // given
     UUID watchingSessionId = UUID.randomUUID();
@@ -391,9 +388,7 @@ class WatchingSessionServiceTest {
 
     // when & then
     assertThatThrownBy(() -> watchingSessionService.leave(watchingSessionId, UUID.randomUUID()))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+        .isInstanceOf(WatchingSessionForbiddenException.class);
     verify(session, never()).exit();
   }
 
@@ -447,6 +442,69 @@ class WatchingSessionServiceTest {
 
     // when & then
     assertThat(watchingSessionService.leave(watchingSessionId, UUID.randomUUID())).isEmpty();
+  }
+
+  @Test
+  @DisplayName("getWatchingSessionByWatcher는 사용자가 없으면 UserNotFoundException이 발생하고 세션을 조회하지 않는다")
+  void getWatchingSessionByWatcher_userNotFound_throwsException() {
+    // given
+    UUID watcherId = UUID.randomUUID();
+    given(userRepository.findByIdAndDeletedAtIsNull(watcherId)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> watchingSessionService.getWatchingSessionByWatcher(watcherId))
+        .isInstanceOf(UserNotFoundException.class);
+    verify(watchingSessionRepository, never())
+        .findFirstByUser_IdAndDeletedAtIsNullOrderByCreatedAtDesc(any());
+  }
+
+  @Test
+  @DisplayName("getWatchingSessionByWatcher는 활성 세션이 없으면 null을 반환한다")
+  void getWatchingSessionByWatcher_noActiveSession_returnsNull() {
+    // given
+    UUID watcherId = UUID.randomUUID();
+    User watcher = mockUser(watcherId, "시청자", null);
+    given(userRepository.findByIdAndDeletedAtIsNull(watcherId)).willReturn(Optional.of(watcher));
+    given(
+            watchingSessionRepository.findFirstByUser_IdAndDeletedAtIsNullOrderByCreatedAtDesc(
+                watcherId))
+        .willReturn(Optional.empty());
+
+    // when
+    WatchingSessionDto result = watchingSessionService.getWatchingSessionByWatcher(watcherId);
+
+    // then
+    assertThat(result).isNull();
+  }
+
+  @Test
+  @DisplayName("getWatchingSessionByWatcher는 활성 세션이 있으면 세션 콘텐츠로 매핑한 DTO를 반환한다")
+  void getWatchingSessionByWatcher_activeSession_returnsDto() {
+    // given
+    UUID watcherId = UUID.randomUUID();
+    UUID contentId = UUID.randomUUID();
+    Content content = mockContent(contentId);
+    User watcher = mockUser(watcherId, "시청자", null);
+    given(userRepository.findByIdAndDeletedAtIsNull(watcherId)).willReturn(Optional.of(watcher));
+
+    WatchingSession session = mockSession(UUID.randomUUID(), Instant.now(), watcher);
+    given(session.getContent()).willReturn(content);
+    given(
+            watchingSessionRepository.findFirstByUser_IdAndDeletedAtIsNullOrderByCreatedAtDesc(
+                watcherId))
+        .willReturn(Optional.of(session));
+    given(tagRepository.findByContentIdAndDeletedAtIsNull(contentId)).willReturn(List.of());
+
+    WatchingSessionDto dto =
+        new WatchingSessionDto(session.getId(), session.getCreatedAt(), null, null);
+    given(watchingSessionMapper.toDto(eq(session), any())).willReturn(dto);
+
+    // when
+    WatchingSessionDto result = watchingSessionService.getWatchingSessionByWatcher(watcherId);
+
+    // then
+    assertThat(result).isEqualTo(dto);
+    verify(tagRepository).findByContentIdAndDeletedAtIsNull(contentId);
   }
 
   private WatchingSessionSearchRequest request(

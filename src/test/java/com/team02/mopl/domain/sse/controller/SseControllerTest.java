@@ -52,7 +52,7 @@ class SseControllerTest {
   @DisplayName("LastEventId 쿼리 파라미터가 있으면 서비스로 전달한다")
   void connect_withLastEventIdParam() throws Exception {
     UUID userId = UUID.randomUUID();
-    String lastEventId = UUID.randomUUID().toString();
+    String lastEventId = "notification:" + UUID.randomUUID();
     SseEmitter emitter = new SseEmitter();
 
     given(sseEmitterService.connect(userId, lastEventId)).willReturn(emitter);
@@ -73,7 +73,7 @@ class SseControllerTest {
   @DisplayName("Last-Event-ID 헤더가 있으면 서비스로 전달한다")
   void connect_withLastEventIdHeader() throws Exception {
     UUID userId = UUID.randomUUID();
-    String lastEventId = UUID.randomUUID().toString();
+    String lastEventId = "notification:" + UUID.randomUUID();
     SseEmitter emitter = new SseEmitter();
 
     given(sseEmitterService.connect(userId, lastEventId)).willReturn(emitter);
@@ -94,8 +94,8 @@ class SseControllerTest {
   @DisplayName("쿼리 파라미터와 헤더가 모두 있으면 Last-Event-ID 헤더를 우선 사용한다")
   void connect_whenParamAndHeaderExist_usesHeaderFirst() throws Exception {
     UUID userId = UUID.randomUUID();
-    String paramLastEventId = UUID.randomUUID().toString();
-    String headerLastEventId = UUID.randomUUID().toString();
+    String paramLastEventId = "notification:" + UUID.randomUUID();
+    String headerLastEventId = "direct-message:" + UUID.randomUUID();
     SseEmitter emitter = new SseEmitter();
 
     given(sseEmitterService.connect(userId, headerLastEventId)).willReturn(emitter);

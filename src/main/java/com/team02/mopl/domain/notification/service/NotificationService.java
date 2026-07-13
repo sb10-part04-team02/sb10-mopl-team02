@@ -17,6 +17,7 @@ import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
+import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
@@ -70,7 +71,7 @@ public class NotificationService {
         request.sortBy() != null ? request.sortBy() : NotificationSortBy.createdAt;
 
     if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new InvalidCursorRequestException();
     }
 
     Instant cursor = NotificationCursorConverter.toSortKey(sortBy, request.cursor());
@@ -95,6 +96,26 @@ public class NotificationService {
 
     return new CursorResponse<>(
         data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.name(), direction.name());
+  }
+
+  // 알림 재연결
+  public void resendNotificationsAfter(UUID receiverId, UUID lastNotificationId) {
+    Notification lastNotification =
+        notificationRepository
+            .findByIdAndReceiver_Id(lastNotificationId, receiverId)
+            .orElseThrow(NotificationNotFoundException::new);
+
+    List<NotificationDto> missedNotifications =
+        notificationRepository
+            .findUnreadNotificationsAfter(
+                receiverId, lastNotification.getCreatedAt(), lastNotificationId)
+            .stream()
+            .map(NotificationDto::from)
+            .toList();
+
+    for (NotificationDto notificationDto : missedNotifications) {
+      sendNotificationAfterCommit(notificationDto);
+    }
   }
 
   // 읽음 처리

@@ -2,7 +2,7 @@ package com.team02.mopl.domain.playlist.util;
 
 import com.team02.mopl.domain.playlist.entity.Playlist;
 import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
-import com.team02.mopl.domain.playlist.exception.PlaylistInvalidCursorException;
+import com.team02.mopl.global.exception.InvalidCursorException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 
@@ -23,7 +23,7 @@ public final class PlaylistCursorConverter {
         case SUBSCRIBE_COUNT -> Long.valueOf(cursor);
       };
     } catch (DateTimeParseException | NumberFormatException e) {
-      throw new PlaylistInvalidCursorException(sortBy, cursor, e);
+      throw new InvalidCursorException(sortBy.name(), cursor, e);
     }
   }
 

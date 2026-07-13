@@ -652,7 +652,7 @@ class DirectMessageServiceTest {
   }
 
   @Test
-  @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_REQUEST 예외가 발생한다")
+  @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_CURSOR_REQUEST 예외가 발생한다")
   void getConversations_partialCursor_throwsInvalidRequest() {
     UUID requesterId = UUID.randomUUID();
 
@@ -661,14 +661,14 @@ class DirectMessageServiceTest {
     assertThatThrownBy(() -> directMessageService.getConversations(requesterId, cursorOnly))
         .isInstanceOfSatisfying(
             BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST));
 
     ConversationSearchRequest idAfterOnly =
         new ConversationSearchRequest(null, null, UUID.randomUUID(), null, null, null);
     assertThatThrownBy(() -> directMessageService.getConversations(requesterId, idAfterOnly))
         .isInstanceOfSatisfying(
             BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST));
   }
 
   @Test
@@ -808,7 +808,7 @@ class DirectMessageServiceTest {
   }
 
   @Test
-  @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_REQUEST 예외가 발생한다")
+  @DisplayName("cursor와 idAfter 중 하나만 있으면 INVALID_CURSOR_REQUEST 예외가 발생한다")
   void getDirectMessages_partialCursor_throwsInvalidRequest() {
     UUID conversationId = UUID.randomUUID();
     UUID requesterId = UUID.randomUUID();
@@ -822,7 +822,7 @@ class DirectMessageServiceTest {
             () -> directMessageService.getDirectMessages(conversationId, requesterId, cursorOnly))
         .isInstanceOfSatisfying(
             BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST));
 
     DirectMessageSearchRequest idAfterOnly =
         new DirectMessageSearchRequest(null, UUID.randomUUID(), null, null, null);
@@ -830,7 +830,7 @@ class DirectMessageServiceTest {
             () -> directMessageService.getDirectMessages(conversationId, requesterId, idAfterOnly))
         .isInstanceOfSatisfying(
             BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST));
   }
 
   @Test

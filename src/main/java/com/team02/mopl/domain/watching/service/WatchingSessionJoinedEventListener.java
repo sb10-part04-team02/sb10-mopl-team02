@@ -37,7 +37,7 @@ public class WatchingSessionJoinedEventListener {
                 NotificationType.FOLLOWING_USER_ACTIVITY));
       } catch (RuntimeException e) {
         log.warn(
-            "실시간 시청 알림 생성 실패. watcherId={}, followerId={}, contentId={}",
+            "watching.notification_failed watcherId={} followerId={} contentId={}",
             event.watcherId(),
             followerId,
             event.contentId(),

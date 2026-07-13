@@ -1,7 +1,10 @@
 package com.team02.mopl.domain.sse.service;
 
+import com.team02.mopl.domain.notification.exception.NotificationNotFoundException;
+import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.sse.repository.SseEmitterRepository;
 import java.io.IOException;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +20,7 @@ public class SseEmitterService {
   private static final String CONNECT_EVENT_NAME = "connect";
 
   private final SseEmitterRepository sseEmitterRepository;
+  private final NotificationService notificationService;
 
   // 사용자별 SSE 연결을 생성하고 기존 연결이 있으면 새 연결로 교체
   public SseEmitter connect(UUID userId, String lastEventId) {
@@ -30,6 +34,7 @@ public class SseEmitterService {
     registerCallbacks(userId, emitter);
     sseEmitterRepository.save(userId, emitter).ifPresent(SseEmitter::complete);
     sendConnectEvent(userId, emitter);
+    recoverMissedNotifications(userId, lastEventId);
 
     return emitter;
   }
@@ -46,12 +51,43 @@ public class SseEmitterService {
     try {
       emitter.send(
           SseEmitter.event()
-              .id(UUID.randomUUID().toString())
+              .id(SseEventId.connect(UUID.randomUUID()))
               .name(CONNECT_EVENT_NAME)
               .data("SSE 연결 성공"));
     } catch (IOException e) {
       emitter.completeWithError(e);
       log.warn("SSE 연결 이벤트 전송 실패. userId={}", userId, e);
+    }
+  }
+
+  // 복구만 skip, 연결은 유지
+  private void recoverMissedNotifications(UUID userId, String lastEventId) {
+    if (lastEventId == null || lastEventId.isBlank()) {
+      return;
+    }
+
+    try {
+      Optional<UUID> lastNotificationId = SseEventId.parseNotificationId(lastEventId);
+
+      if (lastNotificationId.isEmpty()) {
+        log.debug(
+            "알림 이벤트가 아닌 Last-Event-ID이므로 알림 복구를 건너뜁니다. userId={}, lastEventId={}",
+            userId,
+            lastEventId);
+        return;
+      }
+
+      notificationService.resendNotificationsAfter(userId, lastNotificationId.get());
+    } catch (IllegalArgumentException e) {
+      log.warn("잘못된 SSE Last-Event-ID 형식입니다. userId={}, lastEventId={}", userId, lastEventId, e);
+    } catch (NotificationNotFoundException e) {
+      log.warn(
+          "SSE Last-Event-ID에 해당하는 알림을 찾을 수 없습니다. userId={}, lastEventId={}",
+          userId,
+          lastEventId,
+          e);
+    } catch (RuntimeException e) {
+      log.warn("SSE 누락 알림 복구 중 예외가 발생했습니다. userId={}, lastEventId={}", userId, lastEventId, e);
     }
   }
 

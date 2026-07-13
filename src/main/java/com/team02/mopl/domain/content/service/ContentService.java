@@ -16,8 +16,7 @@ import com.team02.mopl.domain.content.util.ContentCursorConverter;
 import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
+import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import com.team02.mopl.global.storage.FileStorage;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -100,7 +99,7 @@ public class ContentService {
     SortBy sortBy = request.sortBy() != null ? request.sortBy() : SortBy.WATCHER_COUNT;
 
     if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new InvalidCursorRequestException();
     }
     boolean asc = direction == SortDirection.ASCENDING;
 
