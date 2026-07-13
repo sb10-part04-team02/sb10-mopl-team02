@@ -33,8 +33,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     registry.setApplicationDestinationPrefixes("/pub");
 
     // 구독(Subscribe) 경로 prefix
-    // /queue는 user destination(/user/queue/errors 등) 라우팅용 — 없으면 브로커가 메시지를 버린다.
-    registry.enableSimpleBroker("/sub", "/queue");
+    registry.enableSimpleBroker("/sub");
   }
 
   @Override

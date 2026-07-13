@@ -2,13 +2,13 @@ package com.team02.mopl.domain.watching.websocket;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team02.mopl.domain.content.dto.ContentSummary;
 import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.content.exception.ContentNotFoundException;
@@ -16,7 +16,7 @@ import com.team02.mopl.domain.watching.dto.WatchingSessionChange;
 import com.team02.mopl.domain.watching.dto.WatchingSessionDto;
 import com.team02.mopl.domain.watching.enums.ChangeType;
 import com.team02.mopl.domain.watching.service.WatchingSessionService;
-import com.team02.mopl.global.exception.ErrorResponse;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.List;
@@ -27,9 +27,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
@@ -44,6 +46,8 @@ class WatchingSessionWebSocketEventListenerTest {
 
   @Mock private WatchingSessionService watchingSessionService;
   @Mock private SimpMessagingTemplate messagingTemplate;
+  @Mock private MessageChannel clientOutboundChannel;
+  @Captor private ArgumentCaptor<Message<byte[]>> errorMessageCaptor;
 
   private WatchingSubscriptionRegistry subscriptionRegistry;
   private WatchingSessionWebSocketEventListener listener;
@@ -58,7 +62,11 @@ class WatchingSessionWebSocketEventListenerTest {
     subscriptionRegistry = new WatchingSubscriptionRegistry();
     listener =
         new WatchingSessionWebSocketEventListener(
-            watchingSessionService, subscriptionRegistry, messagingTemplate);
+            watchingSessionService,
+            subscriptionRegistry,
+            messagingTemplate,
+            clientOutboundChannel,
+            new ObjectMapper());
   }
 
   @Test
@@ -96,8 +104,8 @@ class WatchingSessionWebSocketEventListenerTest {
   }
 
   @Test
-  @DisplayName("join이 실패하면 구독자에게 에러를 전송하고, 브로드캐스트나 세션 추적은 하지 않는다")
-  void handleSubscribe_joinFails_sendsErrorNoBroadcastNoTracking() {
+  @DisplayName("join이 실패하면 당사자 세션에만 실패 사유를 전송하고, 브로드캐스트나 세션 추적은 하지 않는다")
+  void handleSubscribe_joinFails_sendsErrorToSubscriberNoBroadcastNoTracking() {
     // given
     given(watchingSessionService.join(contentId, userId)).willThrow(new ContentNotFoundException());
 
@@ -106,11 +114,14 @@ class WatchingSessionWebSocketEventListenerTest {
     listener.handleDisconnect(disconnectEvent("ws1"));
 
     // then
-    ArgumentCaptor<ErrorResponse> errorCaptor = ArgumentCaptor.forClass(ErrorResponse.class);
-    verify(messagingTemplate)
-        .convertAndSendToUser(eq(userId.toString()), eq("/queue/errors"), errorCaptor.capture());
-    assertThat(errorCaptor.getValue().exceptionName()).isEqualTo("ContentNotFoundException");
-    verifyNoMoreInteractions(messagingTemplate);
+    verify(clientOutboundChannel).send(errorMessageCaptor.capture());
+    StompHeaderAccessor accessor = StompHeaderAccessor.wrap(errorMessageCaptor.getValue());
+    assertThat(accessor.getSessionId()).isEqualTo("ws1");
+    assertThat(accessor.getSubscriptionId()).isEqualTo("sub1");
+    assertThat(accessor.getDestination()).isEqualTo(watchDestination());
+    assertThat(new String(errorMessageCaptor.getValue().getPayload(), StandardCharsets.UTF_8))
+        .contains("ContentNotFoundException");
+    verifyNoInteractions(messagingTemplate);
     verify(watchingSessionService).join(contentId, userId);
     verifyNoMoreInteractions(watchingSessionService);
   }

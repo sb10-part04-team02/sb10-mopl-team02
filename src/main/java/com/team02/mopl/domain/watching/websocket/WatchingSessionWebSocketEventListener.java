@@ -1,5 +1,6 @@
 package com.team02.mopl.domain.watching.websocket;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team02.mopl.domain.watching.dto.WatchingSessionChange;
 import com.team02.mopl.domain.watching.service.WatchingSessionService;
 import com.team02.mopl.domain.watching.websocket.WatchingSubscriptionRegistry.WatchingSubscription;
@@ -12,9 +13,13 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
+import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
@@ -35,6 +40,9 @@ public class WatchingSessionWebSocketEventListener {
   private final WatchingSessionService watchingSessionService;
   private final WatchingSubscriptionRegistry subscriptionRegistry;
   private final SimpMessagingTemplate messagingTemplate;
+  // 브로커를 거치지 않고 특정 세션에만 프레임을 내려보내기 위한 채널 (필드명으로 bean 매칭)
+  private final MessageChannel clientOutboundChannel;
+  private final ObjectMapper objectMapper;
 
   @EventListener
   public void handleSubscribe(SessionSubscribeEvent event) {
@@ -66,7 +74,7 @@ public class WatchingSessionWebSocketEventListener {
     }
 
     // 구독 자체는 이미 성립한 뒤라 예외를 던져도 거부할 수 없으므로,
-    // 실패 시 로그를 남기고 구독자에게 /user/queue/errors로 실패 사유를 전달한다.
+    // 실패 시 로그를 남기고 이미 성립한 구독 위로 실패 사유를 당사자 세션에만 전달한다.
     try {
       WatchingSessionChange change = watchingSessionService.join(contentId, userId);
       subscriptionRegistry.register(
@@ -77,10 +85,7 @@ public class WatchingSessionWebSocketEventListener {
       log.debug("시청 세션 JOIN. contentId={}, userId={}", contentId, userId);
     } catch (Exception e) {
       log.warn("시청 세션 JOIN 처리 실패. contentId={}, userId={}", contentId, userId, e);
-      messagingTemplate.convertAndSendToUser(
-          user.getName(),
-          "/queue/errors",
-          new ErrorResponse(e.getClass().getSimpleName(), e.getMessage(), Map.of()));
+      sendErrorToSubscriber(wsSessionId, subscriptionId, destination, e);
     }
   }
 
@@ -113,5 +118,30 @@ public class WatchingSessionWebSocketEventListener {
 
   private void broadcast(UUID contentId, WatchingSessionChange change) {
     messagingTemplate.convertAndSend("/sub/contents/" + contentId + "/watch", change);
+  }
+
+  /**
+   * JOIN 실패 사유를 이미 성립한 watch 구독 위로 당사자 세션에만 MESSAGE 프레임으로 내려보낸다.
+   *
+   * <p>브로커로 보내면 토픽 구독자 전원에게 브로드캐스트되므로, clientOutboundChannel로 세션·구독 ID를 지정해 직접 전송한다. 클라이언트는 별도 에러
+   * 채널 구독 없이 기존 watch 콜백으로 ErrorResponse를 수신한다.
+   */
+  private void sendErrorToSubscriber(
+      String wsSessionId, String subscriptionId, String destination, Exception e) {
+    try {
+      StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.MESSAGE);
+      accessor.setSessionId(wsSessionId);
+      accessor.setSubscriptionId(subscriptionId);
+      accessor.setDestination(destination);
+      accessor.setContentType(MimeTypeUtils.APPLICATION_JSON);
+      accessor.setLeaveMutable(true);
+      byte[] payload =
+          objectMapper.writeValueAsBytes(
+              new ErrorResponse(e.getClass().getSimpleName(), e.getMessage(), Map.of()));
+      clientOutboundChannel.send(
+          MessageBuilder.createMessage(payload, accessor.getMessageHeaders()));
+    } catch (Exception sendError) {
+      log.warn("시청 세션 JOIN 실패 사유 전송 실패. wsSessionId={}", wsSessionId, sendError);
+    }
   }
 }
