@@ -34,7 +34,7 @@ Client -> CloudFlare -> ALB -> ECS Task(사이드카) -> RDS / ElastiCache
 | 이름 | 역할 | 인바운드 |
 |---|---|---|
 | `mopl-alb-sg` | ALB | 인터넷 80/443 |
-| `mopl-ecs-sg` | ECS Task | `mopl-alb-sg` → 8080 |
+| `mopl-ecs-sg` | ECS Task | `mopl-alb-sg` → 80 (nginx) |
 | `mopl-rds-sg` | RDS | `mopl-ecs-sg` → 5432 |
 | `mopl-redis-sg` | Redis | `mopl-ecs-sg` → 6379 |
 
@@ -96,7 +96,9 @@ ADMIN_PASSWORD  -> mopl/admin-password
 ### IAM
 - Task 실행 역할: `moplEcsTaskExecutionRole`
   - `AmazonECSTaskExecutionRolePolicy`(관리형) + `moplReadSecrets`(인라인, 시크릿 3개만 읽기)
-- Task 역할: 없음 (앱이 AWS SDK 미사용)
+- Task 역할: `moplEcsTaskRole` (사전 프로비저닝, #238 이후 활용 예정)
+  - 인라인 `moplS3Write`(`s3:PutObject`/`s3:DeleteObject`만) — S3 파일 스토리지(#238)용
+  - 현재 배포된 앱(v1, 로컬 저장)은 미사용. task-definition에는 `taskRoleArn`로 선언돼 있음.
 
 ### Secrets Manager
 - `mopl/db-password` → `DB_PASSWORD`
