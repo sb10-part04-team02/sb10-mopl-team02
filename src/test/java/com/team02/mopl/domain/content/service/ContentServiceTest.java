@@ -20,12 +20,13 @@ import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.entity.Tag;
 import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.content.enums.SortBy;
+import com.team02.mopl.domain.content.exception.ContentNotFoundException;
+import com.team02.mopl.domain.content.exception.InvalidCursorRequestException;
 import com.team02.mopl.domain.content.mapper.ContentMapper;
 import com.team02.mopl.domain.content.repository.ContentRepository;
 import com.team02.mopl.domain.content.repository.TagRepository;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.global.storage.FileStorage;
 import java.time.Instant;
@@ -174,7 +175,7 @@ class ContentServiceTest {
 
       // when & then
       assertThatThrownBy(() -> contentService.get(contentId))
-          .isInstanceOf(BusinessException.class)
+          .isInstanceOf(ContentNotFoundException.class)
           .extracting("errorCode")
           .isEqualTo(ErrorCode.CONTENT_NOT_FOUND);
 
@@ -346,7 +347,7 @@ class ContentServiceTest {
 
       // when & then
       assertThatThrownBy(() -> contentService.update(contentId, request, null))
-          .isInstanceOf(BusinessException.class)
+          .isInstanceOf(ContentNotFoundException.class)
           .extracting("errorCode")
           .isEqualTo(ErrorCode.CONTENT_NOT_FOUND);
 
@@ -505,7 +506,7 @@ class ContentServiceTest {
 
       // when & then
       assertThatThrownBy(() -> contentService.delete(contentId))
-          .isInstanceOf(BusinessException.class)
+          .isInstanceOf(ContentNotFoundException.class)
           .extracting("errorCode")
           .isEqualTo(ErrorCode.CONTENT_NOT_FOUND);
 
@@ -742,22 +743,22 @@ class ContentServiceTest {
     }
 
     @Test
-    @DisplayName("cursor만 있고 idAfter가 없으면 INVALID_REQUEST로 거부하고 repository를 호출하지 않는다")
+    @DisplayName("cursor만 있고 idAfter가 없으면 INVALID_CURSOR_REQUEST로 거부하고 repository를 호출하지 않는다")
     void rejectsHalfCursor_whenIdAfterMissing() {
       // given
       ContentSearchRequest req = request(null, null, "somecursor", 20, null, null);
 
       // when & then
       assertThatThrownBy(() -> contentService.getContents(req))
-          .isInstanceOf(BusinessException.class)
+          .isInstanceOf(InvalidCursorRequestException.class)
           .extracting("errorCode")
-          .isEqualTo(ErrorCode.INVALID_REQUEST);
+          .isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST);
 
       then(contentRepository).should(never()).search(any());
     }
 
     @Test
-    @DisplayName("idAfter만 있고 cursor가 없으면 INVALID_REQUEST로 거부하고 repository를 호출하지 않는다")
+    @DisplayName("idAfter만 있고 cursor가 없으면 INVALID_CURSOR_REQUEST로 거부하고 repository를 호출하지 않는다")
     void rejectsHalfCursor_whenCursorMissing() {
       // given
       ContentSearchRequest req =
@@ -765,9 +766,9 @@ class ContentServiceTest {
 
       // when & then
       assertThatThrownBy(() -> contentService.getContents(req))
-          .isInstanceOf(BusinessException.class)
+          .isInstanceOf(InvalidCursorRequestException.class)
           .extracting("errorCode")
-          .isEqualTo(ErrorCode.INVALID_REQUEST);
+          .isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST);
 
       then(contentRepository).should(never()).search(any());
     }

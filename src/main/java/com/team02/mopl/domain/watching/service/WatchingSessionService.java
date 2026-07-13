@@ -16,14 +16,14 @@ import com.team02.mopl.domain.watching.entity.WatchingSession;
 import com.team02.mopl.domain.watching.enums.ChangeType;
 import com.team02.mopl.domain.watching.enums.WatchingSessionSortBy;
 import com.team02.mopl.domain.watching.event.WatchingSessionJoinedEvent;
+import com.team02.mopl.domain.watching.exception.InvalidWatchingCursorRequestException;
+import com.team02.mopl.domain.watching.exception.WatchingSessionForbiddenException;
 import com.team02.mopl.domain.watching.mapper.WatchingSessionMapper;
 import com.team02.mopl.domain.watching.repository.WatchingSessionRepository;
 import com.team02.mopl.domain.watching.util.WatchingSessionCursorConverter;
 import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -65,6 +65,11 @@ public class WatchingSessionService {
     WatchingSession session;
     if (existingSession.isPresent()) {
       session = existingSession.get();
+      log.debug(
+          "watching.session_join_reused contentId={} userId={} sessionId={}",
+          contentId,
+          userId,
+          session.getId());
     } else {
       session =
           watchingSessionRepository.save(
@@ -75,6 +80,11 @@ public class WatchingSessionService {
       eventPublisher.publishEvent(
           new WatchingSessionJoinedEvent(
               watcher.getId(), watcher.getName(), content.getId(), content.getTitle()));
+      log.info(
+          "watching.session_joined contentId={} userId={} sessionId={}",
+          contentId,
+          userId,
+          session.getId());
     }
 
     return toChange(ChangeType.JOIN, session, content);
@@ -90,11 +100,13 @@ public class WatchingSessionService {
             session -> {
               // 세션 소유자만 종료할 수 있다.
               if (!session.getUser().getId().equals(requesterId)) {
-                throw new BusinessException(ErrorCode.FORBIDDEN);
+                throw new WatchingSessionForbiddenException();
               }
               session.exit();
               // 부분 유니크 인덱스(deleted_at IS NULL) 자리를 비워 재시청 시 새 세션을 만들 수 있게 한다.
               session.delete();
+              log.info(
+                  "watching.session_left sessionId={} userId={}", watchingSessionId, requesterId);
               return toChange(ChangeType.LEAVE, session, session.getContent());
             });
   }
@@ -142,11 +154,12 @@ public class WatchingSessionService {
             ? request.watcherNameLike().trim()
             : null;
 
+    // 커서와 idAfter는 함께 제공되거나 모두 생략되어야 한다.
+    if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
+      throw new InvalidWatchingCursorRequestException();
+    }
     // 커서 문자열 형식 검증 및 정렬 키(Instant) 변환
     Instant cursor = WatchingSessionCursorConverter.toSortKey(request.cursor());
-    if ((cursor == null) != (request.idAfter() == null)) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
 
     // hasNext 판정
     List<WatchingSession> rows =

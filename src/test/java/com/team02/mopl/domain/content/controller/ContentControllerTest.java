@@ -22,6 +22,7 @@ import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.content.enums.SortBy;
 import com.team02.mopl.domain.content.exception.ContentNotFoundException;
 import com.team02.mopl.domain.content.exception.InvalidCursorException;
+import com.team02.mopl.domain.content.exception.InvalidCursorRequestException;
 import com.team02.mopl.domain.content.service.ContentService;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.exception.GlobalExceptionHandler;
@@ -170,6 +171,82 @@ class ContentControllerTest {
   }
 
   @Nested
+  class GetContents {
+
+    @Test
+    @DisplayName("GET /api/contents는 쿼리 파라미터를 바인딩해 서비스를 호출하고 CursorResponse를 직렬화한다")
+    void success_shouldReturnCursorResponse_whenParamsBound() throws Exception {
+      // given
+      UUID contentId = UUID.randomUUID();
+      UUID nextIdAfter = UUID.randomUUID();
+      CursorResponse<ContentDto> response =
+          new CursorResponse<>(
+              List.of(createContentDto(contentId)),
+              "5",
+              nextIdAfter,
+              true,
+              10L,
+              "WATCHER_COUNT",
+              "DESCENDING");
+      given(contentService.getContents(any(ContentSearchRequest.class))).willReturn(response);
+
+      // when & then
+      mockMvc
+          .perform(
+              get("/api/contents")
+                  .param("limit", "20")
+                  .param("sortBy", "WATCHER_COUNT")
+                  .param("sortDirection", "DESCENDING"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data[0].id").value(contentId.toString()))
+          .andExpect(jsonPath("$.data[0].title").value("제목"))
+          .andExpect(jsonPath("$.data[0].watcherCount").value(0))
+          .andExpect(jsonPath("$.nextCursor").value("5"))
+          .andExpect(jsonPath("$.nextIdAfter").value(nextIdAfter.toString()))
+          .andExpect(jsonPath("$.hasNext").value(true))
+          .andExpect(jsonPath("$.totalCount").value(10))
+          .andExpect(jsonPath("$.sortBy").value("WATCHER_COUNT"))
+          .andExpect(jsonPath("$.sortDirection").value("DESCENDING"));
+
+      then(contentService).should().getContents(any(ContentSearchRequest.class));
+    }
+
+    @Test
+    @DisplayName("cursor만 있고 idAfter가 없는 목록 조회 시 400과 InvalidCursorRequestException 에러 포맷을 반환한다")
+    void fail_shouldReturn400WithErrorFormat_whenHalfCursorGiven() throws Exception {
+      // given
+      given(contentService.getContents(any(ContentSearchRequest.class)))
+          .willThrow(new InvalidCursorRequestException());
+
+      // when & then
+      mockMvc
+          .perform(get("/api/contents").param("cursor", "somecursor"))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.exceptionName").value("InvalidCursorRequestException"))
+          .andExpect(jsonPath("$.details.cursor").exists());
+    }
+
+    @Test
+    @DisplayName("서비스가 InvalidCursorException을 던지면 400과 예외명을 응답한다")
+    void fail_shouldReturn400_whenInvalidCursor() throws Exception {
+      // given
+      given(contentService.getContents(any(ContentSearchRequest.class)))
+          .willThrow(new InvalidCursorException(SortBy.RATE, "abc"));
+
+      // when & then
+      mockMvc
+          .perform(
+              get("/api/contents")
+                  .param("limit", "20")
+                  .param("cursor", "abc")
+                  .param("sortBy", "RATE"))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.exceptionName").value("InvalidCursorException"))
+          .andExpect(jsonPath("$.details.cursor").exists());
+    }
+  }
+
+  @Nested
   class UpdateContent {
 
     private MockHttpServletRequestBuilder createContentUpdateRequest(UUID contentId)
@@ -287,67 +364,6 @@ class ContentControllerTest {
       mockMvc
           .perform(delete("/api/contents/{contentId}", UUID.randomUUID()))
           .andExpect(status().isForbidden());
-    }
-  }
-
-  @Nested
-  class GetContents {
-
-    @Test
-    @DisplayName("GET /api/contents는 쿼리 파라미터를 바인딩해 서비스를 호출하고 CursorResponse를 직렬화한다")
-    void success_shouldReturnCursorResponse_whenParamsBound() throws Exception {
-      // given
-      UUID contentId = UUID.randomUUID();
-      UUID nextIdAfter = UUID.randomUUID();
-      CursorResponse<ContentDto> response =
-          new CursorResponse<>(
-              List.of(createContentDto(contentId)),
-              "5",
-              nextIdAfter,
-              true,
-              10L,
-              "WATCHER_COUNT",
-              "DESCENDING");
-      given(contentService.getContents(any(ContentSearchRequest.class))).willReturn(response);
-
-      // when & then
-      mockMvc
-          .perform(
-              get("/api/contents")
-                  .param("limit", "20")
-                  .param("sortBy", "WATCHER_COUNT")
-                  .param("sortDirection", "DESCENDING"))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data[0].id").value(contentId.toString()))
-          .andExpect(jsonPath("$.data[0].title").value("제목"))
-          .andExpect(jsonPath("$.data[0].watcherCount").value(0))
-          .andExpect(jsonPath("$.nextCursor").value("5"))
-          .andExpect(jsonPath("$.nextIdAfter").value(nextIdAfter.toString()))
-          .andExpect(jsonPath("$.hasNext").value(true))
-          .andExpect(jsonPath("$.totalCount").value(10))
-          .andExpect(jsonPath("$.sortBy").value("WATCHER_COUNT"))
-          .andExpect(jsonPath("$.sortDirection").value("DESCENDING"));
-
-      then(contentService).should().getContents(any(ContentSearchRequest.class));
-    }
-
-    @Test
-    @DisplayName("서비스가 InvalidCursorException을 던지면 400과 예외명을 응답한다")
-    void fail_shouldReturn400_whenInvalidCursor() throws Exception {
-      // given
-      given(contentService.getContents(any(ContentSearchRequest.class)))
-          .willThrow(new InvalidCursorException(SortBy.RATE, "abc"));
-
-      // when & then
-      mockMvc
-          .perform(
-              get("/api/contents")
-                  .param("limit", "20")
-                  .param("cursor", "abc")
-                  .param("sortBy", "RATE"))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.exceptionName").value("InvalidCursorException"))
-          .andExpect(jsonPath("$.details.cursor").exists());
     }
   }
 }

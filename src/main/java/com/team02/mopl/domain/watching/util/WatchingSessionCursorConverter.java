@@ -1,7 +1,6 @@
 package com.team02.mopl.domain.watching.util;
 
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
+import com.team02.mopl.domain.watching.exception.InvalidWatchingCursorException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 
@@ -17,7 +16,7 @@ public final class WatchingSessionCursorConverter {
     try {
       return Instant.parse(cursor);
     } catch (DateTimeParseException e) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST, e);
+      throw new InvalidWatchingCursorException(cursor, e);
     }
   }
 }
