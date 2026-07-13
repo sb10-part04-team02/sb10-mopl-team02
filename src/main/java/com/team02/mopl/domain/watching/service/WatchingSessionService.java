@@ -109,6 +109,23 @@ public class WatchingSessionService {
     return new WatchingSessionChange(type, dto, watcherCount);
   }
 
+  // 특정 사용자가 현재 시청 중인 세션 1건 조회. 없으면 null(활성 세션 없음).
+  @Transactional(readOnly = true)
+  public WatchingSessionDto getWatchingSessionByWatcher(UUID watcherId) {
+    userRepository.findByIdAndDeletedAtIsNull(watcherId).orElseThrow(UserNotFoundException::new);
+
+    return watchingSessionRepository
+        .findFirstByUser_IdAndDeletedAtIsNullOrderByCreatedAtDesc(watcherId)
+        .map(
+            session -> {
+              Content content = session.getContent();
+              List<Tag> tags = tagRepository.findByContentIdAndDeletedAtIsNull(content.getId());
+              return watchingSessionMapper.toDto(
+                  session, watchingSessionMapper.toContentSummary(content, tags));
+            })
+        .orElse(null);
+  }
+
   // 특정 콘텐츠의 활성 시청 세션 목록 조회 (커서 페이지네이션 + 시청자 이름 필터)
   @Transactional(readOnly = true)
   public CursorResponse<WatchingSessionDto> getWatchingSessionsByContent(

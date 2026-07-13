@@ -43,4 +43,27 @@ public interface WatchingSessionApi {
   ResponseEntity<CursorResponse<WatchingSessionDto>> getWatchingSessions(
       @Parameter(description = "콘텐츠 UUID") UUID contentId,
       @ParameterObject @ModelAttribute @Valid WatchingSessionSearchRequest request);
+
+  @Operation(summary = "특정 사용자의 시청 세션 조회 (nullable)")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "사용자를 찾을 수 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<WatchingSessionDto> getWatchingSessionByWatcher(
+      @Parameter(description = "시청자 UUID") UUID watcherId);
 }
