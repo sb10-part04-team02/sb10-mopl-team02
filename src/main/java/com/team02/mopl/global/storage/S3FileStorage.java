@@ -10,11 +10,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @Slf4j
 @Component
@@ -59,7 +59,8 @@ public class S3FileStorage implements FileStorage {
       s3.putObject(request, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
       log.debug("S3 파일 저장 완료: {}/{}", bucket, key);
       return baseUrl + "/" + key;
-    } catch (IOException | S3Exception e) {
+    } catch (IOException | SdkException e) {
+      // SdkException은 S3 서버 응답 오류(S3Exception)와 클라이언트 측 오류(네트워크/자격증명)를 모두 포함
       throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
@@ -78,7 +79,8 @@ public class S3FileStorage implements FileStorage {
     String key = url.substring((baseUrl + "/").length());
     try {
       s3.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
-    } catch (S3Exception e) {
+    } catch (SdkException e) {
+      // 서버 응답 오류뿐 아니라 네트워크/자격증명 등 클라이언트 측 오류도 삼켜, 삭제 실패가 호출자에게 전파되지 않도록 한다
       log.warn("S3 파일 삭제 실패: {}", url, e); // 삭제 실패는 로그만 남김
     }
   }
