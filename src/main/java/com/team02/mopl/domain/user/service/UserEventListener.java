@@ -5,6 +5,7 @@ import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.service.NotificationService;
+import com.team02.mopl.domain.user.event.PasswordUpdatedEvent;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
 import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
 import java.util.UUID;
@@ -58,6 +59,23 @@ public class UserEventListener {
           event.newRole(),
           e);
     }
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Retryable(
+      retryFor = {DataAccessException.class},
+      maxAttempts = 3,
+      backoff = @Backoff(delay = 1000) // 1초 간격으로 최대 3번 재시도
+      )
+  public void onPasswordUpdated(PasswordUpdatedEvent event) {
+    // 패스워드 변경시 refreshToken 전체삭제
+    jwtRegistry.deleteAllRefreshToken(event.userId());
+  }
+
+  @Recover
+  public void passwordUpdatedRecover(DataAccessException e, PasswordUpdatedEvent event) {
+    log.error(
+        "[Redis] 패스워드 변경 리프레시토큰 삭제 최종 실패: userId={}, reason={}", event.userId(), e.getMessage(), e);
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

@@ -10,6 +10,7 @@ import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
+import com.team02.mopl.domain.user.event.PasswordUpdatedEvent;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
 import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
@@ -197,6 +198,7 @@ public class UserService {
     User findUser =
         userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
     findUser.updatePassword(passwordEncoder.encode(request.password()));
+    eventPublisher.publishEvent(new PasswordUpdatedEvent(findUser.getId()));
 
     log.info("유저 비밀번호변경 로직 완료: userId={}", userId);
   }

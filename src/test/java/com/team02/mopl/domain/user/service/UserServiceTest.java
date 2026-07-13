@@ -26,6 +26,7 @@ import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
+import com.team02.mopl.domain.user.event.PasswordUpdatedEvent;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
 import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
@@ -902,6 +903,7 @@ class UserServiceTest {
 
       // then
       then(mockUser).should(times(1)).updatePassword(eq(encodedPassword));
+      then(eventPublisher).should(times(1)).publishEvent(any(PasswordUpdatedEvent.class));
     }
 
     @Test
@@ -915,6 +917,7 @@ class UserServiceTest {
       assertThrows(
           UserNotFoundException.class,
           () -> userService.updatePassword(UUID.randomUUID(), mock(ChangePasswordRequest.class)));
+      then(eventPublisher).should(never()).publishEvent(any(PasswordUpdatedEvent.class));
     }
   }
 }

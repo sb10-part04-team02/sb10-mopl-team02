@@ -14,6 +14,7 @@ import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.user.entity.enums.Role;
+import com.team02.mopl.domain.user.event.PasswordUpdatedEvent;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
 import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
 import java.lang.reflect.Method;
@@ -125,6 +126,37 @@ class UserEventListenerTest {
       // then
       assertThat(transactional).isNotNull();
       assertThat(transactional.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+    }
+  }
+
+  @Nested
+  class OnPasswordUpdated {
+    @Test
+    @DisplayName("패스워드 변경 이벤트가 오면 유저의 모든 리프레시 토큰을 삭제한다")
+    void success_shouldRemoveAllRefreshTokens_whenPasswordUpdatedEventIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+      PasswordUpdatedEvent event = new PasswordUpdatedEvent(userId);
+
+      // when
+      eventListener.onPasswordUpdated(event);
+
+      // then
+      then(jwtRegistry).should(times(1)).deleteAllRefreshToken(userId);
+    }
+  }
+
+  @Nested
+  class PasswordUpdatedRecover {
+    @Test
+    @DisplayName("Recover함수가 호출되면 예외를 정상적으로 처리한다")
+    void success_shouldNotThrowException_whenRecoverMethodIsCalled() {
+      // given
+      DataAccessException e = new RedisConnectionFailureException("test");
+      PasswordUpdatedEvent event = new PasswordUpdatedEvent(UUID.randomUUID());
+
+      // when & then
+      assertDoesNotThrow(() -> eventListener.passwordUpdatedRecover(e, event));
     }
   }
 
