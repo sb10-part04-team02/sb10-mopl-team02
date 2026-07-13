@@ -896,14 +896,17 @@ class UserServiceTest {
       given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(mockUser));
 
       String encodedPassword = "encodedPassword";
-      given(passwordEncoder.encode(anyString())).willReturn(encodedPassword);
+      given(passwordEncoder.encode(request.password())).willReturn(encodedPassword);
+
+      given(mockUser.getId()).willReturn(userId);
+      PasswordUpdatedEvent event = new PasswordUpdatedEvent(userId);
 
       // when
       userService.updatePassword(userId, request);
 
       // then
       then(mockUser).should(times(1)).updatePassword(eq(encodedPassword));
-      then(eventPublisher).should(times(1)).publishEvent(any(PasswordUpdatedEvent.class));
+      then(eventPublisher).should(times(1)).publishEvent(event);
     }
 
     @Test

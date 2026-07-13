@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.times;
 
 import com.team02.mopl.domain.auth.jwt.JwtRegistry;
+import com.team02.mopl.domain.user.event.PasswordUpdatedEvent;
 import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
 import com.team02.mopl.support.IntegrationTestSupport;
 import java.util.UUID;
@@ -25,7 +26,7 @@ public class UserEventListenerIntegrationTest extends IntegrationTestSupport {
   @MockitoSpyBean private UserEventListener eventListener;
 
   @Test
-  @DisplayName("계정 잠금시 예외가 3번 발생시 재시도후 Recover가 호출된다")
+  @DisplayName("계정 잠금시 예외가 3번 발생하면 재시도후 Recover가 호출된다")
   void fail_shouldInvokeRecover_whenRedisIsDownDuringLock() {
     // given
     UUID userId = UUID.randomUUID();
@@ -39,5 +40,24 @@ public class UserEventListenerIntegrationTest extends IntegrationTestSupport {
     then(eventListener)
         .should(times(1))
         .userLockUpdatedRecover(any(DataAccessException.class), eq(event));
+  }
+
+  @Test
+  @DisplayName("패스워드 변경시 예외가 3번 발생하면 재시도후 Recover가 호출된다")
+  void fail_shouldInvokeRecover_whenRedisIsDownDuringPasswordUpdate() {
+    // given
+    UUID userId = UUID.randomUUID();
+    PasswordUpdatedEvent event = new PasswordUpdatedEvent(userId);
+
+    willThrow(new RecoverableDataAccessException("redis 연결실패"))
+        .given(jwtRegistry)
+        .deleteAllRefreshToken(userId);
+
+    // when & then
+    assertDoesNotThrow(() -> eventListener.onPasswordUpdated(event));
+    then(jwtRegistry).should(times(3)).deleteAllRefreshToken(userId);
+    then(eventListener)
+        .should(times(1))
+        .passwordUpdatedRecover(any(DataAccessException.class), eq(event));
   }
 }
