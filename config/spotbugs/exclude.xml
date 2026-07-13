@@ -67,4 +67,13 @@
         <Class name="~com\.team02\.mopl\.domain\.notification\.kafka\..*"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
+
+    <!-- Spring DI로 주입받는 Redis fan-out 컴포넌트의 인프라 bean 필드는 정적 분석 대상에서 제외 -->
+    <Match>
+        <Or>
+            <Class name="com.team02.mopl.domain.notification.redis.NotificationSseFanOutPublisher"/>
+            <Class name="com.team02.mopl.domain.notification.redis.NotificationSseFanOutSubscriber"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>
