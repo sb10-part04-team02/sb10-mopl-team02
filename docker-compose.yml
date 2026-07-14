@@ -25,6 +25,36 @@ services:
     ports:
       - "6379:6379"
 
+  # 메트릭 수집: 호스트에서 실행 중인 앱(:8080)의 /actuator/prometheus를 스크레이프한다.
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    volumes:
+      - ./config/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    extra_hosts:
+      # Linux에서도 host.docker.internal로 호스트에 접근할 수 있게 한다 (Mac/Windows는 기본 지원)
+      - "host.docker.internal:host-gateway"
+
+  # 메트릭 시각화: http://localhost:3000 (기본 계정 admin/admin, .env로 오버라이드 가능)
+  # 데이터소스와 대시보드는 config/monitoring/grafana 에서 자동 프로비저닝된다.
+  grafana:
+    image: grafana/grafana:11.1.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./config/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
 volumes:
   postgres_data:
   redis-data:
+  prometheus_data:
+  grafana_data:

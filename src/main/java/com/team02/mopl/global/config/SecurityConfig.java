@@ -86,6 +86,18 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/refresh")
                     .permitAll()
+
+                    // Actuator: 헬스체크(Docker HEALTHCHECK)와 Prometheus 스크레이프 대상만 열고
+                    // 나머지 엔드포인트(env, beans 등)는 nonApiMatcher permitAll보다 먼저 차단
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/actuator/health",
+                        "/actuator/health/**",
+                        "/actuator/info",
+                        "/actuator/prometheus")
+                    .permitAll()
+                    .requestMatchers("/actuator/**")
+                    .denyAll()
                     .requestMatchers(nonApiMatcher)
                     .permitAll() // swagger, api-docs 대응
 
