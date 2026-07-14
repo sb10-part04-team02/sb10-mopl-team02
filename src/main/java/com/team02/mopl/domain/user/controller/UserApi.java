@@ -197,5 +197,7 @@ public interface UserApi {
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   })
   ResponseEntity<Void> updatePassword(
-      @PathVariable UUID userId, @RequestBody @Valid ChangePasswordRequest request);
+      @Parameter(hidden = true) UUID requesterId,
+      @PathVariable UUID userId,
+      @RequestBody @Valid ChangePasswordRequest request);
 }

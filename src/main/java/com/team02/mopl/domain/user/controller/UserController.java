@@ -87,11 +87,12 @@ public class UserController implements UserApi {
   }
 
   @Override
-  @PreAuthorize("authentication.principal == #userId")
   @PatchMapping("/{userId}/password")
   public ResponseEntity<Void> updatePassword(
-      @PathVariable UUID userId, @RequestBody @Valid ChangePasswordRequest request) {
-    userService.updatePassword(userId, request);
+      @AuthenticationPrincipal UUID requesterId,
+      @PathVariable UUID userId,
+      @RequestBody @Valid ChangePasswordRequest request) {
+    userService.updatePassword(userId, requesterId, request);
     return ResponseEntity.noContent().build();
   }
 }

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -24,6 +25,8 @@ import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.service.UserService;
+import com.team02.mopl.global.exception.BusinessException;
+import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.support.TestSecurityConfiguration;
 import java.time.Instant;
 import java.util.List;
@@ -438,23 +441,27 @@ class UserControllerNormalTest {
     @DisplayName("본인이 아닐경우 403을 반환한다")
     void fail_shouldReturn403Forbidden_whenRequestUserIsNotOwner() throws Exception {
       // given
-      UUID ownerId = UUID.randomUUID();
-      UUID anotherId = UUID.randomUUID();
+      UUID userId = UUID.randomUUID();
+      UUID requesterId = UUID.randomUUID();
       String content = objectMapper.writeValueAsString(new ChangePasswordRequest("validPassword"));
+
+      willThrow(new BusinessException(ErrorCode.FORBIDDEN))
+          .given(userService)
+          .updatePassword(eq(userId), eq(requesterId), any(ChangePasswordRequest.class));
 
       // when & then
       mockMvc
-          .perform(createChangePasswordRequest(ownerId, content, anotherId))
+          .perform(createChangePasswordRequest(requesterId, content, userId))
           .andExpect(status().isForbidden());
     }
 
     private MockHttpServletRequestBuilder createChangePasswordRequest(
-        UUID ownerId, String content, UUID anotherUserId) {
+        UUID requesterId, String content, UUID anotherUserId) {
       TestingAuthenticationToken testAuth =
           new TestingAuthenticationToken(
-              ownerId, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+              requesterId, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
 
-      UUID userId = anotherUserId != null ? anotherUserId : ownerId;
+      UUID userId = anotherUserId != null ? anotherUserId : requesterId;
 
       return MockMvcRequestBuilders.patch("/api/users/{userId}/password", userId)
           .with(authentication(testAuth))

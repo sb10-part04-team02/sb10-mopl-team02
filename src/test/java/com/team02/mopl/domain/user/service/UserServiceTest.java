@@ -902,7 +902,7 @@ class UserServiceTest {
       PasswordUpdatedEvent event = new PasswordUpdatedEvent(userId);
 
       // when
-      userService.updatePassword(userId, request);
+      userService.updatePassword(userId, userId, request);
 
       // then
       then(mockUser).should(times(1)).updatePassword(eq(encodedPassword));
@@ -913,14 +913,28 @@ class UserServiceTest {
     @DisplayName("유저가 존재하지 않으면 예외를 던진다")
     void fail_shouldThrowException_whenUserNotFound() {
       // given
+      UUID userId = UUID.randomUUID();
       given(userRepository.findByIdAndDeletedAtIsNull(any(UUID.class)))
           .willReturn(Optional.empty());
 
       // when & then
       assertThrows(
           UserNotFoundException.class,
-          () -> userService.updatePassword(UUID.randomUUID(), mock(ChangePasswordRequest.class)));
+          () -> userService.updatePassword(userId, userId, mock(ChangePasswordRequest.class)));
       then(eventPublisher).should(never()).publishEvent(any(PasswordUpdatedEvent.class));
+    }
+
+    @Test
+    @DisplayName("소유주가 아닐경우 예외를 던진다")
+    void fail_shouldThrowException_whenUserAndRequesterAreNotEqual() {
+      // given
+      UUID userId = UUID.randomUUID();
+      UUID requesterId = UUID.randomUUID();
+
+      // when & then
+      assertThrows(
+          BusinessException.class,
+          () -> userService.updatePassword(userId, requesterId, mock(ChangePasswordRequest.class)));
     }
   }
 }

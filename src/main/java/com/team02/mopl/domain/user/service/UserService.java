@@ -25,6 +25,7 @@ import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import com.team02.mopl.global.storage.FileStorage;
+import com.team02.mopl.global.util.OwnershipValidator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -192,8 +193,10 @@ public class UserService {
   }
 
   @Transactional
-  public void updatePassword(UUID userId, ChangePasswordRequest request) {
+  public void updatePassword(UUID userId, UUID requesterId, ChangePasswordRequest request) {
     log.debug("유저 비밀번호변경 시작: userId={}", userId);
+    OwnershipValidator.validateOwner(userId, requesterId);
+
     User findUser =
         userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
     findUser.updatePassword(passwordEncoder.encode(request.password()));

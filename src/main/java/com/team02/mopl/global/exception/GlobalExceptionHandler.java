@@ -136,17 +136,20 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ErrorResponse> handleAuthorizationDeniedException(
       AuthorizationDeniedException e, HttpServletRequest request) {
 
-    Object principal;
+    Object principal = "****";
+    Object authorities = "none";
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth instanceof JwtAuthenticationToken jwtAuth) {
-      principal = jwtAuth.getPrincipal();
-    } else {
-      principal = "****";
+    if (auth != null) {
+      if (auth instanceof JwtAuthenticationToken jwtAuth) {
+        principal = jwtAuth.getPrincipal();
+      }
+      authorities = auth.getAuthorities();
     }
+
     log.warn(
         "권한 에러: userId={}, authorities={}, uri={}",
         principal,
-        auth.getAuthorities(),
+        authorities,
         request.getRequestURI());
 
     String exceptionName = "AuthorizationException";
