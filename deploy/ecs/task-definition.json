@@ -30,12 +30,16 @@
         { "name": "INGESTION_SCHEDULER_ENABLED", "value": "false" },
         { "name": "AWS_S3_BUCKET", "value": "${AWS_S3_BUCKET}" },
         { "name": "AWS_S3_REGION", "value": "${AWS_S3_REGION}" },
-        { "name": "AWS_S3_BASE_URL", "value": "${AWS_S3_BASE_URL}" }
+        { "name": "AWS_S3_BASE_URL", "value": "${AWS_S3_BASE_URL}" },
+        { "name": "KAFKA_BOOTSTRAP_SERVERS", "value": "${KAFKA_BOOTSTRAP_SERVERS}" },
+        { "name": "KAFKA_CONSUMER_GROUP_ID", "value": "${KAFKA_CONSUMER_GROUP_ID}" }
       ],
       "secrets": [
         { "name": "DB_PASSWORD", "valueFrom": "${DB_PASSWORD_SECRET_ARN}" },
         { "name": "JWT_SECRET_KEY", "valueFrom": "${JWT_SECRET_ARN}" },
-        { "name": "ADMIN_PASSWORD", "valueFrom": "${ADMIN_PASSWORD_SECRET_ARN}" }
+        { "name": "ADMIN_PASSWORD", "valueFrom": "${ADMIN_PASSWORD_SECRET_ARN}" },
+        { "name": "KAFKA_API_KEY", "valueFrom": "${KAFKA_API_KEY_SECRET_ARN}" },
+        { "name": "KAFKA_API_SECRET", "valueFrom": "${KAFKA_API_SECRET_SECRET_ARN}" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"],

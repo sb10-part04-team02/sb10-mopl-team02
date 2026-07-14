@@ -18,6 +18,17 @@ spring:
         highlight_sql: false
     show-sql: false
 
+  # Confluent Cloud는 SASL_SSL 인증이 필수. bootstrap-servers/serializer는 application.yaml 공통 블록을 재사용하고,
+  # prod에서만 SASL 프로퍼티를 덧입힌다. 자격증명(API Key/Secret)은 task-def secrets로 주입한다(yaml에 평문 미노출).
+  kafka:
+    properties:
+      security.protocol: SASL_SSL
+      sasl.mechanism: PLAIN
+      sasl.jaas.config: >-
+        org.apache.kafka.common.security.plain.PlainLoginModule required
+        username="${KAFKA_API_KEY}"
+        password="${KAFKA_API_SECRET}";
+
 server:
   port: ${SERVER_PORT:8080}
 
