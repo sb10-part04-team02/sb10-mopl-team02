@@ -6,10 +6,10 @@ import static org.mockito.Mockito.verify;
 
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
 import com.team02.mopl.domain.dm.dto.DmSentEvent;
-import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
-import com.team02.mopl.domain.notification.service.NotificationService;
+import com.team02.mopl.domain.notification.kafka.NotificationKafkaMessage;
+import com.team02.mopl.domain.notification.kafka.NotificationKafkaProducer;
 import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.dto.UserSummary;
 import java.lang.reflect.Method;
@@ -22,21 +22,21 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 @ExtendWith(MockitoExtension.class)
 class DmEventListenerTest {
 
   @Mock private SseEventService sseEventService;
 
-  @Mock private NotificationService notificationService;
+  @Mock private NotificationKafkaProducer notificationKafkaProducer;
 
   @InjectMocks private DmEventListener dmEventListener;
 
   @Test
-  @DisplayName("DM 전송 이벤트를 수신하면 알림 생성과 direct-messages SSE 전송을 수행한다")
-  void onDmSent_createsNotificationAndSendsSse() {
+  @DisplayName("DM 전송 이벤트를 수신하면 알림 Kafka 발행과 direct-messages SSE 전송을 수행한다")
+  void onDmSent_publishesNotificationKafkaMessageAndSendsSse() {
     UUID messageId = UUID.randomUUID();
     UUID conversationId = UUID.randomUUID();
     UUID senderId = UUID.randomUUID();
@@ -56,30 +56,30 @@ class DmEventListenerTest {
 
     dmEventListener.onDmSent(event);
 
-    ArgumentCaptor<NotificationCreateCommand> commandCaptor =
-        ArgumentCaptor.forClass(NotificationCreateCommand.class);
+    ArgumentCaptor<NotificationKafkaMessage> messageCaptor =
+        ArgumentCaptor.forClass(NotificationKafkaMessage.class);
 
-    verify(notificationService).createNotification(commandCaptor.capture());
+    verify(notificationKafkaProducer).publish(messageCaptor.capture());
 
-    NotificationCreateCommand command = commandCaptor.getValue();
+    NotificationKafkaMessage message = messageCaptor.getValue();
 
-    assertThat(command.receiverId()).isEqualTo(receiverId);
-    assertThat(command.title()).isEqualTo("새 메시지");
-    assertThat(command.content()).isEqualTo("발신자님이 메시지를 보냈습니다.");
-    assertThat(command.level()).isEqualTo(NotificationLevel.INFO);
-    assertThat(command.notificationType()).isEqualTo(NotificationType.DIRECT_MESSAGE_RECEIVED);
+    assertThat(message.receiverId()).isEqualTo(receiverId);
+    assertThat(message.title()).isEqualTo("새 메시지");
+    assertThat(message.content()).isEqualTo("발신자님이 메시지를 보냈습니다.");
+    assertThat(message.level()).isEqualTo(NotificationLevel.INFO);
+    assertThat(message.notificationType()).isEqualTo(NotificationType.DIRECT_MESSAGE_RECEIVED);
 
     verify(sseEventService).send(eq(receiverId), eq("direct-messages"), eq(eventId), eq(dto));
   }
 
   @Test
-  @DisplayName("DM 전송 이벤트 리스너는 알림 저장을 새 트랜잭션에서 처리한다")
-  void onDmSent_hasRequiresNewTransaction() throws Exception {
+  @DisplayName("DM 전송 이벤트 리스너는 커밋 이후 처리한다")
+  void onDmSent_hasTransactionalEventListenerAfterCommit() throws Exception {
     Method method = DmEventListener.class.getMethod("onDmSent", DmSentEvent.class);
 
-    Transactional transactional = method.getAnnotation(Transactional.class);
+    TransactionalEventListener annotation = method.getAnnotation(TransactionalEventListener.class);
 
-    assertThat(transactional).isNotNull();
-    assertThat(transactional.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+    assertThat(annotation).isNotNull();
+    assertThat(annotation.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
   }
 }

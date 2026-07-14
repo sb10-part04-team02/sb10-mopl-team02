@@ -1,15 +1,17 @@
 package com.team02.mopl.domain.playlist.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 
-import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
-import com.team02.mopl.domain.notification.service.NotificationService;
+import com.team02.mopl.domain.notification.kafka.NotificationKafkaMessage;
+import com.team02.mopl.domain.notification.kafka.NotificationKafkaProducer;
 import com.team02.mopl.domain.playlist.event.PlaylistContentAddedEvent;
 import com.team02.mopl.domain.subscription.repository.SubscriptionRepository;
 import java.lang.reflect.Method;
@@ -22,21 +24,21 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 @ExtendWith(MockitoExtension.class)
 class PlaylistContentAddedEventListenerTest {
 
   @Mock private SubscriptionRepository subscriptionRepository;
 
-  @Mock private NotificationService notificationService;
+  @Mock private NotificationKafkaProducer notificationKafkaProducer;
 
   @InjectMocks private PlaylistContentAddedEventListener listener;
 
   @Test
-  @DisplayName("플레이리스트 콘텐츠 추가 이벤트를 수신하면 구독자에게 알림을 생성한다")
-  void onPlaylistContentAdded_createsNotificationForSubscribers() {
+  @DisplayName("플레이리스트 콘텐츠 추가 이벤트를 수신하면 구독자에게 알림 Kafka 메시지를 발행한다")
+  void onPlaylistContentAdded_publishesKafkaMessageForSubscribers() {
     UUID playlistId = UUID.randomUUID();
     UUID contentId = UUID.randomUUID();
     UUID subscriberId = UUID.randomUUID();
@@ -49,23 +51,23 @@ class PlaylistContentAddedEventListenerTest {
 
     listener.onPlaylistContentAdded(event);
 
-    ArgumentCaptor<NotificationCreateCommand> commandCaptor =
-        ArgumentCaptor.forClass(NotificationCreateCommand.class);
+    ArgumentCaptor<NotificationKafkaMessage> messageCaptor =
+        ArgumentCaptor.forClass(NotificationKafkaMessage.class);
 
-    then(notificationService).should().createNotification(commandCaptor.capture());
+    then(notificationKafkaProducer).should().publish(messageCaptor.capture());
 
-    NotificationCreateCommand command = commandCaptor.getValue();
+    NotificationKafkaMessage message = messageCaptor.getValue();
 
-    assertThat(command.receiverId()).isEqualTo(subscriberId);
-    assertThat(command.title()).isEqualTo("구독 플레이리스트 콘텐츠 추가 알림");
-    assertThat(command.content()).isEqualTo("[내 플리] 플레이리스트에 콘텐츠 제목 콘텐츠가 추가되었습니다.");
-    assertThat(command.level()).isEqualTo(NotificationLevel.INFO);
-    assertThat(command.notificationType()).isEqualTo(NotificationType.PLAYLIST_CONTENT_ADDED);
+    assertThat(message.receiverId()).isEqualTo(subscriberId);
+    assertThat(message.title()).isEqualTo("구독 플레이리스트 콘텐츠 추가 알림");
+    assertThat(message.content()).isEqualTo("[내 플리] 플레이리스트에 콘텐츠 제목 콘텐츠가 추가되었습니다.");
+    assertThat(message.level()).isEqualTo(NotificationLevel.INFO);
+    assertThat(message.notificationType()).isEqualTo(NotificationType.PLAYLIST_CONTENT_ADDED);
   }
 
   @Test
-  @DisplayName("구독자가 없으면 알림을 생성하지 않는다")
-  void onPlaylistContentAdded_noSubscribers_doesNotCreateNotification() {
+  @DisplayName("구독자가 없으면 알림을 발행하지 않는다")
+  void onPlaylistContentAdded_noSubscribers_doesNotPublish() {
     UUID playlistId = UUID.randomUUID();
     UUID contentId = UUID.randomUUID();
 
@@ -77,12 +79,12 @@ class PlaylistContentAddedEventListenerTest {
 
     listener.onPlaylistContentAdded(event);
 
-    then(notificationService).should(never()).createNotification(any());
+    then(notificationKafkaProducer).should(never()).publish(any());
   }
 
   @Test
-  @DisplayName("일부 구독자 알림 생성에 실패해도 예외를 전파하지 않는다")
-  void onPlaylistContentAdded_notificationFailure_doesNotThrow() {
+  @DisplayName("일부 구독자 알림 Kafka 발행에 실패해도 예외를 전파하지 않는다")
+  void onPlaylistContentAdded_kafkaPublishFailure_doesNotThrow() {
     UUID playlistId = UUID.randomUUID();
     UUID contentId = UUID.randomUUID();
     UUID subscriberId = UUID.randomUUID();
@@ -92,24 +94,25 @@ class PlaylistContentAddedEventListenerTest {
 
     given(subscriptionRepository.findActiveSubscriberIdsByPlaylistId(playlistId))
         .willReturn(List.of(subscriberId));
-    given(notificationService.createNotification(any()))
-        .willThrow(new RuntimeException("notification failed"));
+    willThrow(new RuntimeException("kafka publish failed"))
+        .given(notificationKafkaProducer)
+        .publish(any());
 
-    listener.onPlaylistContentAdded(event);
+    assertThatCode(() -> listener.onPlaylistContentAdded(event)).doesNotThrowAnyException();
 
-    then(notificationService).should().createNotification(any());
+    then(notificationKafkaProducer).should().publish(any());
   }
 
   @Test
-  @DisplayName("플레이리스트 콘텐츠 추가 이벤트 리스너는 알림 저장을 새 트랜잭션에서 처리한다")
-  void onPlaylistContentAdded_hasRequiresNewTransaction() throws Exception {
+  @DisplayName("플레이리스트 콘텐츠 추가 이벤트 리스너는 커밋 이후 Kafka 메시지를 발행한다")
+  void onPlaylistContentAdded_hasTransactionalEventListenerAfterCommit() throws Exception {
     Method method =
         PlaylistContentAddedEventListener.class.getMethod(
             "onPlaylistContentAdded", PlaylistContentAddedEvent.class);
 
-    Transactional transactional = method.getAnnotation(Transactional.class);
+    TransactionalEventListener annotation = method.getAnnotation(TransactionalEventListener.class);
 
-    assertThat(transactional).isNotNull();
-    assertThat(transactional.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+    assertThat(annotation).isNotNull();
+    assertThat(annotation.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
   }
 }

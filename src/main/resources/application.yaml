@@ -5,6 +5,9 @@ spring:
   profiles:
     active: dev
 
+  flyway:
+    enabled: true  # 기동 시 db/migration 마이그레이션 적용 (스키마 자동 생성·버전관리)
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -25,6 +28,17 @@ spring:
     multipart:
       max-file-size: 10MB     # 업로드 가능한 개별 파일의 최대 크기
       max-request-size: 20MB  # 단일 요청 전체의 최대 크기
+
+# 모니터링(Prometheus/Grafana): health/info 외에 prometheus 메트릭 엔드포인트만 노출한다.
+# 나머지 actuator 엔드포인트는 SecurityConfig에서 접근을 차단한다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}  # 인스턴스 여러 대일 때 메트릭 출처 구분용 공통 태그
 
 logging:
   pattern:
