@@ -46,7 +46,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
     volumes:
       - ./config/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./config/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      # grafana_data(/var/lib/grafana) 하위에 중첩 마운트하지 않도록 설정 파일은 /etc/grafana 아래로 분리
+      - ./config/monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     ports:
       - "3000:3000"
