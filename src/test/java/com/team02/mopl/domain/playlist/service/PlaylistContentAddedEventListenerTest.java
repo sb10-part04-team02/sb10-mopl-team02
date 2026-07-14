@@ -39,12 +39,13 @@ class PlaylistContentAddedEventListenerTest {
   @Test
   @DisplayName("플레이리스트 콘텐츠 추가 이벤트를 수신하면 구독자에게 알림 Kafka 메시지를 발행한다")
   void onPlaylistContentAdded_publishesKafkaMessageForSubscribers() {
+    UUID playlistContentId = UUID.randomUUID();
     UUID playlistId = UUID.randomUUID();
     UUID contentId = UUID.randomUUID();
     UUID subscriberId = UUID.randomUUID();
 
     PlaylistContentAddedEvent event =
-        new PlaylistContentAddedEvent(playlistId, "내 플리", contentId, "콘텐츠 제목");
+        new PlaylistContentAddedEvent(playlistContentId, playlistId, "내 플리", contentId, "콘텐츠 제목");
 
     given(subscriptionRepository.findActiveSubscriberIdsByPlaylistId(playlistId))
         .willReturn(List.of(subscriberId));
@@ -63,6 +64,8 @@ class PlaylistContentAddedEventListenerTest {
     assertThat(message.content()).isEqualTo("[내 플리] 플레이리스트에 콘텐츠 제목 콘텐츠가 추가되었습니다.");
     assertThat(message.level()).isEqualTo(NotificationLevel.INFO);
     assertThat(message.notificationType()).isEqualTo(NotificationType.PLAYLIST_CONTENT_ADDED);
+    assertThat(message.dedupKey())
+        .isEqualTo("PLAYLIST_CONTENT_ADDED:" + subscriberId + ":" + playlistContentId);
   }
 
   @Test
@@ -72,7 +75,7 @@ class PlaylistContentAddedEventListenerTest {
     UUID contentId = UUID.randomUUID();
 
     PlaylistContentAddedEvent event =
-        new PlaylistContentAddedEvent(playlistId, "내 플리", contentId, "콘텐츠 제목");
+        new PlaylistContentAddedEvent(UUID.randomUUID(), playlistId, "내 플리", contentId, "콘텐츠 제목");
 
     given(subscriptionRepository.findActiveSubscriberIdsByPlaylistId(playlistId))
         .willReturn(List.of());
@@ -90,7 +93,7 @@ class PlaylistContentAddedEventListenerTest {
     UUID subscriberId = UUID.randomUUID();
 
     PlaylistContentAddedEvent event =
-        new PlaylistContentAddedEvent(playlistId, "내 플리", contentId, "콘텐츠 제목");
+        new PlaylistContentAddedEvent(UUID.randomUUID(), playlistId, "내 플리", contentId, "콘텐츠 제목");
 
     given(subscriptionRepository.findActiveSubscriberIdsByPlaylistId(playlistId))
         .willReturn(List.of(subscriberId));

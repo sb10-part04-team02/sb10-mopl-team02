@@ -79,7 +79,11 @@ public class WatchingSessionService {
       // 기존 활성 세션 재사용 시에도 이벤트를 발행하면 새로고침/재연결마다 중복 알림이 생성될 수 있다.
       eventPublisher.publishEvent(
           new WatchingSessionJoinedEvent(
-              watcher.getId(), watcher.getName(), content.getId(), content.getTitle()));
+              session.getId(),
+              watcher.getId(),
+              watcher.getName(),
+              content.getId(),
+              content.getTitle()));
       log.info(
           "watching.session_joined contentId={} userId={} sessionId={}",
           contentId,

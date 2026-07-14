@@ -52,8 +52,9 @@ public class SubscriptionService {
       throw new SubscriptionAlreadyExistsException();
     }
 
+    Subscription subscription;
     try {
-      subscriptionRepository.saveAndFlush(new Subscription(requesterId, playlist));
+      subscription = subscriptionRepository.saveAndFlush(new Subscription(requesterId, playlist));
     } catch (DataIntegrityViolationException e) {
       throw new SubscriptionAlreadyExistsException(e);
     }
@@ -63,7 +64,11 @@ public class SubscriptionService {
     // 구독 트랜잭션 커밋 이후 알림을 생성해, 알림 실패가 구독 성공을 롤백하지 않도록 분리한다.
     eventPublisher.publishEvent(
         new SubscriptionCreatedEvent(
-            subscriber.getId(), subscriber.getName(), playlist.getOwnerId(), playlist.getTitle()));
+            subscription.getId(),
+            subscriber.getId(),
+            subscriber.getName(),
+            playlist.getOwnerId(),
+            playlist.getTitle()));
 
     log.info("플레이리스트 구독 성공: playlistId={}, requesterId={}", playlistId, requesterId);
   }

@@ -41,17 +41,32 @@ public class Notification extends BaseEntity {
   @Column(name = "notification_type", nullable = false, length = 30)
   private NotificationType notificationType;
 
+  // Kafka 재소비 시 중복 저장을 막기 위한 멱등 키 (도메인 사건 기준 결정적 값)
+  @Column(name = "dedup_key", length = 255)
+  private String dedupKey;
+
   public Notification(
       User receiver,
       String title,
       String content,
       NotificationLevel level,
       NotificationType notificationType) {
+    this(receiver, title, content, level, notificationType, null);
+  }
+
+  public Notification(
+      User receiver,
+      String title,
+      String content,
+      NotificationLevel level,
+      NotificationType notificationType,
+      String dedupKey) {
     this.receiver = Objects.requireNonNull(receiver, "receiver는 null일 수 없습니다.");
     this.title = Objects.requireNonNull(title, "title은 null일 수 없습니다.");
     this.content = Objects.requireNonNull(content, "content는 null일 수 없습니다.");
     this.level = level == null ? NotificationLevel.INFO : level;
     this.notificationType =
         Objects.requireNonNull(notificationType, "notificationType은 null일 수 없습니다.");
+    this.dedupKey = dedupKey;
   }
 }

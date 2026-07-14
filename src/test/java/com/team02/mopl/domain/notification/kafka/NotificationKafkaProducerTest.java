@@ -40,7 +40,8 @@ class NotificationKafkaProducerTest {
             "새 팔로워 알림",
             "팔로워님이 팔로우했습니다.",
             NotificationLevel.INFO,
-            NotificationType.USER_FOLLOWED);
+            NotificationType.USER_FOLLOWED,
+            null);
 
     String payload = "{\"receiverId\":\"" + receiverId + "\"}";
     CompletableFuture<SendResult<String, String>> pendingFuture = new CompletableFuture<>();
@@ -75,7 +76,8 @@ class NotificationKafkaProducerTest {
             "새 팔로워 알림",
             "팔로워님이 팔로우했습니다.",
             NotificationLevel.INFO,
-            NotificationType.USER_FOLLOWED);
+            NotificationType.USER_FOLLOWED,
+            null);
 
     given(objectMapper.writeValueAsString(message))
         .willThrow(new JsonProcessingException("serialize failed") {});

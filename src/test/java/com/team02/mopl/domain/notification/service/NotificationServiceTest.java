@@ -40,6 +40,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -65,7 +66,12 @@ class NotificationServiceTest {
     User receiver = mockUser(receiverId);
     NotificationCreateCommand command =
         new NotificationCreateCommand(
-            receiverId, "알림 제목", "알림 내용", NotificationLevel.INFO, NotificationType.USER_FOLLOWED);
+            receiverId,
+            "알림 제목",
+            "알림 내용",
+            NotificationLevel.INFO,
+            NotificationType.USER_FOLLOWED,
+            null);
 
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
     given(notificationRepository.save(any(Notification.class)))
@@ -89,6 +95,57 @@ class NotificationServiceTest {
   }
 
   @Test
+  @DisplayName("동일 dedupKey의 알림이 이미 존재하면 저장·fan-out 없이 스킵한다")
+  void createNotification_duplicateDedupKey_skipsSave() {
+    UUID receiverId = UUID.randomUUID();
+    String dedupKey = "USER_FOLLOWED:" + receiverId + ":" + UUID.randomUUID();
+    NotificationCreateCommand command =
+        new NotificationCreateCommand(
+            receiverId,
+            "알림 제목",
+            "알림 내용",
+            NotificationLevel.INFO,
+            NotificationType.USER_FOLLOWED,
+            dedupKey);
+
+    given(notificationRepository.existsByReceiver_IdAndDedupKey(receiverId, dedupKey))
+        .willReturn(true);
+
+    NotificationDto result = notificationService.createNotification(command);
+
+    assertThat(result).isNull();
+    verify(notificationRepository, never()).save(any(Notification.class));
+    then(notificationSseFanOutPublisher).should(never()).publish(any());
+  }
+
+  @Test
+  @DisplayName("존재 검사 이후 UNIQUE 제약 위반이 발생하면 예외를 전파해 Kafka 재소비로 복구한다")
+  void createNotification_uniqueViolationOnSave_propagatesForRetry() {
+    UUID receiverId = UUID.randomUUID();
+    User receiver = mock(User.class);
+    String dedupKey = "USER_FOLLOWED:" + receiverId + ":" + UUID.randomUUID();
+    NotificationCreateCommand command =
+        new NotificationCreateCommand(
+            receiverId,
+            "알림 제목",
+            "알림 내용",
+            NotificationLevel.INFO,
+            NotificationType.USER_FOLLOWED,
+            dedupKey);
+
+    given(notificationRepository.existsByReceiver_IdAndDedupKey(receiverId, dedupKey))
+        .willReturn(false);
+    given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
+    given(notificationRepository.save(any(Notification.class)))
+        .willThrow(new DataIntegrityViolationException("unique violation"));
+
+    // 동시 삽입 레이스로 UNIQUE 제약에 걸리면 예외가 전파되고, Kafka 재소비 시 존재 검사에 걸려 최종적으로 1건만 저장된다.
+    assertThatThrownBy(() -> notificationService.createNotification(command))
+        .isInstanceOf(DataIntegrityViolationException.class);
+    then(notificationSseFanOutPublisher).should(never()).publish(any());
+  }
+
+  @Test
   @DisplayName("알림 생성 후 Redis Pub/Sub fan-out 이벤트를 발행한다")
   void createNotification_publishesFanOutEvent() {
     UUID receiverId = UUID.randomUUID();
@@ -96,7 +153,12 @@ class NotificationServiceTest {
     User receiver = mockUser(receiverId);
     NotificationCreateCommand command =
         new NotificationCreateCommand(
-            receiverId, "알림 제목", "알림 내용", NotificationLevel.INFO, NotificationType.USER_FOLLOWED);
+            receiverId,
+            "알림 제목",
+            "알림 내용",
+            NotificationLevel.INFO,
+            NotificationType.USER_FOLLOWED,
+            null);
 
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
     given(notificationRepository.save(any(Notification.class)))
@@ -118,7 +180,12 @@ class NotificationServiceTest {
     UUID receiverId = UUID.randomUUID();
     NotificationCreateCommand command =
         new NotificationCreateCommand(
-            receiverId, "알림 제목", "알림 내용", NotificationLevel.INFO, NotificationType.USER_FOLLOWED);
+            receiverId,
+            "알림 제목",
+            "알림 내용",
+            NotificationLevel.INFO,
+            NotificationType.USER_FOLLOWED,
+            null);
 
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.empty());
 
@@ -136,7 +203,7 @@ class NotificationServiceTest {
     User receiver = mockUser(receiverId);
     NotificationCreateCommand command =
         new NotificationCreateCommand(
-            receiverId, "알림 제목", "알림 내용", null, NotificationType.USER_FOLLOWED);
+            receiverId, "알림 제목", "알림 내용", null, NotificationType.USER_FOLLOWED, null);
 
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
     given(notificationRepository.save(any(Notification.class)))
@@ -335,7 +402,12 @@ class NotificationServiceTest {
     User receiver = mockUser(receiverId);
     NotificationCreateCommand command =
         new NotificationCreateCommand(
-            receiverId, "알림 제목", "알림 내용", NotificationLevel.INFO, NotificationType.USER_FOLLOWED);
+            receiverId,
+            "알림 제목",
+            "알림 내용",
+            NotificationLevel.INFO,
+            NotificationType.USER_FOLLOWED,
+            null);
 
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
     given(notificationRepository.save(any(Notification.class)))
@@ -370,7 +442,12 @@ class NotificationServiceTest {
     User receiver = mockUser(receiverId);
     NotificationCreateCommand command =
         new NotificationCreateCommand(
-            receiverId, "알림 제목", "알림 내용", NotificationLevel.INFO, NotificationType.USER_FOLLOWED);
+            receiverId,
+            "알림 제목",
+            "알림 내용",
+            NotificationLevel.INFO,
+            NotificationType.USER_FOLLOWED,
+            null);
 
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
     given(notificationRepository.save(any(Notification.class)))

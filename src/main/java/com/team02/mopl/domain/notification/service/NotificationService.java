@@ -45,8 +45,24 @@ public class NotificationService {
   private final NotificationSseFanOutPublisher notificationSseFanOutPublisher;
   private final SseEventService sseEventService;
 
+  /**
+   * 알림을 생성한다. Kafka 재소비로 동일 메시지가 다시 들어오면 dedupKey 존재 검사로 중복 저장을 막고 {@code null}을 반환한다. 존재 검사 이후 동시
+   * 삽입 레이스로 UNIQUE 제약(receiver_id, dedup_key)에 걸리면 커밋이 실패해 예외가 전파되고, Kafka 재소비 시 존재 검사에 걸려 최종적으로
+   * 1건만 저장된다.
+   *
+   * @return 저장된 알림 DTO. 중복으로 스킵된 경우 {@code null}.
+   */
   @Transactional
   public NotificationDto createNotification(@Valid NotificationCreateCommand command) {
+    // Kafka 재소비로 동일 메시지가 다시 들어오면 dedupKey로 존재 검사해 중복 저장을 막는다
+    if (command.dedupKey() != null
+        && notificationRepository.existsByReceiver_IdAndDedupKey(
+            command.receiverId(), command.dedupKey())) {
+      log.debug(
+          "중복 알림 감지, 저장 생략. receiverId={}, dedupKey={}", command.receiverId(), command.dedupKey());
+      return null;
+    }
+
     User receiver = getActiveUser(command.receiverId());
 
     Notification notification =
@@ -55,8 +71,11 @@ public class NotificationService {
             command.title(),
             command.content(),
             command.level(),
-            command.notificationType());
+            command.notificationType(),
+            command.dedupKey());
 
+    // 존재 검사 통과 후 저장한다. 동시 삽입 레이스로 UNIQUE 제약에 걸리면 커밋이 실패하고,
+    // Kafka 재소비 시 존재 검사에 걸려 최종적으로 1건만 저장된다(UNIQUE 제약이 최종 방어선).
     Notification savedNotification = notificationRepository.save(notification);
     NotificationDto notificationDto = NotificationDto.from(savedNotification);
 

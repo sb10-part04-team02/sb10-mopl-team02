@@ -49,7 +49,8 @@ public class UserEventListener {
               "권한 변경 알림",
               "회원님의 권한이 " + event.oldRole() + "에서 " + event.newRole() + "으로 변경되었습니다.",
               NotificationLevel.INFO,
-              NotificationType.ROLE_UPDATED));
+              NotificationType.ROLE_UPDATED,
+              null));
     } catch (RuntimeException e) {
       log.warn(
           "권한 변경 알림 생성 실패. userId={}, oldRole={}, newRole={}",

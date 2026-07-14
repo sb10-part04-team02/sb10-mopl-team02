@@ -11,4 +11,5 @@ public record NotificationCreateCommand(
     @NotBlank String title,
     @NotBlank String content,
     NotificationLevel level,
-    @NotNull NotificationType notificationType) {}
+    @NotNull NotificationType notificationType,
+    String dedupKey) {}

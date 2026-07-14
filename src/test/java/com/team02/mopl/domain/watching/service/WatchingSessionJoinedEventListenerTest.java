@@ -39,12 +39,13 @@ class WatchingSessionJoinedEventListenerTest {
   @Test
   @DisplayName("실시간 시청 시작 이벤트를 수신하면 팔로워에게 주요 활동 알림 Kafka 메시지를 발행한다")
   void onWatchingSessionJoined_publishesFollowingUserActivityKafkaMessage() {
+    UUID activityId = UUID.randomUUID();
     UUID watcherId = UUID.randomUUID();
     UUID followerId = UUID.randomUUID();
     UUID contentId = UUID.randomUUID();
 
     WatchingSessionJoinedEvent event =
-        new WatchingSessionJoinedEvent(watcherId, "우디", contentId, "QA 영화");
+        new WatchingSessionJoinedEvent(activityId, watcherId, "우디", contentId, "QA 영화");
 
     given(followRepository.findActiveFollowerIdsByFolloweeId(watcherId))
         .willReturn(List.of(followerId));
@@ -63,16 +64,19 @@ class WatchingSessionJoinedEventListenerTest {
     assertThat(message.content()).isEqualTo("[QA 영화] 시청 중");
     assertThat(message.level()).isEqualTo(NotificationLevel.INFO);
     assertThat(message.notificationType()).isEqualTo(NotificationType.FOLLOWING_USER_ACTIVITY);
+    assertThat(message.dedupKey())
+        .isEqualTo("FOLLOWING_USER_ACTIVITY:" + followerId + ":" + activityId);
   }
 
   @Test
   @DisplayName("팔로워가 없으면 알림을 발행하지 않는다")
   void onWatchingSessionJoined_noFollowers_doesNotPublish() {
+    UUID activityId = UUID.randomUUID();
     UUID watcherId = UUID.randomUUID();
     UUID contentId = UUID.randomUUID();
 
     WatchingSessionJoinedEvent event =
-        new WatchingSessionJoinedEvent(watcherId, "우디", contentId, "QA 영화");
+        new WatchingSessionJoinedEvent(activityId, watcherId, "우디", contentId, "QA 영화");
 
     given(followRepository.findActiveFollowerIdsByFolloweeId(watcherId)).willReturn(List.of());
 
@@ -84,12 +88,13 @@ class WatchingSessionJoinedEventListenerTest {
   @Test
   @DisplayName("일부 팔로워 알림 Kafka 발행에 실패해도 예외를 전파하지 않는다")
   void onWatchingSessionJoined_kafkaPublishFailure_doesNotPropagate() {
+    UUID activityId = UUID.randomUUID();
     UUID watcherId = UUID.randomUUID();
     UUID followerId = UUID.randomUUID();
     UUID contentId = UUID.randomUUID();
 
     WatchingSessionJoinedEvent event =
-        new WatchingSessionJoinedEvent(watcherId, "우디", contentId, "QA 영화");
+        new WatchingSessionJoinedEvent(activityId, watcherId, "우디", contentId, "QA 영화");
 
     given(followRepository.findActiveFollowerIdsByFolloweeId(watcherId))
         .willReturn(List.of(followerId));

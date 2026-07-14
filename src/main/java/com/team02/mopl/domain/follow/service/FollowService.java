@@ -52,7 +52,8 @@ public class FollowService {
       throw new FollowAlreadyExistsException();
     }
 
-    eventPublisher.publishEvent(new FollowCreatedEvent(followerId, follower.getName(), followeeId));
+    eventPublisher.publishEvent(
+        new FollowCreatedEvent(follow.getId(), followerId, follower.getName(), followeeId));
 
     return FollowDto.from(follow);
   }

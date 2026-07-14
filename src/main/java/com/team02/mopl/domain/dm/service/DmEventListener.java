@@ -29,7 +29,8 @@ public class DmEventListener {
               "새 메시지",
               event.dto().sender().name() + "님이 메시지를 보냈습니다.",
               NotificationLevel.INFO,
-              NotificationType.DIRECT_MESSAGE_RECEIVED));
+              NotificationType.DIRECT_MESSAGE_RECEIVED,
+              "DIRECT_MESSAGE_RECEIVED:" + event.receiverUserId() + ":" + event.eventId()));
     } catch (RuntimeException e) {
       log.warn(
           "DM 수신 알림 Kafka 발행 실패. receiverUserId={}, eventId={}",

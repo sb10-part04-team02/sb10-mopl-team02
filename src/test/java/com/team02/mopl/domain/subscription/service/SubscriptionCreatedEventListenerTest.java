@@ -33,11 +33,12 @@ class SubscriptionCreatedEventListenerTest {
   @Test
   @DisplayName("구독 생성 이벤트를 수신하면 PLAYLIST_SUBSCRIBED 알림 Kafka 메시지를 발행한다")
   void onSubscriptionCreated_publishesPlaylistSubscribedKafkaMessage() {
+    UUID subscriptionId = UUID.randomUUID();
     UUID subscriberId = UUID.randomUUID();
     UUID playlistOwnerId = UUID.randomUUID();
 
     SubscriptionCreatedEvent event =
-        new SubscriptionCreatedEvent(subscriberId, "구독자", playlistOwnerId, "내 플리");
+        new SubscriptionCreatedEvent(subscriptionId, subscriberId, "구독자", playlistOwnerId, "내 플리");
 
     listener.onSubscriptionCreated(event);
 
@@ -53,16 +54,19 @@ class SubscriptionCreatedEventListenerTest {
     assertThat(message.content()).isEqualTo("구독자님이 [내 플리] 플레이리스트를 구독했습니다.");
     assertThat(message.level()).isEqualTo(NotificationLevel.INFO);
     assertThat(message.notificationType()).isEqualTo(NotificationType.PLAYLIST_SUBSCRIBED);
+    assertThat(message.dedupKey())
+        .isEqualTo("PLAYLIST_SUBSCRIBED:" + playlistOwnerId + ":" + subscriptionId);
   }
 
   @Test
   @DisplayName("구독 알림 Kafka 발행에 실패해도 예외를 전파하지 않는다")
   void onSubscriptionCreated_kafkaPublishFailure_doesNotThrow() {
+    UUID subscriptionId = UUID.randomUUID();
     UUID subscriberId = UUID.randomUUID();
     UUID playlistOwnerId = UUID.randomUUID();
 
     SubscriptionCreatedEvent event =
-        new SubscriptionCreatedEvent(subscriberId, "구독자", playlistOwnerId, "내 플리");
+        new SubscriptionCreatedEvent(subscriptionId, subscriberId, "구독자", playlistOwnerId, "내 플리");
 
     willThrow(new RuntimeException("kafka publish failed"))
         .given(notificationKafkaProducer)

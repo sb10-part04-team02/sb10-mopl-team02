@@ -140,7 +140,11 @@ public class PlaylistService {
     // 플레이리스트 생성 알림은 커밋 이후 이벤트 리스너에서 처리한다.
     eventPublisher.publishEvent(
         new PlaylistCreatedEvent(
-            owner.getId(), owner.getName(), saved.getTitle(), saved.getDescription()));
+            saved.getId(),
+            owner.getId(),
+            owner.getName(),
+            saved.getTitle(),
+            saved.getDescription()));
 
     // 방금 생성한 본인 플레이리스트이므로 subscribedByMe는 false, 콘텐츠는 아직 없음
     PlaylistDto playlistDto =
@@ -228,8 +232,10 @@ public class PlaylistService {
       throw new PlaylistContentAlreadyExistsException();
     }
 
+    PlaylistContent playlistContent;
     try {
-      playlistContentRepository.saveAndFlush(new PlaylistContent(playlist, content.getId()));
+      playlistContent =
+          playlistContentRepository.saveAndFlush(new PlaylistContent(playlist, content.getId()));
     } catch (DataIntegrityViolationException e) {
       throw new PlaylistContentAlreadyExistsException();
     }
@@ -237,7 +243,11 @@ public class PlaylistService {
     // 콘텐츠 추가 알림은 커밋 이후 리스너에서 처리해, 알림 실패가 콘텐츠 추가를 롤백하지 않도록 분리한다.
     eventPublisher.publishEvent(
         new PlaylistContentAddedEvent(
-            playlist.getId(), playlist.getTitle(), content.getId(), content.getTitle()));
+            playlistContent.getId(),
+            playlist.getId(),
+            playlist.getTitle(),
+            content.getId(),
+            content.getTitle()));
 
     log.info(
         "플레이리스트 콘텐츠 추가 성공: playlistId={}, requesterId={}, contentId={}",
