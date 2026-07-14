@@ -125,6 +125,35 @@ mkdir -p logs/app && set -a && source .env && set +a && ./gradlew bootRun 2>&1 |
 
 - SpotBugs 리포트: `build/reports/spotbugs/main.html`
 
+### 7. 모니터링 (Prometheus / Grafana) 로컬 확인
+
+`docker compose up -d`(2번)로 인프라를 띄우면 Prometheus, Grafana 컨테이너도 함께 실행됩니다.
+Prometheus는 호스트에서 실행 중인 앱(`host.docker.internal:8080`)의 `/actuator/prometheus`를 스크레이프하므로,
+**메트릭이 수집되려면 3번의 애플리케이션(`./gradlew bootRun`)이 실행 중이어야 합니다.**
+
+#### 확인 순서
+
+1. 앱 메트릭 노출 확인
+   ```bash
+   curl -s http://localhost:8080/actuator/prometheus | head   # 메트릭 텍스트가 나오면 정상
+   ```
+2. Prometheus 타깃 상태 확인
+   - http://localhost:9090/targets 접속 -> `mopl` job이 **UP**이면 스크레이프 정상
+   - 쿼리 예: http://localhost:9090 에서 `up{job="mopl"}` 실행 시 값이 `1`
+3. Grafana 대시보드 확인
+   - http://localhost:3000 접속 (기본 계정 `admin` / `admin`, `.env`의 `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`로 오버라이드 가능)
+   - 좌측 메뉴 **Dashboards -> Mopl -> "Mopl 서버 모니터링"** 대시보드에서 HTTP 요청 처리율/응답 시간 등 확인
+   - 데이터소스(Prometheus)와 대시보드는 `config/monitoring/grafana`에서 자동 프로비저닝됩니다.
+
+| 서비스 | 주소 | 비고 |
+| --- | --- | --- |
+| 앱 메트릭 | http://localhost:8080/actuator/prometheus | 호스트에서 `bootRun`으로 실행 |
+| Prometheus | http://localhost:9090 | `/targets`에서 스크레이프 상태 확인 |
+| Grafana | http://localhost:3000 | admin/admin, 대시보드 자동 로드 |
+
+> `include: health, info, prometheus`로 지정된 actuator 엔드포인트만 노출되며, 나머지는 `SecurityConfig`에서 차단됩니다.
+> 타깃이 **DOWN**이면 앱이 호스트에서 실행 중인지(2번이 아닌 3번), `8080` 포트가 열려 있는지 확인하세요.
+
 </div>
 </details>
 
