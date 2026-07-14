@@ -21,6 +21,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @Slf4j
 @RestControllerAdvice
@@ -70,6 +71,16 @@ public class GlobalExceptionHandler {
 
     ErrorResponse response =
         new ErrorResponse(e.getClass().getSimpleName(), "잘못된 요청입니다.", Map.of(parameter, details));
+
+    return ResponseEntity.badRequest().body(response);
+  }
+
+  // 업로드 파일이 multipart 한도(max-file-size)를 초과했을 때 발생하는 예외 처리
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException e) {
+    ErrorResponse response =
+        new ErrorResponse(
+            e.getClass().getSimpleName(), "잘못된 요청입니다.", Map.of("file", "파일 크기가 허용 한도를 초과했습니다."));
 
     return ResponseEntity.badRequest().body(response);
   }

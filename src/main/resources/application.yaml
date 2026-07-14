@@ -50,11 +50,26 @@ app:
     email: ${ADMIN_EMAIL}
     password: ${ADMIN_PASSWORD}
     name: ${ADMIN_NAME}
+  redis:
+    outbox:
+      maximum-retry-threshold: 5
+      retry-delay: 10m
+      clean-up: "0 0 3 * * *"
+  kafka:
+    consumer:
+      retry:
+        interval: 1s
+        max-retries: 3
   storage:
+    type: local            # 사용할 스토리지 구현체: local | s3
     local:
       base-path: storage   # 파일이 저장되는 디스크상의 디렉터리 경로
       base-url: /files     # 저장된 파일을 서빙하는 URL 경로 접두사
       public-base-url: ""  # dev에서만 절대 URL로 오버라이드
+    s3:
+      bucket: ""           # S3 버킷 이름 (운영에서 오버라이드)
+      region: ""           # 버킷 리전
+      base-url: ""         # 공개 접근 URL 접두사 (CDN)
     # 썸네일 미제공 시 내려줄 기본 URL. 앱 내장 정적 리소스(static/images/default-thumbnail.svg)를 서빙
     # prod는 상대 경로(동일 origin), dev는 application-dev.yaml에서 절대 URL로 오버라이드
     default-thumbnail-url: /images/default-thumbnail.svg
@@ -71,7 +86,7 @@ app:
     base-url: https://www.thesportsdb.com/api/v1/json
     connect-timeout: 3s
     read-timeout: 10s
-    leagues:  # 수집 대상 리그+시즌. 시즌 표기는 리그마다 다름
+    leagues: # 수집 대상 리그+시즌. 시즌 표기는 리그마다 다름
       - id: "4328"
         season: "2025-2026"  # English Premier League
   ingestion:

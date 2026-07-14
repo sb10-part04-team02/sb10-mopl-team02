@@ -26,7 +26,11 @@ public class SseEventService {
   private void sendEvent(
       UUID receiverId, SseEmitter emitter, String eventName, String eventId, Object data) {
     try {
-      emitter.send(SseEmitter.event().id(eventId).name(eventName).data(data));
+      emitter.send(
+          SseEmitter.event()
+              .id(SseEventId.fromEventName(eventName, eventId))
+              .name(eventName)
+              .data(data));
     } catch (IOException e) {
       sseEmitterRepository.delete(receiverId, emitter);
       log.warn("Failed to send SSE event. receiverId={}, eventName={}", receiverId, eventName, e);

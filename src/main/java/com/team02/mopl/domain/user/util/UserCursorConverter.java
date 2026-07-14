@@ -3,7 +3,7 @@ package com.team02.mopl.domain.user.util;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
-import com.team02.mopl.domain.user.exception.UserInvalidCursorException;
+import com.team02.mopl.global.exception.InvalidCursorException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 
@@ -24,7 +24,7 @@ public final class UserCursorConverter {
         case ROLE -> Role.valueOf(cursor);
       };
     } catch (DateTimeParseException | IllegalArgumentException e) {
-      throw new UserInvalidCursorException(sortBy, cursor, e);
+      throw new InvalidCursorException(sortBy.name(), cursor, e);
     }
   }
 

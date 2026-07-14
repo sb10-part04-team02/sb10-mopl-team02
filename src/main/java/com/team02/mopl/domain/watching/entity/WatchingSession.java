@@ -2,6 +2,7 @@ package com.team02.mopl.domain.watching.entity;
 
 import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.user.entity.User;
+import com.team02.mopl.domain.watching.exception.AlreadyExitedWatchingSessionException;
 import com.team02.mopl.global.entity.BaseMutableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -44,7 +45,7 @@ public class WatchingSession extends BaseMutableEntity {
 
   public void exit() {
     if (this.exitedAt != null) {
-      throw new IllegalStateException("이미 종료된 시청 세션입니다.");
+      throw new AlreadyExitedWatchingSessionException();
     }
     this.exitedAt = Instant.now();
   }

@@ -9,6 +9,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.util.StringUtils;
 
 @Entity
 @Table(name = "reviews")
@@ -38,7 +39,7 @@ public class Review extends BaseMutableEntity {
   }
 
   public void update(String text, Double rating) {
-    if (text != null) {
+    if (StringUtils.hasText(text)) {
       this.text = text;
     }
     if (rating != null) {

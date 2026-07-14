@@ -7,9 +7,9 @@ import com.team02.mopl.domain.notification.entity.Notification;
 import com.team02.mopl.domain.notification.enums.NotificationSortBy;
 import com.team02.mopl.domain.notification.exception.NotificationForbiddenException;
 import com.team02.mopl.domain.notification.exception.NotificationNotFoundException;
+import com.team02.mopl.domain.notification.redis.NotificationSseFanOutPublisher;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
 import com.team02.mopl.domain.notification.util.NotificationCursorConverter;
-import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.dto.CursorPageRequest;
@@ -17,6 +17,7 @@ import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
+import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
@@ -36,11 +37,9 @@ import org.springframework.validation.annotation.Validated;
 @Transactional(readOnly = true)
 public class NotificationService {
 
-  private static final String NOTIFICATION_EVENT_NAME = "notifications";
-
   private final NotificationRepository notificationRepository;
   private final UserRepository userRepository;
-  private final SseEventService sseEventService;
+  private final NotificationSseFanOutPublisher notificationSseFanOutPublisher;
 
   @Transactional
   public NotificationDto createNotification(@Valid NotificationCreateCommand command) {
@@ -70,7 +69,7 @@ public class NotificationService {
         request.sortBy() != null ? request.sortBy() : NotificationSortBy.createdAt;
 
     if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new InvalidCursorRequestException();
     }
 
     Instant cursor = NotificationCursorConverter.toSortKey(sortBy, request.cursor());
@@ -95,6 +94,26 @@ public class NotificationService {
 
     return new CursorResponse<>(
         data, nextCursor, nextIdAfter, hasNext, totalCount, sortBy.name(), direction.name());
+  }
+
+  // 알림 재연결
+  public void resendNotificationsAfter(UUID receiverId, UUID lastNotificationId) {
+    Notification lastNotification =
+        notificationRepository
+            .findByIdAndReceiver_Id(lastNotificationId, receiverId)
+            .orElseThrow(NotificationNotFoundException::new);
+
+    List<NotificationDto> missedNotifications =
+        notificationRepository
+            .findUnreadNotificationsAfter(
+                receiverId, lastNotification.getCreatedAt(), lastNotificationId)
+            .stream()
+            .map(NotificationDto::from)
+            .toList();
+
+    for (NotificationDto notificationDto : missedNotifications) {
+      sendNotificationAfterCommit(notificationDto);
+    }
   }
 
   // 읽음 처리
@@ -140,14 +159,10 @@ public class NotificationService {
 
   private void sendNotification(NotificationDto notificationDto) {
     try {
-      sseEventService.send(
-          notificationDto.receiverId(),
-          NOTIFICATION_EVENT_NAME,
-          notificationDto.id().toString(),
-          notificationDto);
+      notificationSseFanOutPublisher.publish(notificationDto);
     } catch (RuntimeException e) {
       log.warn(
-          "알림 SSE event 전송 실패. notificationId={}, receiverId={}",
+          "알림 Redis Pub/Sub fan-out 발행 실패. notificationId={}, receiverId={}",
           notificationDto.id(),
           notificationDto.receiverId(),
           e);

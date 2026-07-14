@@ -1,5 +1,9 @@
 package com.team02.mopl.global.storage;
 
+import static com.team02.mopl.global.storage.FileStorageUtils.extractExtension;
+import static com.team02.mopl.global.storage.FileStorageUtils.stripTrailingSlash;
+import static com.team02.mopl.global.storage.FileStorageUtils.validateImage;
+
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import java.io.IOException;
@@ -9,12 +13,14 @@ import java.nio.file.Paths;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "app.storage.type", havingValue = "local", matchIfMissing = true)
 public class LocalFileStorage implements FileStorage {
 
   private final Path basePath; // 파일 실제 저장 루트 경로
@@ -36,9 +42,8 @@ public class LocalFileStorage implements FileStorage {
   // 업로드된 파일을 로컬 디스크에 저장하고 접근 가능한 URL을 반환
   @Override
   public String store(MultipartFile file) {
-    if (file == null || file.isEmpty()) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
+    // 확장자 화이트리스트/크기 검증 (로컬은 파일을 그대로 저장하므로 반환 content-type은 사용하지 않음)
+    validateImage(file);
     // 파일명 충돌 방지 - UUID + 원본확장자 붙이기 (원본 파일명 저장시 - path traversal 등 기타 고려사항 있음)
     String storedName = UUID.randomUUID() + extractExtension(file.getOriginalFilename());
     try {
@@ -85,22 +90,5 @@ public class LocalFileStorage implements FileStorage {
     } catch (IOException e) {
       log.warn("파일 삭제 실패: {}", url, e); // 삭제 실패는 로그만 남김
     }
-  }
-
-  // 원본 파일명에서 확장자를 추출
-  private String extractExtension(String originalFilename) {
-    if (!StringUtils.hasText(originalFilename)) {
-      return "";
-    }
-    int dot = originalFilename.lastIndexOf('.'); // 마지막 . 의 위치 찾아서
-    return dot >= 0 ? originalFilename.substring(dot) : ""; // . 있으면 그 위치부터 끝까지를 확장자로 반환
-  }
-
-  // publicBaseUrl 끝의 슬래시를 제거 (baseUrl과 결합 시 슬래시 중복 방지)
-  private String stripTrailingSlash(String value) {
-    if (!StringUtils.hasText(value)) {
-      return "";
-    }
-    return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
   }
 }

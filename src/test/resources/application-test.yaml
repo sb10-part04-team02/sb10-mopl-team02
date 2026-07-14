@@ -24,6 +24,10 @@ spring:
             enable: true    # TLS 보안설정
 
 app:
+  notification:
+    redis-fan-out:
+      enabled: false
+
   tmdb:
     access-token: dummy-token-for-testing
   sportsdb:

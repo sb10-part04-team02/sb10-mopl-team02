@@ -1,7 +1,7 @@
 package com.team02.mopl.domain.dm.util;
 
 import com.team02.mopl.domain.dm.enums.DirectMessageSortBy;
-import com.team02.mopl.domain.dm.exception.DmInvalidCursorException;
+import com.team02.mopl.global.exception.InvalidCursorException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 
@@ -21,7 +21,7 @@ public final class DirectMessageCursorConverter {
         case CREATED_AT -> Instant.parse(cursor);
       };
     } catch (DateTimeParseException e) {
-      throw new DmInvalidCursorException(sortBy.name(), cursor, e);
+      throw new InvalidCursorException(sortBy.name(), cursor, e);
     }
   }
 }

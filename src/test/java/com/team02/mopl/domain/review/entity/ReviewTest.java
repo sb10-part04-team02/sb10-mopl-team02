@@ -108,6 +108,21 @@ class ReviewTest {
       assertThat(review.getRating()).isEqualTo(1.0);
     }
 
+    @ParameterizedTest
+    @DisplayName("text가 빈 문자열이나 공백이면 기존 내용을 유지하고 rating만 변경한다")
+    @ValueSource(strings = {"", " ", "\t", "\n"})
+    void update_keepsTextWhenBlank(String blankText) {
+      // given
+      Review review = new Review(authorId, contentId, "원본", 4.5);
+
+      // when
+      review.update(blankText, 1.0);
+
+      // then
+      assertThat(review.getText()).isEqualTo("원본");
+      assertThat(review.getRating()).isEqualTo(1.0);
+    }
+
     @Test
     @DisplayName("rating이 null이면 기존 평점을 유지하고 text만 변경한다")
     void update_keepsRatingWhenNull() {
