@@ -5,6 +5,9 @@ spring:
   profiles:
     active: dev
 
+  flyway:
+    enabled: true  # 기동 시 db/migration 마이그레이션 적용 (스키마 자동 생성·버전관리)
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
