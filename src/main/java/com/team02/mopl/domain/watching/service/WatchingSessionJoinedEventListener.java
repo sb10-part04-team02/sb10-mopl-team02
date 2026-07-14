@@ -1,10 +1,10 @@
 package com.team02.mopl.domain.watching.service;
 
 import com.team02.mopl.domain.follow.repository.FollowRepository;
-import com.team02.mopl.domain.notification.dto.NotificationCreateCommand;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
-import com.team02.mopl.domain.notification.service.NotificationService;
+import com.team02.mopl.domain.notification.kafka.NotificationKafkaMessage;
+import com.team02.mopl.domain.notification.kafka.NotificationKafkaProducer;
 import com.team02.mopl.domain.watching.event.WatchingSessionJoinedEvent;
 import java.util.List;
 import java.util.UUID;
@@ -20,7 +20,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class WatchingSessionJoinedEventListener {
 
   private final FollowRepository followRepository;
-  private final NotificationService notificationService;
+  private final NotificationKafkaProducer notificationKafkaProducer;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onWatchingSessionJoined(WatchingSessionJoinedEvent event) {
@@ -28,8 +28,8 @@ public class WatchingSessionJoinedEventListener {
 
     for (UUID followerId : followerIds) {
       try {
-        notificationService.createNotification(
-            new NotificationCreateCommand(
+        notificationKafkaProducer.publish(
+            new NotificationKafkaMessage(
                 followerId,
                 event.watcherName() + "님이 콘텐츠를 시청하기 시작했어요.",
                 "[" + event.contentTitle() + "] 시청 중",
@@ -37,7 +37,7 @@ public class WatchingSessionJoinedEventListener {
                 NotificationType.FOLLOWING_USER_ACTIVITY));
       } catch (RuntimeException e) {
         log.warn(
-            "watching.notification_failed watcherId={} followerId={} contentId={}",
+            "watching.notification_kafka_publish_failed watcherId={} followerId={} contentId={}",
             event.watcherId(),
             followerId,
             event.contentId(),
