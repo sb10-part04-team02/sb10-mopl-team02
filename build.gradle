@@ -51,7 +51,11 @@ dependencies {
     implementation platform('software.amazon.awssdk:bom:2.34.0')
     implementation 'software.amazon.awssdk:s3'
 
-    // === QueryDSL (Jakarta) ===
+    // === 로깅 ===
+    // 로컬 ELK 수집용 JSON 로그 인코더 (logback-spring.xml의 LOGSTASH appender에서 사용)
+    implementation 'net.logstash.logback:logstash-logback-encoder:8.1'
+
+    // === QueryDSL (Jakarta) === 버전은 Spring Boot BOM 이 관리
     implementation 'com.querydsl:querydsl-jpa::jakarta'
     annotationProcessor 'com.querydsl:querydsl-apt::jakarta'
     annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
@@ -86,6 +90,8 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
     finalizedBy jacocoTestReport
+    // 프로파일 미지정 테스트가 dev 프로파일로 뜨며 application-dev.yaml의 DEBUG 레벨을 물려받는 것을 차단
+    systemProperty 'logging.level.com.team02.mopl', 'INFO'
 }
 
 jacoco {
