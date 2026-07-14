@@ -5,6 +5,9 @@ spring:
   profiles:
     active: dev
 
+  flyway:
+    enabled: true  # 기동 시 db/migration 마이그레이션 적용 (스키마 자동 생성·버전관리)
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -40,6 +43,17 @@ spring:
           connectiontimeout: 5000   # 연결대기시간 5초
           timeout: 5000             # 응답대기시간 5초
           writetimeout: 5000        # 쓰기대기시간 5초
+
+# 모니터링(Prometheus/Grafana): health/info 외에 prometheus 메트릭 엔드포인트만 노출한다.
+# 나머지 actuator 엔드포인트는 SecurityConfig에서 접근을 차단한다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}  # 인스턴스 여러 대일 때 메트릭 출처 구분용 공통 태그
 
 logging:
   pattern:

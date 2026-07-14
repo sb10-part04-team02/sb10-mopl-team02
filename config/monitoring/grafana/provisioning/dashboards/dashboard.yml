@@ -1,0 +1,11 @@
+# /etc/grafana/dashboards 에 마운트된 대시보드 JSON을 자동 로드한다.
+apiVersion: 1
+
+providers:
+  - name: mopl-dashboards
+    folder: Mopl
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards
