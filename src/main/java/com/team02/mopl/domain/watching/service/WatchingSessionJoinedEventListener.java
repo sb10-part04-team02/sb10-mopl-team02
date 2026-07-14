@@ -34,7 +34,8 @@ public class WatchingSessionJoinedEventListener {
                 event.watcherName() + "님이 콘텐츠를 시청하기 시작했어요.",
                 "[" + event.contentTitle() + "] 시청 중",
                 NotificationLevel.INFO,
-                NotificationType.FOLLOWING_USER_ACTIVITY));
+                NotificationType.FOLLOWING_USER_ACTIVITY,
+                "FOLLOWING_USER_ACTIVITY:" + followerId + ":" + event.activityId()));
       } catch (RuntimeException e) {
         log.warn(
             "watching.notification_kafka_publish_failed watcherId={} followerId={} contentId={}",

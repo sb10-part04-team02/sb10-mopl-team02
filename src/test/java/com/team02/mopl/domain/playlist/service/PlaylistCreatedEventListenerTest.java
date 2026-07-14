@@ -39,10 +39,11 @@ class PlaylistCreatedEventListenerTest {
   @Test
   @DisplayName("플레이리스트 생성 이벤트를 수신하면 팔로워에게 주요 활동 알림 Kafka 메시지를 발행한다")
   void onPlaylistCreated_publishesFollowingUserActivityKafkaMessage() {
+    UUID activityId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
     UUID followerId = UUID.randomUUID();
 
-    PlaylistCreatedEvent event = new PlaylistCreatedEvent(ownerId, "우디", "내 플리", "설명");
+    PlaylistCreatedEvent event = new PlaylistCreatedEvent(activityId, ownerId, "우디", "내 플리", "설명");
 
     given(followRepository.findActiveFollowerIdsByFolloweeId(ownerId))
         .willReturn(List.of(followerId));
@@ -61,14 +62,17 @@ class PlaylistCreatedEventListenerTest {
     assertThat(message.content()).isEqualTo("[내 플리] 설명");
     assertThat(message.level()).isEqualTo(NotificationLevel.INFO);
     assertThat(message.notificationType()).isEqualTo(NotificationType.FOLLOWING_USER_ACTIVITY);
+    assertThat(message.dedupKey())
+        .isEqualTo("FOLLOWING_USER_ACTIVITY:" + followerId + ":" + activityId);
   }
 
   @Test
   @DisplayName("팔로워가 없으면 알림을 발행하지 않는다")
   void onPlaylistCreated_noFollowers_doesNotPublish() {
+    UUID activityId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
 
-    PlaylistCreatedEvent event = new PlaylistCreatedEvent(ownerId, "우디", "내 플리", "설명");
+    PlaylistCreatedEvent event = new PlaylistCreatedEvent(activityId, ownerId, "우디", "내 플리", "설명");
 
     given(followRepository.findActiveFollowerIdsByFolloweeId(ownerId)).willReturn(List.of());
 
@@ -80,10 +84,11 @@ class PlaylistCreatedEventListenerTest {
   @Test
   @DisplayName("팔로워 알림 Kafka 발행에 실패해도 예외를 전파하지 않는다")
   void onPlaylistCreated_kafkaPublishFailure_doesNotStopListener() {
+    UUID activityId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
     UUID followerId = UUID.randomUUID();
 
-    PlaylistCreatedEvent event = new PlaylistCreatedEvent(ownerId, "우디", "내 플리", "설명");
+    PlaylistCreatedEvent event = new PlaylistCreatedEvent(activityId, ownerId, "우디", "내 플리", "설명");
 
     given(followRepository.findActiveFollowerIdsByFolloweeId(ownerId))
         .willReturn(List.of(followerId));

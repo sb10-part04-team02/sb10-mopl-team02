@@ -3,7 +3,9 @@ package com.team02.mopl.domain.notification.kafka;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team02.mopl.domain.notification.entity.Notification;
+import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.redis.NotificationSseFanOutPublisher;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
@@ -52,6 +54,10 @@ class NotificationKafkaPipelineIntegrationTest {
 
   @Autowired private NotificationRepository notificationRepository;
 
+  @Autowired private NotificationKafkaConsumer notificationKafkaConsumer;
+
+  @Autowired private ObjectMapper objectMapper;
+
   @MockitoBean private NotificationSseFanOutPublisher notificationSseFanOutPublisher;
 
   @Test
@@ -89,6 +95,36 @@ class NotificationKafkaPipelineIntegrationTest {
               assertThat(notification.getContent()).contains("QA 플레이리스트");
               assertThat(notification.getDeletedAt()).isNull();
             });
+  }
+
+  @Test
+  @DisplayName("동일 dedupKey의 알림 메시지를 두 번 소비해도 알림은 1건만 저장된다")
+  void duplicateMessage_consumedTwice_persistsSingleNotification() throws Exception {
+    User receiver =
+        userRepository.save(
+            new User("수신자", uniqueEmail("receiver"), "password", null, Role.USER, false));
+
+    String dedupKey = "USER_FOLLOWED:" + receiver.getId() + ":" + UUID.randomUUID();
+    NotificationKafkaMessage message =
+        new NotificationKafkaMessage(
+            receiver.getId(),
+            "새 팔로워 알림",
+            "팔로워님이 팔로우했습니다.",
+            NotificationLevel.INFO,
+            NotificationType.USER_FOLLOWED,
+            dedupKey);
+    String payload = objectMapper.writeValueAsString(message);
+
+    // Kafka 재소비를 시뮬레이션하기 위해 동일 payload를 두 번 소비한다
+    notificationKafkaConsumer.consume(payload);
+    notificationKafkaConsumer.consume(payload);
+
+    List<Notification> notifications =
+        notificationRepository.findAll().stream()
+            .filter(n -> n.getReceiver().getId().equals(receiver.getId()))
+            .toList();
+    assertThat(notifications).hasSize(1);
+    assertThat(notifications.get(0).getDedupKey()).isEqualTo(dedupKey);
   }
 
   private String uniqueEmail(String prefix) {

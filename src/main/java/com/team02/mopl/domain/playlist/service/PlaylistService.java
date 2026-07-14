@@ -140,7 +140,11 @@ public class PlaylistService {
     // 플레이리스트 생성 알림은 커밋 이후 이벤트 리스너에서 처리한다.
     eventPublisher.publishEvent(
         new PlaylistCreatedEvent(
-            owner.getId(), owner.getName(), saved.getTitle(), saved.getDescription()));
+            saved.getId(),
+            owner.getId(),
+            owner.getName(),
+            saved.getTitle(),
+            saved.getDescription()));
 
     // 방금 생성한 본인 플레이리스트이므로 subscribedByMe는 false, 콘텐츠는 아직 없음
     PlaylistDto playlistDto =

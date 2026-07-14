@@ -9,4 +9,5 @@ public record NotificationKafkaMessage(
     String title,
     String content,
     NotificationLevel level,
-    NotificationType notificationType) {}
+    NotificationType notificationType,
+    String dedupKey) {}

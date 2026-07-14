@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -47,6 +48,15 @@ public class NotificationService {
 
   @Transactional
   public NotificationDto createNotification(@Valid NotificationCreateCommand command) {
+    // Kafka 재소비로 동일 메시지가 다시 들어오면 dedupKey로 존재 검사해 중복 저장을 막는다
+    if (command.dedupKey() != null
+        && notificationRepository.existsByReceiver_IdAndDedupKey(
+            command.receiverId(), command.dedupKey())) {
+      log.debug(
+          "중복 알림 감지, 저장 생략. receiverId={}, dedupKey={}", command.receiverId(), command.dedupKey());
+      return null;
+    }
+
     User receiver = getActiveUser(command.receiverId());
 
     Notification notification =
@@ -55,9 +65,21 @@ public class NotificationService {
             command.title(),
             command.content(),
             command.level(),
-            command.notificationType());
+            command.notificationType(),
+            command.dedupKey());
 
-    Notification savedNotification = notificationRepository.save(notification);
+    Notification savedNotification;
+    try {
+      savedNotification = notificationRepository.saveAndFlush(notification);
+    } catch (DataIntegrityViolationException e) {
+      // 존재 검사 이후 동시 재소비 레이스로 UNIQUE 제약에 걸린 경우, 이미 저장된 것으로 간주하고 스킵 (최종 방어선)
+      log.debug(
+          "중복 알림 저장 충돌, 저장 생략. receiverId={}, dedupKey={}",
+          command.receiverId(),
+          command.dedupKey());
+      return null;
+    }
+
     NotificationDto notificationDto = NotificationDto.from(savedNotification);
 
     sendNotificationAfterCommit(notificationDto);

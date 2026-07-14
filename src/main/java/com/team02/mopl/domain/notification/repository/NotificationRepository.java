@@ -19,6 +19,8 @@ public interface NotificationRepository
 
   Optional<Notification> findByIdAndReceiver_Id(UUID notificationId, UUID receiverId);
 
+  boolean existsByReceiver_IdAndDedupKey(UUID receiverId, String dedupKey);
+
   @Query(
       "SELECT n FROM Notification n "
           + "WHERE n.receiver.id = :receiverId "

@@ -32,13 +32,15 @@ class NotificationKafkaConsumerTest {
         new NotificationKafkaConsumer(objectMapper, notificationService);
 
     UUID receiverId = UUID.randomUUID();
+    String dedupKey = "USER_FOLLOWED:" + receiverId + ":" + UUID.randomUUID();
     NotificationKafkaMessage message =
         new NotificationKafkaMessage(
             receiverId,
             "새 팔로워 알림",
             "팔로워님이 팔로우했습니다.",
             NotificationLevel.INFO,
-            NotificationType.USER_FOLLOWED);
+            NotificationType.USER_FOLLOWED,
+            dedupKey);
 
     String payload = objectMapper.writeValueAsString(message);
 
@@ -59,6 +61,7 @@ class NotificationKafkaConsumerTest {
     org.assertj.core.api.Assertions.assertThat(command.level()).isEqualTo(NotificationLevel.INFO);
     org.assertj.core.api.Assertions.assertThat(command.notificationType())
         .isEqualTo(NotificationType.USER_FOLLOWED);
+    org.assertj.core.api.Assertions.assertThat(command.dedupKey()).isEqualTo(dedupKey);
   }
 
   @Test
@@ -88,7 +91,8 @@ class NotificationKafkaConsumerTest {
             "새 팔로워 알림",
             "팔로워님이 팔로우했습니다.",
             NotificationLevel.INFO,
-            NotificationType.USER_FOLLOWED);
+            NotificationType.USER_FOLLOWED,
+            null);
 
     String payload = objectMapper.writeValueAsString(message);
 

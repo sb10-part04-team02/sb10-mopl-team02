@@ -34,7 +34,8 @@ public class PlaylistCreatedEventListener {
                 event.ownerName() + "님이 플레이리스트를 만들었어요.",
                 "[" + event.playlistTitle() + "] " + event.playlistDescription(),
                 NotificationLevel.INFO,
-                NotificationType.FOLLOWING_USER_ACTIVITY));
+                NotificationType.FOLLOWING_USER_ACTIVITY,
+                "FOLLOWING_USER_ACTIVITY:" + followerId + ":" + event.activityId()));
       } catch (RuntimeException e) {
         log.warn(
             "플레이리스트 생성 알림 Kafka 발행 실패. ownerId={}, followerId={}", event.ownerId(), followerId, e);
