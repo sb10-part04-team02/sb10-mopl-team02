@@ -77,9 +77,30 @@ export function login(email, password) {
 }
 
 // access 토큰 만료(10분) 대응. 부하가 10분 넘어가면 사용.
-// refresh 토큰은 REFRESH_TOKEN 쿠키에 있고 VU jar 에 저장돼 있다.
-// export function refresh() {
-//   const res = http.post(`${BASE_URL}/api/auth/refresh`, null, { tags: { name: 'refresh' } });
-//   check(res, { 'refresh: status 200': (r) => r.status === 200 });
-//   return res.json('accessToken');
-// }
+//
+// 주의점 2가지:
+//  1) refresh 토큰은 REFRESH_TOKEN 쿠키에 있고 login() 을 호출한 "그 VU 의 쿠키 jar" 에 저장된다.
+//     따라서 refresh 는 VU 별로 로그인하는 구조(lib/accounts.js 의 getSession)에서만 동작한다.
+//     setup 에서 1회 로그인해 전체 VU 가 토큰만 공유하면, 쿠키가 setup 컨텍스트에 갇혀 refresh 가 불가능하다.
+//  2) refresh POST 도 CSRF 대상이다(SecurityConfig 에 csrf ignore 가 없다). login 때 받아둔 csrf 를
+//     X-XSRF-TOKEN 헤더로 되돌려야 하며, 빠뜨리면 403 이 난다.
+export function refresh(csrf) {
+  const res = http.post(`${BASE_URL}/api/auth/refresh`, null, {
+    headers: { [CSRF_HEADER]: csrf },
+    tags: { name: 'refresh' },
+  });
+  const ok = check(res, {
+    'refresh: status 200': (r) => r.status === 200,
+    'refresh: has accessToken': (r) => {
+      try {
+        return typeof r.json('accessToken') === 'string';
+      } catch (_) {
+        return false;
+      }
+    },
+  });
+  if (!ok) {
+    fail(`토큰 refresh 실패 (status ${res.status}): ${String(res.body).slice(0, 200)}`);
+  }
+  return res.json('accessToken');
+}
