@@ -1,8 +1,7 @@
 package com.team02.mopl.domain.content.service;
 
+import com.team02.mopl.domain.content.exception.ContentNotFoundException;
 import com.team02.mopl.domain.content.repository.ContentRepository;
-import com.team02.mopl.global.exception.BusinessException;
-import com.team02.mopl.global.exception.ErrorCode;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +21,7 @@ public class ContentRatingService {
   public void refreshAggregate(UUID contentId) {
     int updated = contentRepository.refreshRatingAggregate(contentId);
     if (updated == 0) {
-      throw new BusinessException(ErrorCode.CONTENT_NOT_FOUND);
+      throw new ContentNotFoundException();
     }
     log.debug("content.rating_refreshed contentId={}", contentId);
   }

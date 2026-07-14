@@ -7,8 +7,11 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.team02.mopl.domain.notification.exception.NotificationNotFoundException;
+import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.sse.repository.SseEmitterRepository;
 import java.io.IOException;
 import java.util.Optional;
@@ -28,6 +31,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 class SseEmitterServiceTest {
 
   @Mock private SseEmitterRepository sseEmitterRepository;
+  @Mock private NotificationService notificationService;
 
   @InjectMocks private SseEmitterService sseEmitterService;
 
@@ -64,10 +68,11 @@ class SseEmitterServiceTest {
   }
 
   @Test
-  @DisplayName("LastEventId가 있어도 SSE 연결을 생성한다")
-  void connect_withLastEventId_success() {
+  @DisplayName("Last-Event-ID가 알림 이벤트이면 SSE 연결 후 누락 알림 복구를 요청한다")
+  void connect_withLastEventId_recoversMissedNotifications() {
     UUID userId = UUID.randomUUID();
-    String lastEventId = UUID.randomUUID().toString();
+    UUID lastNotificationId = UUID.randomUUID();
+    String lastEventId = SseEventId.notification(lastNotificationId.toString());
 
     given(sseEmitterRepository.save(eq(userId), any(SseEmitter.class)))
         .willReturn(Optional.empty());
@@ -75,7 +80,69 @@ class SseEmitterServiceTest {
     SseEmitter result = sseEmitterService.connect(userId, lastEventId);
 
     assertThat(result).isNotNull();
-    verify(sseEmitterRepository).save(eq(userId), any(SseEmitter.class));
+    verify(notificationService).resendNotificationsAfter(userId, lastNotificationId);
+  }
+
+  @Test
+  @DisplayName("Last-Event-ID가 없으면 누락 알림 복구를 요청하지 않는다")
+  void connect_withoutLastEventId_doesNotRecoverMissedNotifications() {
+    UUID userId = UUID.randomUUID();
+
+    given(sseEmitterRepository.save(eq(userId), any(SseEmitter.class)))
+        .willReturn(Optional.empty());
+
+    SseEmitter result = sseEmitterService.connect(userId, null);
+
+    assertThat(result).isNotNull();
+    verify(notificationService, never()).resendNotificationsAfter(any(), any());
+  }
+
+  @Test
+  @DisplayName("Last-Event-ID가 알림 이벤트가 아니면 누락 알림 복구를 건너뛴다")
+  void connect_withNonNotificationLastEventId_skipsRecovery() {
+    UUID userId = UUID.randomUUID();
+    String lastEventId = SseEventId.directMessage(UUID.randomUUID().toString());
+
+    given(sseEmitterRepository.save(eq(userId), any(SseEmitter.class)))
+        .willReturn(Optional.empty());
+
+    SseEmitter result = sseEmitterService.connect(userId, lastEventId);
+
+    assertThat(result).isNotNull();
+    verify(notificationService, never()).resendNotificationsAfter(any(), any());
+  }
+
+  @Test
+  @DisplayName("잘못된 Last-Event-ID 형식이어도 SSE 연결은 유지하고 복구는 건너뛴다")
+  void connect_withInvalidLastEventId_doesNotThrow() {
+    UUID userId = UUID.randomUUID();
+
+    given(sseEmitterRepository.save(eq(userId), any(SseEmitter.class)))
+        .willReturn(Optional.empty());
+
+    SseEmitter result = sseEmitterService.connect(userId, "invalid-event-id");
+
+    assertThat(result).isNotNull();
+    verify(notificationService, never()).resendNotificationsAfter(any(), any());
+  }
+
+  @Test
+  @DisplayName("Last-Event-ID에 해당하는 알림이 없어도 SSE 연결은 유지한다")
+  void connect_whenLastNotificationNotFound_doesNotThrow() {
+    UUID userId = UUID.randomUUID();
+    UUID lastNotificationId = UUID.randomUUID();
+    String lastEventId = SseEventId.notification(lastNotificationId.toString());
+
+    given(sseEmitterRepository.save(eq(userId), any(SseEmitter.class)))
+        .willReturn(Optional.empty());
+    doThrow(new NotificationNotFoundException())
+        .when(notificationService)
+        .resendNotificationsAfter(userId, lastNotificationId);
+
+    SseEmitter result = sseEmitterService.connect(userId, lastEventId);
+
+    assertThat(result).isNotNull();
+    verify(notificationService).resendNotificationsAfter(userId, lastNotificationId);
   }
 
   @Test
@@ -84,7 +151,7 @@ class SseEmitterServiceTest {
     UUID userId = UUID.randomUUID();
     SseEmitter emitter = mock(SseEmitter.class);
     TestableSseEmitterService service =
-        new TestableSseEmitterService(sseEmitterRepository, emitter);
+        new TestableSseEmitterService(sseEmitterRepository, notificationService, emitter);
 
     given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
 
@@ -96,12 +163,12 @@ class SseEmitterServiceTest {
   }
 
   @Test
-  @DisplayName("SSE 연결 시 초기 connect 이벤트를 전송한다")
+  @DisplayName("SSE 연결 후 초기 connect 이벤트를 전송한다")
   void connect_sendsConnectEvent() throws Exception {
     UUID userId = UUID.randomUUID();
     SseEmitter emitter = mock(SseEmitter.class);
     TestableSseEmitterService service =
-        new TestableSseEmitterService(sseEmitterRepository, emitter);
+        new TestableSseEmitterService(sseEmitterRepository, notificationService, emitter);
 
     given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
 
@@ -116,7 +183,7 @@ class SseEmitterServiceTest {
     UUID userId = UUID.randomUUID();
     SseEmitter emitter = mock(SseEmitter.class);
     TestableSseEmitterService service =
-        new TestableSseEmitterService(sseEmitterRepository, emitter);
+        new TestableSseEmitterService(sseEmitterRepository, notificationService, emitter);
     ArgumentCaptor<Runnable> completionCaptor = ArgumentCaptor.forClass(Runnable.class);
 
     given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
@@ -136,7 +203,7 @@ class SseEmitterServiceTest {
     UUID userId = UUID.randomUUID();
     SseEmitter emitter = mock(SseEmitter.class);
     TestableSseEmitterService service =
-        new TestableSseEmitterService(sseEmitterRepository, emitter);
+        new TestableSseEmitterService(sseEmitterRepository, notificationService, emitter);
     ArgumentCaptor<Runnable> timeoutCaptor = ArgumentCaptor.forClass(Runnable.class);
 
     given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
@@ -157,7 +224,7 @@ class SseEmitterServiceTest {
     UUID userId = UUID.randomUUID();
     SseEmitter emitter = mock(SseEmitter.class);
     TestableSseEmitterService service =
-        new TestableSseEmitterService(sseEmitterRepository, emitter);
+        new TestableSseEmitterService(sseEmitterRepository, notificationService, emitter);
     ArgumentCaptor<Consumer<Throwable>> errorCaptor = ArgumentCaptor.forClass(Consumer.class);
 
     given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
@@ -178,7 +245,7 @@ class SseEmitterServiceTest {
     IOException exception = new IOException("SSE send failed");
     SseEmitter emitter = mock(SseEmitter.class);
     TestableSseEmitterService service =
-        new TestableSseEmitterService(sseEmitterRepository, emitter);
+        new TestableSseEmitterService(sseEmitterRepository, notificationService, emitter);
 
     given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
     doThrow(exception).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
@@ -194,7 +261,7 @@ class SseEmitterServiceTest {
     UUID userId = UUID.randomUUID();
     SseEmitter emitter = mock(SseEmitter.class);
     TestableSseEmitterService service =
-        new TestableSseEmitterService(sseEmitterRepository, emitter);
+        new TestableSseEmitterService(sseEmitterRepository, notificationService, emitter);
 
     given(sseEmitterRepository.save(userId, emitter)).willReturn(Optional.empty());
 
@@ -207,13 +274,34 @@ class SseEmitterServiceTest {
     inOrder.verify(sseEmitterRepository).save(userId, emitter);
   }
 
+  @Test
+  @DisplayName("누락 알림 복구 중 예외가 발생해도 SSE 연결은 유지한다")
+  void connect_whenRecoverFails_doesNotThrow() {
+    UUID userId = UUID.randomUUID();
+    UUID lastNotificationId = UUID.randomUUID();
+    String lastEventId = SseEventId.notification(lastNotificationId.toString());
+
+    given(sseEmitterRepository.save(eq(userId), any(SseEmitter.class)))
+        .willReturn(Optional.empty());
+    doThrow(new RuntimeException("recover failed"))
+        .when(notificationService)
+        .resendNotificationsAfter(userId, lastNotificationId);
+
+    SseEmitter result = sseEmitterService.connect(userId, lastEventId);
+
+    assertThat(result).isNotNull();
+    verify(notificationService).resendNotificationsAfter(userId, lastNotificationId);
+  }
+
   private static class TestableSseEmitterService extends SseEmitterService {
 
     private final SseEmitter emitter;
 
     private TestableSseEmitterService(
-        SseEmitterRepository sseEmitterRepository, SseEmitter emitter) {
-      super(sseEmitterRepository);
+        SseEmitterRepository sseEmitterRepository,
+        NotificationService notificationService,
+        SseEmitter emitter) {
+      super(sseEmitterRepository, notificationService);
       this.emitter = emitter;
     }
 

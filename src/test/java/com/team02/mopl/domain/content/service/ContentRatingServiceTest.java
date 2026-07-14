@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 
+import com.team02.mopl.domain.content.exception.ContentNotFoundException;
 import com.team02.mopl.domain.content.repository.ContentRepository;
-import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -38,15 +38,15 @@ class ContentRatingServiceTest {
   }
 
   @Test
-  @DisplayName("갱신된 콘텐츠가 없으면(갱신 행 0건) CONTENT_NOT_FOUND BusinessException을 던진다")
+  @DisplayName("갱신된 콘텐츠가 없으면(갱신 행 0건) ContentNotFoundException을 던진다")
   void fail_whenContentNotFound() {
     // given
     given(contentRepository.refreshRatingAggregate(eq(contentId))).willReturn(0);
 
     // when & then
     assertThatThrownBy(() -> contentRatingService.refreshAggregate(contentId))
-        .isInstanceOf(BusinessException.class)
-        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isInstanceOf(ContentNotFoundException.class)
+        .extracting(e -> ((ContentNotFoundException) e).getErrorCode())
         .isEqualTo(ErrorCode.CONTENT_NOT_FOUND);
   }
 }

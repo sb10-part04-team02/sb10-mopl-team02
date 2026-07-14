@@ -13,8 +13,10 @@ import com.team02.mopl.domain.content.mapper.ContentMapper;
 import com.team02.mopl.domain.content.repository.ContentRepository;
 import com.team02.mopl.domain.content.repository.TagRepository;
 import com.team02.mopl.domain.content.util.ContentCursorConverter;
+import com.team02.mopl.global.dto.CursorPageRequest;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
+import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import com.team02.mopl.global.storage.FileStorage;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,10 +42,12 @@ public class ContentService {
   private final WatcherCountService watcherCountService;
   private final FileStorage fileStorage;
 
-  // 썸네일 미제공 시 사용할 기본값.
+  // default-thumbnail-url 설정이 비어 있을 때 최종적으로 사용할 코드 레벨 fallback (앱 내장 정적 리소스)
+  private static final String FALLBACK_THUMBNAIL_URL = "/images/default-thumbnail.svg";
+
+  // 썸네일 미제공 시 사용할 기본값. 앱 내장 정적 리소스(static/images/default-thumbnail.svg) URL.
   // 생성 폼 - 썸네일을 클라이언트단에서 필수로 강제하고 있으나 직접 API 호출 시 방어 목적.
   // project-mopl-fe-1.0.2/src/pages/contents/components/ContentFormDialog.tsx 98-101 lines
-  // TODO: S3 스토리지 구현 이슈에서 실제 기본 이미지의 절대 URL로 교체 예정
   @Value("${app.storage.default-thumbnail-url:}")
   private String defaultThumbnailUrl;
 
@@ -53,7 +57,7 @@ public class ContentService {
     String thumbnailUrl =
         (thumbnail != null && !thumbnail.isEmpty())
             ? fileStorage.store(thumbnail)
-            : defaultThumbnailUrl;
+            : resolveDefaultThumbnailUrl();
     Content content =
         new Content(request.type(), request.title(), request.description(), thumbnailUrl);
     contentRepository.save(content);
@@ -65,6 +69,16 @@ public class ContentService {
         request.type(),
         tags.size());
     return contentMapper.toDto(content, tags, 0L);
+  }
+
+  // default-thumbnail-url 설정이 비어 있어도 500(blank 검증 실패)이 발생하지 않도록 코드 레벨 fallback 보장
+  private String resolveDefaultThumbnailUrl() {
+    if (defaultThumbnailUrl == null || defaultThumbnailUrl.isBlank()) {
+      log.warn(
+          "app.storage.default-thumbnail-url 미설정. 코드 레벨 fallback 사용: {}", FALLBACK_THUMBNAIL_URL);
+      return FALLBACK_THUMBNAIL_URL;
+    }
+    return defaultThumbnailUrl;
   }
 
   // 콘텐츠 단건 조회
@@ -79,11 +93,14 @@ public class ContentService {
   // 콘텐츠 목록 조회 (QueryDSL 동적 필터 + 동적 정렬 + 복합 커서)
   @Transactional(readOnly = true)
   public CursorResponse<ContentDto> getContents(ContentSearchRequest request) {
+    int limit = CursorPageRequest.normalizeLimit(request.limit());
+    SortDirection direction = CursorPageRequest.normalizeSortDirection(request.sortDirection());
     // 정렬 기준 미지정 시 인기순(WATCHER_COUNT)으로 기본 정렬
     SortBy sortBy = request.sortBy() != null ? request.sortBy() : SortBy.WATCHER_COUNT;
-    // 정렬 방향 미지정 시 내림차순(최신순) 기본값
-    SortDirection direction =
-        request.sortDirection() != null ? request.sortDirection() : SortDirection.DESCENDING;
+
+    if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
+      throw new InvalidCursorRequestException();
+    }
     boolean asc = direction == SortDirection.ASCENDING;
 
     // 필터 정규화
@@ -102,13 +119,12 @@ public class ContentService {
             asc,
             ContentCursorConverter.toSortKey(sortBy, request.cursor()),
             request.idAfter(),
-            request.fetchLimit());
+            limit + 1);
 
     // limit + 1 적재분을 잘라 hasNext 판정 (커서 페이지네이션)
     List<Content> rows = contentRepository.search(condition);
-    int size = request.normalizedLimit();
-    boolean hasNext = rows.size() > size;
-    List<Content> pageContents = hasNext ? rows.subList(0, size) : rows;
+    boolean hasNext = rows.size() > limit;
+    List<Content> pageContents = hasNext ? rows.subList(0, limit) : rows;
     // 이번 페이지에 있는 contentId를 한 번에 다 뽑는다
     List<UUID> pageIds = pageContents.stream().map(Content::getId).toList();
 

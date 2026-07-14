@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 테스트 클래스패스에서는 이 파일이 logback-spring.xml보다 우선 적용된다.
+     dev 프로파일로 뜨는 테스트가 LOGSTASH appender(TCP 5000 전송)를 구성하지 않도록 콘솔 출력만 남긴다. -->
+<configuration>
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+  <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+</configuration>

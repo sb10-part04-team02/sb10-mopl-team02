@@ -1,7 +1,7 @@
 package com.team02.mopl.domain.notification.util;
 
 import com.team02.mopl.domain.notification.enums.NotificationSortBy;
-import com.team02.mopl.domain.notification.exception.NotificationInvalidCursorException;
+import com.team02.mopl.global.exception.InvalidCursorException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 
@@ -21,7 +21,7 @@ public final class NotificationCursorConverter {
         case createdAt -> Instant.parse(cursor);
       };
     } catch (DateTimeParseException e) {
-      throw new NotificationInvalidCursorException(sortBy, cursor, e);
+      throw new InvalidCursorException(sortBy.name(), cursor, e);
     }
   }
 }

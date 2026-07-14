@@ -19,6 +19,7 @@ import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
+import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import com.team02.mopl.global.util.OwnershipValidator;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +51,7 @@ public class ReviewService {
     ReviewSortBy sortBy = request.sortBy() != null ? request.sortBy() : ReviewSortBy.CREATED_AT;
 
     if (!CursorPageRequest.isValidCursorCombo(request.cursor(), request.idAfter())) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new InvalidCursorRequestException();
     }
 
     Comparable<?> cursor = ReviewCursorConverter.toSortKey(sortBy, request.cursor());

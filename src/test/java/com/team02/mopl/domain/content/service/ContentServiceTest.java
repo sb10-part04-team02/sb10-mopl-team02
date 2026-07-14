@@ -20,13 +20,14 @@ import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.entity.Tag;
 import com.team02.mopl.domain.content.enums.ContentType;
 import com.team02.mopl.domain.content.enums.SortBy;
+import com.team02.mopl.domain.content.exception.ContentNotFoundException;
 import com.team02.mopl.domain.content.mapper.ContentMapper;
 import com.team02.mopl.domain.content.repository.ContentRepository;
 import com.team02.mopl.domain.content.repository.TagRepository;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
-import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorCode;
+import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import com.team02.mopl.global.storage.FileStorage;
 import java.time.Instant;
 import java.util.Arrays;
@@ -174,7 +175,7 @@ class ContentServiceTest {
 
       // when & then
       assertThatThrownBy(() -> contentService.get(contentId))
-          .isInstanceOf(BusinessException.class)
+          .isInstanceOf(ContentNotFoundException.class)
           .extracting("errorCode")
           .isEqualTo(ErrorCode.CONTENT_NOT_FOUND);
 
@@ -310,6 +311,26 @@ class ContentServiceTest {
       then(contentRepository).should().save(contentCaptor.capture());
       assertThat(contentCaptor.getValue().getThumbnailUrl()).isEqualTo(DEFAULT_THUMBNAIL_URL);
     }
+
+    @Test
+    @DisplayName("기본 썸네일 설정이 비어 있어도 500 없이 코드 레벨 fallback URL로 정상 저장한다")
+    void success_usesFallbackThumbnail_whenDefaultUrlBlank() {
+      // given: default-thumbnail-url 설정 누락 상황 재현 (이슈 #340의 실제 500 유발 조건)
+      ReflectionTestUtils.setField(contentService, "defaultThumbnailUrl", "");
+      ContentCreateRequest request =
+          new ContentCreateRequest(ContentType.MOVIE, "인셉션", "꿈 속의 꿈", List.of());
+      given(contentMapper.toDto(any(Content.class), anyList(), eq(0L)))
+          .willReturn(mockDto(UUID.randomUUID(), List.of(), 0L));
+
+      // when
+      contentService.create(request, null);
+
+      // then: Content blank 검증(500)에 걸리지 않고 코드 레벨 fallback URL이 저장됨
+      then(fileStorage).should(never()).store(any());
+      then(contentRepository).should().save(contentCaptor.capture());
+      assertThat(contentCaptor.getValue().getThumbnailUrl())
+          .isEqualTo("/images/default-thumbnail.svg");
+    }
   }
 
   @Nested
@@ -326,7 +347,7 @@ class ContentServiceTest {
 
       // when & then
       assertThatThrownBy(() -> contentService.update(contentId, request, null))
-          .isInstanceOf(BusinessException.class)
+          .isInstanceOf(ContentNotFoundException.class)
           .extracting("errorCode")
           .isEqualTo(ErrorCode.CONTENT_NOT_FOUND);
 
@@ -443,6 +464,33 @@ class ContentServiceTest {
       then(contentMapper).should().toDto(eq(content), mapperTagListCaptor.capture(), eq(0L));
       assertThat(mapperTagListCaptor.getValue()).extracting(Tag::getName).containsExactly("액션");
     }
+
+    @Test
+    @DisplayName("tags가 빈 리스트면 기존 태그를 모두 논리 삭제하고 새 태그는 저장하지 않는다")
+    void success_removesAllTags_whenTagsEmptyList() {
+      // given
+      UUID contentId = UUID.randomUUID();
+      Content content = contentWithId(contentId);
+      ContentUpdateRequest request = new ContentUpdateRequest(null, null, List.of());
+      Tag oldTag = new Tag(content, "SF");
+
+      given(contentRepository.findByIdAndDeletedAtIsNull(contentId))
+          .willReturn(Optional.of(content));
+      given(tagRepository.findByContentIdAndDeletedAtIsNull(contentId)).willReturn(List.of(oldTag));
+      given(watcherCountService.count(contentId)).willReturn(0L);
+      given(contentMapper.toDto(eq(content), anyList(), eq(0L)))
+          .willReturn(mockDto(contentId, List.of(), 0L));
+
+      // when
+      contentService.update(contentId, request, null);
+
+      // then: tags == null이면 유지되지만, 빈 리스트면 전부 제거된다
+      assertThat(oldTag.isDeleted()).isTrue();
+      then(tagRepository).should().flush();
+      then(tagRepository).should(never()).saveAll(any());
+      then(contentMapper).should().toDto(eq(content), mapperTagListCaptor.capture(), eq(0L));
+      assertThat(mapperTagListCaptor.getValue()).isEmpty();
+    }
   }
 
   @Nested
@@ -458,7 +506,7 @@ class ContentServiceTest {
 
       // when & then
       assertThatThrownBy(() -> contentService.delete(contentId))
-          .isInstanceOf(BusinessException.class)
+          .isInstanceOf(ContentNotFoundException.class)
           .extracting("errorCode")
           .isEqualTo(ErrorCode.CONTENT_NOT_FOUND);
 
@@ -692,6 +740,37 @@ class ContentServiceTest {
       // 커서의 보조 키(tie-breaker)인 nextIdAfter는 잘라낸 뒤 마지막 행 id1의 id가 된다
       assertThat(response.nextIdAfter()).isEqualTo(id1);
       assertThat(response.nextCursor()).isEqualTo(lastCreatedAt.toString());
+    }
+
+    @Test
+    @DisplayName("cursor만 있고 idAfter가 없으면 INVALID_CURSOR_REQUEST로 거부하고 repository를 호출하지 않는다")
+    void rejectsHalfCursor_whenIdAfterMissing() {
+      // given
+      ContentSearchRequest req = request(null, null, "somecursor", 20, null, null);
+
+      // when & then
+      assertThatThrownBy(() -> contentService.getContents(req))
+          .isInstanceOf(InvalidCursorRequestException.class)
+          .extracting("errorCode")
+          .isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST);
+
+      then(contentRepository).should(never()).search(any());
+    }
+
+    @Test
+    @DisplayName("idAfter만 있고 cursor가 없으면 INVALID_CURSOR_REQUEST로 거부하고 repository를 호출하지 않는다")
+    void rejectsHalfCursor_whenCursorMissing() {
+      // given
+      ContentSearchRequest req =
+          new ContentSearchRequest(null, null, null, null, UUID.randomUUID(), 20, null, null);
+
+      // when & then
+      assertThatThrownBy(() -> contentService.getContents(req))
+          .isInstanceOf(InvalidCursorRequestException.class)
+          .extracting("errorCode")
+          .isEqualTo(ErrorCode.INVALID_CURSOR_REQUEST);
+
+      then(contentRepository).should(never()).search(any());
     }
   }
 
