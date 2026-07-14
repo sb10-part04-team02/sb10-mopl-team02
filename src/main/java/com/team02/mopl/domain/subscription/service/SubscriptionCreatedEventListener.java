@@ -28,7 +28,7 @@ public class SubscriptionCreatedEventListener {
               event.subscriberName() + "님이 [" + event.playlistTitle() + "] 플레이리스트를 구독했습니다.",
               NotificationLevel.INFO,
               NotificationType.PLAYLIST_SUBSCRIBED,
-              "PLAYLIST_SUBSCRIBED:" + event.playlistOwnerId() + ":" + event.subscriberId()));
+              "PLAYLIST_SUBSCRIBED:" + event.playlistOwnerId() + ":" + event.subscriptionId()));
     } catch (RuntimeException e) {
       log.warn(
           "플레이리스트 구독 알림 Kafka 발행 실패. subscriberId={}, playlistOwnerId={}",

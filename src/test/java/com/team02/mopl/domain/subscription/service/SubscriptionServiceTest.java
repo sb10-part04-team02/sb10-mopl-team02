@@ -65,6 +65,8 @@ class SubscriptionServiceTest {
         .willReturn(false);
     given(userRepository.findByIdAndDeletedAtIsNull(requesterId))
         .willReturn(Optional.of(subscriber));
+    given(subscriptionRepository.saveAndFlush(any(Subscription.class)))
+        .willAnswer(invocation -> invocation.getArgument(0));
 
     subscriptionService.subscribe(playlistId, requesterId);
 

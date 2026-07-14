@@ -28,7 +28,7 @@ public class FollowCreatedEventListener {
               event.followerName() + "님이 팔로우했습니다.",
               NotificationLevel.INFO,
               NotificationType.USER_FOLLOWED,
-              "USER_FOLLOWED:" + event.followeeId() + ":" + event.followerId()));
+              "USER_FOLLOWED:" + event.followeeId() + ":" + event.followId()));
     } catch (RuntimeException e) {
       log.warn(
           "팔로우 알림 Kafka 발행 실패. followerId={}, followeeId={}",

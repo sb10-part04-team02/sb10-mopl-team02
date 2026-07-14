@@ -34,9 +34,10 @@ class FollowCreatedEventListenerTest {
   @DisplayName("팔로우 생성 이벤트를 수신하면 USER_FOLLOWED 알림 Kafka 메시지를 발행한다")
   void onFollowCreated_publishesUserFollowedNotificationKafkaMessage() {
     // given
+    UUID followId = UUID.randomUUID();
     UUID followerId = UUID.randomUUID();
     UUID followeeId = UUID.randomUUID();
-    FollowCreatedEvent event = new FollowCreatedEvent(followerId, "팔로워", followeeId);
+    FollowCreatedEvent event = new FollowCreatedEvent(followId, followerId, "팔로워", followeeId);
 
     // when
     listener.onFollowCreated(event);
@@ -54,15 +55,17 @@ class FollowCreatedEventListenerTest {
     assertThat(message.content()).isEqualTo("팔로워님이 팔로우했습니다.");
     assertThat(message.level()).isEqualTo(NotificationLevel.INFO);
     assertThat(message.notificationType()).isEqualTo(NotificationType.USER_FOLLOWED);
+    assertThat(message.dedupKey()).isEqualTo("USER_FOLLOWED:" + followeeId + ":" + followId);
   }
 
   @Test
   @DisplayName("팔로우 알림 Kafka 발행에 실패해도 예외를 전파하지 않는다")
   void onFollowCreated_kafkaPublishFailure_doesNotThrow() {
     // given
+    UUID followId = UUID.randomUUID();
     UUID followerId = UUID.randomUUID();
     UUID followeeId = UUID.randomUUID();
-    FollowCreatedEvent event = new FollowCreatedEvent(followerId, "팔로워", followeeId);
+    FollowCreatedEvent event = new FollowCreatedEvent(followId, followerId, "팔로워", followeeId);
 
     willThrow(new RuntimeException("kafka publish failed"))
         .given(notificationKafkaProducer)

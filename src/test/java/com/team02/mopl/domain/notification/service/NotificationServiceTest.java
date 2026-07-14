@@ -74,7 +74,7 @@ class NotificationServiceTest {
             null);
 
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
-    given(notificationRepository.saveAndFlush(any(Notification.class)))
+    given(notificationRepository.save(any(Notification.class)))
         .willAnswer(
             invocation -> {
               Notification notification = invocation.getArgument(0);
@@ -91,7 +91,7 @@ class NotificationServiceTest {
     assertThat(result.level()).isEqualTo(NotificationLevel.INFO);
 
     verify(userRepository).findByIdAndDeletedAtIsNull(receiverId);
-    verify(notificationRepository).saveAndFlush(any(Notification.class));
+    verify(notificationRepository).save(any(Notification.class));
   }
 
   @Test
@@ -114,13 +114,13 @@ class NotificationServiceTest {
     NotificationDto result = notificationService.createNotification(command);
 
     assertThat(result).isNull();
-    verify(notificationRepository, never()).saveAndFlush(any(Notification.class));
+    verify(notificationRepository, never()).save(any(Notification.class));
     then(notificationSseFanOutPublisher).should(never()).publish(any());
   }
 
   @Test
-  @DisplayName("존재 검사 이후 UNIQUE 제약 위반이 발생하면 예외를 삼키고 스킵한다")
-  void createNotification_uniqueViolationOnSave_skipsSilently() {
+  @DisplayName("존재 검사 이후 UNIQUE 제약 위반이 발생하면 예외를 전파해 Kafka 재소비로 복구한다")
+  void createNotification_uniqueViolationOnSave_propagatesForRetry() {
     UUID receiverId = UUID.randomUUID();
     User receiver = mock(User.class);
     String dedupKey = "USER_FOLLOWED:" + receiverId + ":" + UUID.randomUUID();
@@ -136,12 +136,12 @@ class NotificationServiceTest {
     given(notificationRepository.existsByReceiver_IdAndDedupKey(receiverId, dedupKey))
         .willReturn(false);
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
-    given(notificationRepository.saveAndFlush(any(Notification.class)))
+    given(notificationRepository.save(any(Notification.class)))
         .willThrow(new DataIntegrityViolationException("unique violation"));
 
-    NotificationDto result = notificationService.createNotification(command);
-
-    assertThat(result).isNull();
+    // 동시 삽입 레이스로 UNIQUE 제약에 걸리면 예외가 전파되고, Kafka 재소비 시 존재 검사에 걸려 최종적으로 1건만 저장된다.
+    assertThatThrownBy(() -> notificationService.createNotification(command))
+        .isInstanceOf(DataIntegrityViolationException.class);
     then(notificationSseFanOutPublisher).should(never()).publish(any());
   }
 
@@ -161,7 +161,7 @@ class NotificationServiceTest {
             null);
 
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
-    given(notificationRepository.saveAndFlush(any(Notification.class)))
+    given(notificationRepository.save(any(Notification.class)))
         .willAnswer(
             invocation -> {
               Notification notification = invocation.getArgument(0);
@@ -206,7 +206,7 @@ class NotificationServiceTest {
             receiverId, "알림 제목", "알림 내용", null, NotificationType.USER_FOLLOWED, null);
 
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
-    given(notificationRepository.saveAndFlush(any(Notification.class)))
+    given(notificationRepository.save(any(Notification.class)))
         .willAnswer(
             invocation -> {
               Notification notification = invocation.getArgument(0);
@@ -218,7 +218,7 @@ class NotificationServiceTest {
 
     assertThat(result.level()).isEqualTo(NotificationLevel.INFO);
 
-    verify(notificationRepository).saveAndFlush(any(Notification.class));
+    verify(notificationRepository).save(any(Notification.class));
   }
 
   @Test
@@ -410,7 +410,7 @@ class NotificationServiceTest {
             null);
 
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
-    given(notificationRepository.saveAndFlush(any(Notification.class)))
+    given(notificationRepository.save(any(Notification.class)))
         .willAnswer(
             invocation -> {
               Notification notification = invocation.getArgument(0);
@@ -450,7 +450,7 @@ class NotificationServiceTest {
             null);
 
     given(userRepository.findByIdAndDeletedAtIsNull(receiverId)).willReturn(Optional.of(receiver));
-    given(notificationRepository.saveAndFlush(any(Notification.class)))
+    given(notificationRepository.save(any(Notification.class)))
         .willAnswer(
             invocation -> {
               Notification notification = invocation.getArgument(0);
@@ -468,7 +468,7 @@ class NotificationServiceTest {
     assertThat(result.receiverId()).isEqualTo(receiverId);
     assertThat(result.title()).isEqualTo("알림 제목");
 
-    verify(notificationRepository).saveAndFlush(any(Notification.class));
+    verify(notificationRepository).save(any(Notification.class));
     verify(notificationSseFanOutPublisher).publish(any(NotificationDto.class));
   }
 

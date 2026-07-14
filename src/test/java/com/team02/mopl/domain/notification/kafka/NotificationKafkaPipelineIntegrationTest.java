@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.notification.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -75,7 +77,11 @@ class NotificationKafkaPipelineIntegrationTest {
         status ->
             eventPublisher.publishEvent(
                 new SubscriptionCreatedEvent(
-                    subscriber.getId(), subscriber.getName(), owner.getId(), "QA 플레이리스트")));
+                    UUID.randomUUID(),
+                    subscriber.getId(),
+                    subscriber.getName(),
+                    owner.getId(),
+                    "QA 플레이리스트")));
 
     await()
         .atMost(Duration.ofSeconds(10))
@@ -125,6 +131,52 @@ class NotificationKafkaPipelineIntegrationTest {
             .toList();
     assertThat(notifications).hasSize(1);
     assertThat(notifications.get(0).getDedupKey()).isEqualTo(dedupKey);
+  }
+
+  @Test
+  @DisplayName("동일 (receiver_id, dedup_key)로 두 번째 알림을 저장하면 UNIQUE 제약이 실제로 거부한다")
+  void sameDedupKey_secondInsert_rejectedByUniqueConstraint() {
+    User receiver =
+        userRepository.save(
+            new User("수신자", uniqueEmail("receiver"), "password", null, Role.USER, false));
+
+    String dedupKey = "USER_FOLLOWED:" + receiver.getId() + ":" + UUID.randomUUID();
+
+    TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+
+    // 첫 번째 저장은 성공하고 커밋된다.
+    transactionTemplate.executeWithoutResult(
+        status ->
+            notificationRepository.save(
+                new Notification(
+                    receiver,
+                    "새 팔로워 알림",
+                    "팔로워님이 팔로우했습니다.",
+                    NotificationLevel.INFO,
+                    NotificationType.USER_FOLLOWED,
+                    dedupKey)));
+
+    // 존재 검사를 우회해 곧바로 같은 dedupKey를 다시 저장하면(동시 삽입 레이스 재현),
+    // DB UNIQUE 제약이 최종 방어선으로 작동해 예외가 발생한다.
+    assertThatThrownBy(
+            () ->
+                transactionTemplate.executeWithoutResult(
+                    status ->
+                        notificationRepository.saveAndFlush(
+                            new Notification(
+                                receiver,
+                                "새 팔로워 알림",
+                                "팔로워님이 팔로우했습니다.",
+                                NotificationLevel.INFO,
+                                NotificationType.USER_FOLLOWED,
+                                dedupKey))))
+        .isInstanceOf(DataIntegrityViolationException.class);
+
+    List<Notification> notifications =
+        notificationRepository.findAll().stream()
+            .filter(n -> n.getReceiver().getId().equals(receiver.getId()))
+            .toList();
+    assertThat(notifications).hasSize(1);
   }
 
   private String uniqueEmail(String prefix) {
