@@ -35,6 +35,11 @@ app:
     email: ${ADMIN_EMAIL}
     password: ${ADMIN_PASSWORD}
     name: ${ADMIN_NAME}
+  redis:
+    outbox:
+      maximum-retry-threshold: 5
+      retry-delay: 10m
+      clean-up: "0 0 3 * * *"
   kafka:
     consumer:
       retry:
