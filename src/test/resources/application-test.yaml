@@ -11,6 +11,18 @@ spring:
         format_sql: true
     show-sql: false
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: senderExample@gmail.com
+    password: 1234@QWER
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true    # TLS 보안설정
+
 app:
   notification:
     redis-fan-out:

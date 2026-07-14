@@ -28,6 +28,21 @@ spring:
     multipart:
       max-file-size: 10MB     # 업로드 가능한 개별 파일의 최대 크기
       max-request-size: 20MB  # 단일 요청 전체의 최대 크기
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${EMAIL_ACCOUNT}
+    password: ${EMAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true    # TLS 보안설정
+            required: true
+          connectiontimeout: 5000   # 연결대기시간 5초
+          timeout: 5000             # 응답대기시간 5초
+          writetimeout: 5000        # 쓰기대기시간 5초
 
 # 모니터링(Prometheus/Grafana): health/info 외에 prometheus 메트릭 엔드포인트만 노출한다.
 # 나머지 actuator 엔드포인트는 SecurityConfig에서 접근을 차단한다.
@@ -103,3 +118,4 @@ app:
       max-account-count: 1
       blacklist-prefix: "jwt:blacklist:"
       user-lock-prefix: "jwt:userlock:"
+      temp-password-prefix: "temp:pw:"

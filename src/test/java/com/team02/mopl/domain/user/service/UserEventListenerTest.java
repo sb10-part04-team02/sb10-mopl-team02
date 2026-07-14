@@ -14,8 +14,13 @@ import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.user.entity.enums.Role;
+import com.team02.mopl.domain.user.event.PasswordUpdatedEvent;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
 import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
+import com.team02.mopl.global.outbox.redis.entity.RedisCommandOutbox;
+import com.team02.mopl.global.outbox.redis.entity.enums.CommandType;
+import com.team02.mopl.global.outbox.redis.entity.enums.OutboxTarget;
+import com.team02.mopl.global.outbox.redis.service.RedisOutboxService;
 import java.lang.reflect.Method;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +41,7 @@ class UserEventListenerTest {
 
   @Mock private JwtRegistry jwtRegistry;
   @Mock private NotificationService notificationService;
+  @Mock private RedisOutboxService outboxService;
 
   @InjectMocks private UserEventListener eventListener;
 
@@ -125,6 +131,48 @@ class UserEventListenerTest {
       // then
       assertThat(transactional).isNotNull();
       assertThat(transactional.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+    }
+  }
+
+  @Nested
+  class OnPasswordUpdated {
+    @Test
+    @DisplayName("패스워드 변경 이벤트가 오면 유저의 모든 리프레시 토큰을 삭제한다")
+    void success_shouldRemoveAllRefreshTokens_whenPasswordUpdatedEventIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+      PasswordUpdatedEvent event = new PasswordUpdatedEvent(userId);
+
+      // when
+      eventListener.onPasswordUpdated(event);
+
+      // then
+      then(jwtRegistry).should(times(1)).deleteAllRefreshToken(userId);
+    }
+  }
+
+  @Nested
+  class PasswordUpdatedRecover {
+    @Test
+    @DisplayName("Recover함수가 호출되면 outbox를 저장한다")
+    void success_shouldSaveOutbox_whenRecoverMethodIsCalled() {
+      // given
+      UUID userId = UUID.randomUUID();
+      DataAccessException e = new RedisConnectionFailureException("test");
+      PasswordUpdatedEvent event = new PasswordUpdatedEvent(userId);
+
+      // when
+      assertDoesNotThrow(() -> eventListener.passwordUpdatedRecover(e, event));
+
+      // then
+      ArgumentCaptor<RedisCommandOutbox> outboxCaptor =
+          ArgumentCaptor.forClass(RedisCommandOutbox.class);
+      then(outboxService).should(times(1)).saveOutbox(outboxCaptor.capture());
+      RedisCommandOutbox actualOutbox = outboxCaptor.getValue();
+
+      assertThat(actualOutbox.getCommandType()).isEqualTo(CommandType.DELETE_ALL_REFRESH_TOKEN);
+      assertThat(actualOutbox.getTargetId()).isEqualTo(userId);
+      assertThat(actualOutbox.getTarget()).isEqualTo(OutboxTarget.USER);
     }
   }
 

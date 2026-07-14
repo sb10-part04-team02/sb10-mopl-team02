@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -15,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team02.mopl.domain.user.dto.ChangePasswordRequest;
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
@@ -23,9 +25,11 @@ import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
 import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.service.UserService;
-import com.team02.mopl.global.exception.GlobalExceptionHandler;
+import com.team02.mopl.global.exception.BusinessException;
+import com.team02.mopl.global.exception.ErrorCode;
 import com.team02.mopl.support.TestSecurityConfiguration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
@@ -38,18 +42,22 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.web.multipart.MultipartFile;
 
 @WebMvcTest(UserController.class)
-@Import({TestSecurityConfiguration.class, GlobalExceptionHandler.class})
+@Import({TestSecurityConfiguration.class})
 class UserControllerNormalTest {
 
   @MockitoBean private UserService userService;
@@ -396,6 +404,69 @@ class UserControllerNormalTest {
           .should()
           .updateProfile(
               eq(userId), eq(userId), any(UserUpdateRequest.class), isA(MultipartFile.class));
+    }
+  }
+
+  @Nested
+  class UpdatePassword {
+    @Test
+    @DisplayName("패스워드 변경을 성공적으로 수행하면 204를 반환한다")
+    void success_shouldReturn204_whenPasswordIsUpdatedSuccessfully() throws Exception {
+      // given
+      UUID userId = UUID.randomUUID();
+      String content = objectMapper.writeValueAsString(new ChangePasswordRequest("validPassword"));
+
+      // when & then
+      mockMvc
+          .perform(createChangePasswordRequest(userId, content, null))
+          .andExpect(status().isNoContent());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1234567", "123456789012345678901"})
+    @DisplayName("유효하지 않은 자리수의 문자열이 오면 400을 반환한다")
+    void fail_shouldReturn400_whenLengthIsInvalid(String invalidPassword) throws Exception {
+      // given
+      UUID userId = UUID.randomUUID();
+      String invalidContent =
+          objectMapper.writeValueAsString(new ChangePasswordRequest(invalidPassword));
+
+      // when & then
+      mockMvc
+          .perform(createChangePasswordRequest(userId, invalidContent, null))
+          .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("본인이 아닐경우 403을 반환한다")
+    void fail_shouldReturn403Forbidden_whenRequestUserIsNotOwner() throws Exception {
+      // given
+      UUID userId = UUID.randomUUID();
+      UUID requesterId = UUID.randomUUID();
+      String content = objectMapper.writeValueAsString(new ChangePasswordRequest("validPassword"));
+
+      willThrow(new BusinessException(ErrorCode.FORBIDDEN))
+          .given(userService)
+          .updatePassword(eq(userId), eq(requesterId), any(ChangePasswordRequest.class));
+
+      // when & then
+      mockMvc
+          .perform(createChangePasswordRequest(requesterId, content, userId))
+          .andExpect(status().isForbidden());
+    }
+
+    private MockHttpServletRequestBuilder createChangePasswordRequest(
+        UUID requesterId, String content, UUID anotherUserId) {
+      TestingAuthenticationToken testAuth =
+          new TestingAuthenticationToken(
+              requesterId, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+      UUID userId = anotherUserId != null ? anotherUserId : requesterId;
+
+      return MockMvcRequestBuilders.patch("/api/users/{userId}/password", userId)
+          .with(authentication(testAuth))
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(content);
     }
   }
 

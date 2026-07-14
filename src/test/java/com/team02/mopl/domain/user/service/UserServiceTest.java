@@ -16,6 +16,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 
+import com.team02.mopl.domain.user.dto.ChangePasswordRequest;
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
@@ -25,6 +26,7 @@ import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
+import com.team02.mopl.domain.user.event.PasswordUpdatedEvent;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
 import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
@@ -879,6 +881,60 @@ class UserServiceTest {
       assertThrows(
           UserNotFoundException.class,
           () -> userService.updateLock(UUID.randomUUID(), mock(UserLockUpdateRequest.class)));
+    }
+  }
+
+  @Nested
+  class UpdatePassword {
+    @Test
+    @DisplayName("패스워드변경요청이 들어오면 패스워드를 변경한다")
+    void success_shouldUpdatePassword_whenChangePasswordIsProvided() {
+      // given
+      UUID userId = UUID.randomUUID();
+      User mockUser = mock(User.class);
+      ChangePasswordRequest request = new ChangePasswordRequest("validPassword");
+      given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(mockUser));
+
+      String encodedPassword = "encodedPassword";
+      given(passwordEncoder.encode(request.password())).willReturn(encodedPassword);
+
+      given(mockUser.getId()).willReturn(userId);
+      PasswordUpdatedEvent event = new PasswordUpdatedEvent(userId);
+
+      // when
+      userService.updatePassword(userId, userId, request);
+
+      // then
+      then(mockUser).should(times(1)).updatePassword(eq(encodedPassword));
+      then(eventPublisher).should(times(1)).publishEvent(event);
+    }
+
+    @Test
+    @DisplayName("유저가 존재하지 않으면 예외를 던진다")
+    void fail_shouldThrowException_whenUserNotFound() {
+      // given
+      UUID userId = UUID.randomUUID();
+      given(userRepository.findByIdAndDeletedAtIsNull(any(UUID.class)))
+          .willReturn(Optional.empty());
+
+      // when & then
+      assertThrows(
+          UserNotFoundException.class,
+          () -> userService.updatePassword(userId, userId, mock(ChangePasswordRequest.class)));
+      then(eventPublisher).should(never()).publishEvent(any(PasswordUpdatedEvent.class));
+    }
+
+    @Test
+    @DisplayName("소유주가 아닐경우 예외를 던진다")
+    void fail_shouldThrowException_whenUserAndRequesterAreNotEqual() {
+      // given
+      UUID userId = UUID.randomUUID();
+      UUID requesterId = UUID.randomUUID();
+
+      // when & then
+      assertThrows(
+          BusinessException.class,
+          () -> userService.updatePassword(userId, requesterId, mock(ChangePasswordRequest.class)));
     }
   }
 }

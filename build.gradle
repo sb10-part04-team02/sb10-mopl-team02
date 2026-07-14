@@ -44,6 +44,9 @@ dependencies {
     // === 재시도(Retry) ===
     implementation 'org.springframework.retry:spring-retry'
 
+    // === 메일 ===
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
     // === 데이터 저장소 ===
     runtimeOnly 'org.postgresql:postgresql'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'

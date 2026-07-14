@@ -1,5 +1,6 @@
 package com.team02.mopl.domain.user.controller;
 
+import com.team02.mopl.domain.user.dto.ChangePasswordRequest;
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
@@ -170,4 +171,33 @@ public interface UserApi {
   })
   ResponseEntity<Void> updateLock(
       @PathVariable UUID userId, @RequestBody @Valid UserLockUpdateRequest request);
+
+  @Operation(summary = "비밀번호 변경", description = "본인의 비밀번호만 변경할 수 있습니다.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "권한 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "해당 리소스 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<Void> updatePassword(
+      @Parameter(hidden = true) UUID requesterId,
+      @PathVariable UUID userId,
+      @RequestBody @Valid ChangePasswordRequest request);
 }

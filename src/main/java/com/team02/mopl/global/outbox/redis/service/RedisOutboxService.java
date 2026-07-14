@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -54,5 +55,10 @@ public class RedisOutboxService {
       log.warn("[Outbox] outbox 임계값 초과로 softDeleted가 진행되었습니다: outboxId={}", outbox.getId());
     }
     outboxRepository.save(outbox); // 준영속 상태라 명시적 save 진행
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void saveOutbox(RedisCommandOutbox outbox) {
+    outboxRepository.save(outbox);
   }
 }

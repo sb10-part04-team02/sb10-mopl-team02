@@ -6,12 +6,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willAnswer;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -19,15 +21,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team02.mopl.domain.auth.dto.JwtDto;
+import com.team02.mopl.domain.auth.dto.ResetPasswordRequest;
 import com.team02.mopl.domain.auth.dto.SignInRequest;
 import com.team02.mopl.domain.auth.exception.AuthException;
 import com.team02.mopl.domain.auth.jwt.handler.JwtLogoutHandler;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import com.team02.mopl.domain.auth.service.AuthService;
 import com.team02.mopl.domain.auth.service.AuthService.TokenResult;
+import com.team02.mopl.domain.auth.service.MailService;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.entity.enums.Role;
+import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.global.config.SecurityConfig;
+import com.team02.mopl.global.exception.GlobalExceptionHandler;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;
@@ -43,6 +49,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -56,9 +63,10 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 @WebMvcTest(AuthController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, GlobalExceptionHandler.class})
 // 테스트 실행마다 스프링 컨테이너, 시큐리티 환경 다시 빌드
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class AuthControllerTest {
@@ -70,6 +78,7 @@ class AuthControllerTest {
   @MockitoBean private JwtLogoutHandler jwtLogoutHandler;
   @MockitoBean private AuthService authService;
   @MockitoBean private JwtUtils jwtUtils;
+  @MockitoBean private MailService mailService;
 
   @Autowired private AuthController authController;
   @Autowired private ObjectMapper objectMapper;
@@ -307,6 +316,61 @@ class AuthControllerTest {
           .andExpect(cookie().value(refreshTokenName, newRefreshToken));
 
       then(authService).should(times(1)).update(comingRefreshToken);
+    }
+  }
+
+  @Nested
+  class ResetPassword {
+    @Test
+    @DisplayName("비밀번호 초기화를 성공적으로 수행한다면 200을 반환한다")
+    void success_shouldReturn200_whenValidRequest() throws Exception {
+      // given
+      ResetPasswordRequest request = new ResetPasswordRequest("example@gmail.com");
+      String content = objectMapper.writeValueAsString(request);
+
+      // when & then
+      mockMvc
+          .perform(createResetPasswordRequest(content))
+          .andDo(print())
+          .andExpect(status().isOk());
+      then(mailService).should(times(1)).sendResetPasswordEmail(any(ResetPasswordRequest.class));
+    }
+
+    @Test
+    @DisplayName("이메일 형태가 맞지 않는다면 400을 반환한다")
+    void fail_shouldReturn400_whenInvalidEmailIsProvided() throws Exception {
+      // given
+      ResetPasswordRequest request = new ResetPasswordRequest("invalid-email");
+      String content = objectMapper.writeValueAsString(request);
+
+      // when & then
+      mockMvc
+          .perform(createResetPasswordRequest(content))
+          .andDo(print())
+          .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("유저를 찾을수 없다면 404을 반환한다")
+    void fail_shouldReturn404_whenUserNotFound() throws Exception {
+      // given
+      ResetPasswordRequest request = new ResetPasswordRequest("example@gmail.com");
+      String content = objectMapper.writeValueAsString(request);
+      willThrow(new UserNotFoundException()).given(mailService).sendResetPasswordEmail(request);
+
+      // when & then
+      mockMvc
+          .perform(createResetPasswordRequest(content))
+          .andDo(print())
+          .andExpect(status().isNotFound());
+    }
+
+    private MockHttpServletRequestBuilder createResetPasswordRequest(String content) {
+
+      return MockMvcRequestBuilders.post("/api/auth/reset-password")
+          .with(csrf())
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(content);
     }
   }
 }

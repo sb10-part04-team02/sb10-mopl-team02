@@ -1,5 +1,6 @@
 package com.team02.mopl.domain.user.service;
 
+import com.team02.mopl.domain.user.dto.ChangePasswordRequest;
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
@@ -9,6 +10,7 @@ import com.team02.mopl.domain.user.dto.UserUpdateRequest;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
+import com.team02.mopl.domain.user.event.PasswordUpdatedEvent;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
 import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
 import com.team02.mopl.domain.user.exception.UserEmailDuplicateException;
@@ -23,6 +25,7 @@ import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
 import com.team02.mopl.global.exception.InvalidCursorRequestException;
 import com.team02.mopl.global.storage.FileStorage;
+import com.team02.mopl.global.util.OwnershipValidator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -187,6 +190,19 @@ public class UserService {
     eventPublisher.publishEvent(new UserLockUpdatedEvent(userId, newLocked));
     log.info(
         "유저 계정잠금변경 로직 완료: userId={}, isLocked=[{} -> {}]", findUser.getId(), oldLocked, newLocked);
+  }
+
+  @Transactional
+  public void updatePassword(UUID userId, UUID requesterId, ChangePasswordRequest request) {
+    log.debug("유저 비밀번호변경 시작: userId={}", userId);
+    OwnershipValidator.validateOwner(userId, requesterId);
+
+    User findUser =
+        userRepository.findByIdAndDeletedAtIsNull(userId).orElseThrow(UserNotFoundException::new);
+    findUser.updatePassword(passwordEncoder.encode(request.password()));
+    eventPublisher.publishEvent(new PasswordUpdatedEvent(findUser.getId()));
+
+    log.info("유저 비밀번호변경 로직 완료: userId={}", userId);
   }
 
   private void validateOwner(UUID requesterId, UUID userId) {

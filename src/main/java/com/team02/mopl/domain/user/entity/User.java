@@ -71,4 +71,8 @@ public class User extends BaseMutableEntity {
     this.isLocked = locked;
     return oldLocked;
   }
+
+  public void updatePassword(String password) {
+    this.password = password;
+  }
 }
