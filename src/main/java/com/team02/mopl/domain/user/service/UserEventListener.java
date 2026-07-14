@@ -8,6 +8,10 @@ import com.team02.mopl.domain.notification.service.NotificationService;
 import com.team02.mopl.domain.user.event.PasswordUpdatedEvent;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
 import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
+import com.team02.mopl.global.outbox.redis.entity.RedisCommandOutbox;
+import com.team02.mopl.global.outbox.redis.entity.enums.CommandType;
+import com.team02.mopl.global.outbox.redis.entity.enums.OutboxTarget;
+import com.team02.mopl.global.outbox.redis.service.RedisOutboxService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +32,7 @@ public class UserEventListener {
 
   private final JwtRegistry jwtRegistry;
   private final NotificationService notificationService;
+  private final RedisOutboxService outboxService;
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -74,8 +79,13 @@ public class UserEventListener {
 
   @Recover
   public void passwordUpdatedRecover(DataAccessException e, PasswordUpdatedEvent event) {
-    log.error(
-        "[Redis] 패스워드 변경 리프레시토큰 삭제 최종 실패: userId={}, reason={}", event.userId(), e.getMessage(), e);
+    UUID userId = event.userId();
+    log.error("[Redis] 패스워드 변경 리프레시토큰 삭제 최종 실패: userId={}, reason={}", userId, e.getMessage(), e);
+
+    // repository에 실패기록 직접 저장
+    RedisCommandOutbox outbox =
+        new RedisCommandOutbox(CommandType.DELETE_ALL_REFRESH_TOKEN, userId, OutboxTarget.USER);
+    outboxService.saveOutbox(outbox);
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

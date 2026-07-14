@@ -130,4 +130,20 @@ class RedisOutboxServiceTest {
       then(outboxRepository).should().save(mockOutbox);
     }
   }
+
+  @Nested
+  class SaveOutbox {
+    @Test
+    @DisplayName("outbox를 저장한다")
+    void success_shouldSaveOutbox_whenOutboxIsProvided() {
+      // given
+      RedisCommandOutbox mockOutbox = mock(RedisCommandOutbox.class);
+
+      // when
+      outboxService.saveOutbox(mockOutbox);
+
+      // then
+      then(outboxRepository).should(times(1)).save(mockOutbox);
+    }
+  }
 }

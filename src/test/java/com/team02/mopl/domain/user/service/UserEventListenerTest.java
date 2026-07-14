@@ -17,6 +17,10 @@ import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.event.PasswordUpdatedEvent;
 import com.team02.mopl.domain.user.event.RoleUpdatedEvent;
 import com.team02.mopl.domain.user.event.UserLockUpdatedEvent;
+import com.team02.mopl.global.outbox.redis.entity.RedisCommandOutbox;
+import com.team02.mopl.global.outbox.redis.entity.enums.CommandType;
+import com.team02.mopl.global.outbox.redis.entity.enums.OutboxTarget;
+import com.team02.mopl.global.outbox.redis.service.RedisOutboxService;
 import java.lang.reflect.Method;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +41,7 @@ class UserEventListenerTest {
 
   @Mock private JwtRegistry jwtRegistry;
   @Mock private NotificationService notificationService;
+  @Mock private RedisOutboxService outboxService;
 
   @InjectMocks private UserEventListener eventListener;
 
@@ -149,14 +154,25 @@ class UserEventListenerTest {
   @Nested
   class PasswordUpdatedRecover {
     @Test
-    @DisplayName("Recover함수가 호출되면 예외를 정상적으로 처리한다")
-    void success_shouldNotThrowException_whenRecoverMethodIsCalled() {
+    @DisplayName("Recover함수가 호출되면 outbox를 저장한다")
+    void success_shouldSaveOutbox_whenRecoverMethodIsCalled() {
       // given
+      UUID userId = UUID.randomUUID();
       DataAccessException e = new RedisConnectionFailureException("test");
-      PasswordUpdatedEvent event = new PasswordUpdatedEvent(UUID.randomUUID());
+      PasswordUpdatedEvent event = new PasswordUpdatedEvent(userId);
 
-      // when & then
+      // when
       assertDoesNotThrow(() -> eventListener.passwordUpdatedRecover(e, event));
+
+      // then
+      ArgumentCaptor<RedisCommandOutbox> outboxCaptor =
+          ArgumentCaptor.forClass(RedisCommandOutbox.class);
+      then(outboxService).should(times(1)).saveOutbox(outboxCaptor.capture());
+      RedisCommandOutbox actualOutbox = outboxCaptor.getValue();
+
+      assertThat(actualOutbox.getCommandType()).isEqualTo(CommandType.DELETE_ALL_REFRESH_TOKEN);
+      assertThat(actualOutbox.getTargetId()).isEqualTo(userId);
+      assertThat(actualOutbox.getTarget()).isEqualTo(OutboxTarget.USER);
     }
   }
 

@@ -54,6 +54,10 @@
       <Class name="com.team02.mopl.global.redis.RedisLockManager" />
       <Bug pattern="EI_EXPOSE_REP2" />
     </Match>
+    <Match>
+      <Class name="com.team02.mopl.domain.user.outbox.DeleteAllRefreshTokenUserOutboxProcessor" />
+      <Bug pattern="EI_EXPOSE_REP2" />
+    </Match>
     <!-- 수집(ingestion) 컴포넌트: DI 주입 협력 빈(RestClient 등 싱글톤)을 필드에 저장하는 동일 패턴 -> 오탐 제외 -->
     <Match>
       <Class name="~com\.team02\.mopl\.domain\.content\.ingestion\..*" />
