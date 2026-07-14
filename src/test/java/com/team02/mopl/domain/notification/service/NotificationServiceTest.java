@@ -22,6 +22,7 @@ import com.team02.mopl.domain.notification.enums.NotificationSortBy;
 import com.team02.mopl.domain.notification.exception.NotificationNotFoundException;
 import com.team02.mopl.domain.notification.redis.NotificationSseFanOutPublisher;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
+import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -36,7 +37,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -52,6 +52,8 @@ class NotificationServiceTest {
   @Mock private UserRepository userRepository;
 
   @Mock private NotificationSseFanOutPublisher notificationSseFanOutPublisher;
+
+  @Mock private SseEventService sseEventService;
 
   @InjectMocks private NotificationService notificationService;
 
@@ -394,8 +396,8 @@ class NotificationServiceTest {
   }
 
   @Test
-  @DisplayName("Last-Event-ID 이후 알림들을 Redis Pub/Sub fan-out으로 재전송한다")
-  void resendNotificationsAfter_publishesMissedNotifications() {
+  @DisplayName("Last-Event-ID 이후 알림들을 로컬 SSE로 재전송한다")
+  void resendNotificationsAfter_resendsMissedNotificationsLocally() {
     UUID receiverId = UUID.randomUUID();
     UUID lastNotificationId = UUID.randomUUID();
 
@@ -445,14 +447,22 @@ class NotificationServiceTest {
 
     notificationService.resendNotificationsAfter(receiverId, lastNotificationId);
 
-    ArgumentCaptor<NotificationDto> notificationCaptor =
-        ArgumentCaptor.forClass(NotificationDto.class);
+    then(notificationSseFanOutPublisher).shouldHaveNoInteractions();
 
-    then(notificationSseFanOutPublisher).should(times(2)).publish(notificationCaptor.capture());
-
-    assertThat(notificationCaptor.getAllValues())
-        .extracting(NotificationDto::id)
-        .containsExactly(missedNotification1.getId(), missedNotification2.getId());
+    then(sseEventService)
+        .should(times(1))
+        .send(
+            eq(receiverId),
+            eq("notifications"),
+            eq(missedNotification1.getId().toString()),
+            any(NotificationDto.class));
+    then(sseEventService)
+        .should(times(1))
+        .send(
+            eq(receiverId),
+            eq("notifications"),
+            eq(missedNotification2.getId().toString()),
+            any(NotificationDto.class));
   }
 
   @Test
@@ -470,12 +480,12 @@ class NotificationServiceTest {
 
     then(notificationRepository).should().findByIdAndReceiver_Id(lastNotificationId, receiverId);
     then(notificationRepository).should(never()).findUnreadNotificationsAfter(any(), any(), any());
-    then(notificationSseFanOutPublisher).shouldHaveNoInteractions();
+    then(sseEventService).shouldHaveNoInteractions();
   }
 
   @Test
-  @DisplayName("Last-Event-ID 이후 누락 알림이 없으면 fan-out 이벤트를 발행하지 않는다")
-  void resendNotificationsAfter_doesNotPublish_whenNoMissedNotifications() {
+  @DisplayName("Last-Event-ID 이후 누락 알림이 없으면 SSE를 전송하지 않는다")
+  void resendNotificationsAfter_doesNotSend_whenNoMissedNotifications() {
     UUID receiverId = UUID.randomUUID();
     UUID lastNotificationId = UUID.randomUUID();
 
@@ -507,7 +517,7 @@ class NotificationServiceTest {
         .should()
         .findUnreadNotificationsAfter(
             receiverId, lastNotification.getCreatedAt(), lastNotificationId);
-    then(notificationSseFanOutPublisher).shouldHaveNoInteractions();
+    then(sseEventService).shouldHaveNoInteractions();
   }
 
   private Notification createNotificationWithIdAndCreatedAt(

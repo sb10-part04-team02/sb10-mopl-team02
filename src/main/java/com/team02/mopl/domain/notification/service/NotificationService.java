@@ -10,6 +10,7 @@ import com.team02.mopl.domain.notification.exception.NotificationNotFoundExcepti
 import com.team02.mopl.domain.notification.redis.NotificationSseFanOutPublisher;
 import com.team02.mopl.domain.notification.repository.NotificationRepository;
 import com.team02.mopl.domain.notification.util.NotificationCursorConverter;
+import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.dto.CursorPageRequest;
@@ -37,9 +38,12 @@ import org.springframework.validation.annotation.Validated;
 @Transactional(readOnly = true)
 public class NotificationService {
 
+  private static final String NOTIFICATION_EVENT_NAME = "notifications";
+
   private final NotificationRepository notificationRepository;
   private final UserRepository userRepository;
   private final NotificationSseFanOutPublisher notificationSseFanOutPublisher;
+  private final SseEventService sseEventService;
 
   @Transactional
   public NotificationDto createNotification(@Valid NotificationCreateCommand command) {
@@ -112,7 +116,7 @@ public class NotificationService {
             .toList();
 
     for (NotificationDto notificationDto : missedNotifications) {
-      sendNotificationAfterCommit(notificationDto);
+      resendLocal(notificationDto);
     }
   }
 
@@ -163,6 +167,23 @@ public class NotificationService {
     } catch (RuntimeException e) {
       log.warn(
           "알림 Redis Pub/Sub fan-out 발행 실패. notificationId={}, receiverId={}",
+          notificationDto.id(),
+          notificationDto.receiverId(),
+          e);
+    }
+  }
+
+  // 재연결 복구는 방금 이 인스턴스에 연결된 emitter가 대상이므로 fan-out 없이 로컬로만 전송
+  private void resendLocal(NotificationDto notificationDto) {
+    try {
+      sseEventService.send(
+          notificationDto.receiverId(),
+          NOTIFICATION_EVENT_NAME,
+          notificationDto.id().toString(),
+          notificationDto);
+    } catch (RuntimeException e) {
+      log.warn(
+          "알림 SSE 복구 전송 실패. notificationId={}, receiverId={}",
           notificationDto.id(),
           notificationDto.receiverId(),
           e);
