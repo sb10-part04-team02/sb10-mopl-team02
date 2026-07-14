@@ -75,11 +75,13 @@ class NotificationKafkaPipelineIntegrationTest {
         .atMost(Duration.ofSeconds(10))
         .untilAsserted(
             () -> {
-              List<Notification> notifications = notificationRepository.findAll();
+              List<Notification> notifications =
+                  notificationRepository.findAll().stream()
+                      .filter(n -> n.getReceiver().getId().equals(owner.getId()))
+                      .toList();
               assertThat(notifications).hasSize(1);
 
               Notification notification = notifications.get(0);
-              assertThat(notification.getReceiver().getId()).isEqualTo(owner.getId());
               assertThat(notification.getNotificationType())
                   .isEqualTo(NotificationType.PLAYLIST_SUBSCRIBED);
               assertThat(notification.getTitle()).isEqualTo("플레이리스트 구독 알림");

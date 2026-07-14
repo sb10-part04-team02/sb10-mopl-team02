@@ -15,6 +15,7 @@ import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.kafka.NotificationKafkaMessage;
 import com.team02.mopl.domain.notification.kafka.NotificationKafkaProducer;
 import com.team02.mopl.domain.watching.event.WatchingSessionJoinedEvent;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +25,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 @ExtendWith(MockitoExtension.class)
 class WatchingSessionJoinedEventListenerTest {
@@ -97,5 +100,18 @@ class WatchingSessionJoinedEventListenerTest {
     assertDoesNotThrow(() -> listener.onWatchingSessionJoined(event));
 
     then(notificationKafkaProducer).should(times(1)).publish(any());
+  }
+
+  @Test
+  @DisplayName("실시간 시청 시작 이벤트 리스너는 커밋 이후 Kafka 메시지를 발행한다")
+  void onWatchingSessionJoined_hasTransactionalEventListenerAfterCommit() throws Exception {
+    Method method =
+        WatchingSessionJoinedEventListener.class.getMethod(
+            "onWatchingSessionJoined", WatchingSessionJoinedEvent.class);
+
+    TransactionalEventListener annotation = method.getAnnotation(TransactionalEventListener.class);
+
+    assertThat(annotation).isNotNull();
+    assertThat(annotation.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
   }
 }
