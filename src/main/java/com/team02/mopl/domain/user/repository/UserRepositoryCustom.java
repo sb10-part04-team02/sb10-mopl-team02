@@ -18,4 +18,6 @@ public interface UserRepositoryCustom {
       Integer limit,
       SortDirection sortDirection,
       UserSortBy sortBy);
+
+  long countUsersByCursor(String emailLike, Role roleEqual, Boolean isLocked);
 }

@@ -283,6 +283,36 @@ class UserRepositoryTest extends RepositoryTestSupport {
             tuple(user1.getRole(), user1.getId()), tuple(user2.getRole(), user2.getId()));
   }
 
+  @Test
+  @DisplayName("검색 파라미터가 모두 null이어도 전체 유저 수를 반환한다")
+  void success_shouldCountAllUsers_whenSearchParametersAreNull() {
+    // given
+    saveUser("user1", "user1@gmail.com", Role.USER, false);
+    saveUser("user2", "user2@naver.com", Role.USER, true);
+    saveUser("user3", "user3@gmail.com", Role.ADMIN, false);
+
+    // when
+    long count = userRepository.countUsersByCursor(null, null, null);
+
+    // then
+    assertThat(count).isEqualTo(3);
+  }
+
+  @Test
+  @DisplayName("검색 파라미터가 제공되면 조건에 맞는 유저 수를 반환한다")
+  void success_shouldCountMatchingUsers_whenSearchParametersAreProvided() {
+    // given
+    saveUser("user1", "user1@example.com", Role.USER, false);
+    saveUser("user2", "user2@gmail.com", Role.ADMIN, false);
+    saveUser("user3", "user3@example.com", Role.ADMIN, true);
+
+    // when
+    long count = userRepository.countUsersByCursor("example", Role.ADMIN, true);
+
+    // then
+    assertThat(count).isEqualTo(1);
+  }
+
   private User saveUser(String name, String email, Role role, boolean isLocked) {
     User user = new User(name, email, "pwd", null, role, isLocked);
     em.persist(user); // 영속화
