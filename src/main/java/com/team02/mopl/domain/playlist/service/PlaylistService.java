@@ -232,8 +232,10 @@ public class PlaylistService {
       throw new PlaylistContentAlreadyExistsException();
     }
 
+    PlaylistContent playlistContent;
     try {
-      playlistContentRepository.saveAndFlush(new PlaylistContent(playlist, content.getId()));
+      playlistContent =
+          playlistContentRepository.saveAndFlush(new PlaylistContent(playlist, content.getId()));
     } catch (DataIntegrityViolationException e) {
       throw new PlaylistContentAlreadyExistsException();
     }
@@ -241,7 +243,11 @@ public class PlaylistService {
     // 콘텐츠 추가 알림은 커밋 이후 리스너에서 처리해, 알림 실패가 콘텐츠 추가를 롤백하지 않도록 분리한다.
     eventPublisher.publishEvent(
         new PlaylistContentAddedEvent(
-            playlist.getId(), playlist.getTitle(), content.getId(), content.getTitle()));
+            playlistContent.getId(),
+            playlist.getId(),
+            playlist.getTitle(),
+            content.getId(),
+            content.getTitle()));
 
     log.info(
         "플레이리스트 콘텐츠 추가 성공: playlistId={}, requesterId={}, contentId={}",

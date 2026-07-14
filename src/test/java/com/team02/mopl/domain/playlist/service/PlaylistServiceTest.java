@@ -729,6 +729,14 @@ class PlaylistServiceTest {
           .willReturn(Optional.of(content));
       given(playlistContentRepository.existsByPlaylistIdAndContentId(playlistId, contentId))
           .willReturn(false);
+      UUID playlistContentId = UUID.randomUUID();
+      given(playlistContentRepository.saveAndFlush(any(PlaylistContent.class)))
+          .willAnswer(
+              invocation -> {
+                PlaylistContent saved = invocation.getArgument(0);
+                ReflectionTestUtils.setField(saved, "id", playlistContentId);
+                return saved;
+              });
 
       // when
       playlistService.addContent(playlistId, ownerId, contentId);
@@ -749,6 +757,7 @@ class PlaylistServiceTest {
       then(eventPublisher).should().publishEvent(eventCaptor.capture());
 
       PlaylistContentAddedEvent event = eventCaptor.getValue();
+      assertThat(event.playlistContentId()).isEqualTo(playlistContentId);
       assertThat(event.playlistId()).isEqualTo(playlistId);
       assertThat(event.playlistTitle()).isEqualTo("제목");
       assertThat(event.contentId()).isEqualTo(contentId);

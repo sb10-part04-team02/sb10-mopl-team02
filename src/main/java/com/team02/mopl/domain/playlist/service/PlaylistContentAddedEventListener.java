@@ -40,12 +40,7 @@ public class PlaylistContentAddedEventListener {
                     + " 콘텐츠가 추가되었습니다.",
                 NotificationLevel.INFO,
                 NotificationType.PLAYLIST_CONTENT_ADDED,
-                "PLAYLIST_CONTENT_ADDED:"
-                    + subscriberId
-                    + ":"
-                    + event.playlistId()
-                    + ":"
-                    + event.contentId()));
+                "PLAYLIST_CONTENT_ADDED:" + subscriberId + ":" + event.playlistContentId()));
       } catch (RuntimeException e) {
         log.warn(
             "플레이리스트 콘텐츠 추가 알림 Kafka 발행 실패. playlistId={}, contentId={}, subscriberId={}",
