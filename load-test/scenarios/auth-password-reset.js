@@ -1,7 +1,8 @@
-// 인증 시나리오 — 비밀번호 초기화 플로우 (미구현: 전체 주석 처리)
+// 인증 시나리오 - 비밀번호 초기화 플로우 (미구현: 전체 주석 처리)
 //
-// 현황(origin/dev): ResetPasswordRequest·ChangePasswordRequest DTO 만 존재하고
-// 컨트롤러 엔드포인트·서비스가 없다. 스펙상 임시 비밀번호는 3분 만료 후 일반 sign-in 을 재사용한다.
+// 현황(2026-07 기준): 스펙에는 POST /api/auth/reset-password, PATCH /api/users/{userId}/password 가 있으나
+// ResetPasswordRequest, ChangePasswordRequest DTO 만 존재하고 컨트롤러 엔드포인트/서비스가 없다.
+// 스펙상 임시 비밀번호는 3분 만료 후 일반 sign-in 을 재사용한다.
 // API 가 구현되면 아래 골격의 경로/파라미터를 실제 계약에 맞춰 채우고 주석을 해제한다.
 //
 // import http from 'k6/http';
@@ -15,7 +16,7 @@
 // export default function () {
 //   const user = pickUser(0);
 //
-//   // 1) 비밀번호 초기화 요청 → 임시 비밀번호 발급(3분 만료). (CSRF 필요)
+//   // 1) 비밀번호 초기화 요청 -> 임시 비밀번호 발급(3분 만료). (CSRF 필요)
 //   const csrf = fetchCsrfToken();
 //   const resetRes = http.post(
 //     `${BASE_URL}/api/auth/reset-password`, // TODO: 실제 엔드포인트로 교체
