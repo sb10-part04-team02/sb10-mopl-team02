@@ -5,6 +5,12 @@ spring:
   profiles:
     active: dev
 
+  batch:
+    job:
+      enabled: false  # 기동 시 Job 자동 실행 방지 (스케줄러/러너가 JobLauncher로 실행)
+    jdbc:
+      initialize-schema: never  # BATCH_* 메타테이블은 Flyway(V3)가 관리
+
   flyway:
     enabled: true  # 기동 시 db/migration 마이그레이션 적용 (스키마 자동 생성·버전관리)
 
@@ -60,6 +66,11 @@ logging:
     correlation: "[%X{requestId:-}] "  # 전 프로파일 공통. 콘솔/파일 로그의 레벨 옆에 MDC requestId를 표시 (요청 밖 로그는 빈 값)
 
 app:
+  alert:
+    discord:
+      webhook-url: ${DISCORD_ALERT_WEBHOOK_URL:}  # 빈 값이면 알림 비활성 (운영에서 env로 주입)
+      connect-timeout: 2s
+      read-timeout: 5s
   admin:
     email: ${ADMIN_EMAIL}
     password: ${ADMIN_PASSWORD}
