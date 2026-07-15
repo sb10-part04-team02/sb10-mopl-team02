@@ -42,16 +42,22 @@ jobs:
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: buildx 준비
+        uses: docker/setup-buildx-action@v3
+
       - name: 이미지 태그 준비 (short SHA)
         run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
-      - name: app 이미지 빌드 · 푸시
+      - name: app 이미지 빌드 · 푸시 (ARM64)
+        # Fargate 태스크가 ARM64(Graviton)라 러너(amd64)와 다르므로 buildx로 arm64 크로스빌드
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
-          docker build -t "$REGISTRY/$APP_REPO:$IMAGE_TAG" -t "$REGISTRY/$APP_REPO:latest" .
-          docker push "$REGISTRY/$APP_REPO:$IMAGE_TAG"
-          docker push "$REGISTRY/$APP_REPO:latest"
+          docker buildx build \
+            --platform linux/arm64 \
+            -t "$REGISTRY/$APP_REPO:$IMAGE_TAG" \
+            -t "$REGISTRY/$APP_REPO:latest" \
+            --push .
 
       - name: EMAIL_PASSWORD를 Secrets Manager에 주입
         env:
