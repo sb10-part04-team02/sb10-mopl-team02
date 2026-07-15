@@ -90,6 +90,10 @@
         <Or>
             <Class name="com.team02.mopl.domain.notification.redis.NotificationSseFanOutPublisher"/>
             <Class name="com.team02.mopl.domain.notification.redis.NotificationSseFanOutSubscriber"/>
+            <Class name="com.team02.mopl.global.websocket.redis.StompFanOutPublisher"/>
+            <Class name="com.team02.mopl.global.websocket.redis.StompFanOutSubscriber"/>
+            <Class name="com.team02.mopl.domain.dm.redis.DmSseFanOutPublisher"/>
+            <Class name="com.team02.mopl.domain.dm.redis.DmSseFanOutSubscriber"/>
         </Or>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
