@@ -1,14 +1,12 @@
 name: CD
 
-# dev 브랜치에 머지(push)되면 ECS(mopl-service)로 자동 배포한다.
-# 인증은 OIDC(moplGithubActionsCdRole)로만 하며 장기 액세스키를 쓰지 않는다.
 on:
   push:
     branches:
       - dev
   workflow_dispatch:
 
-# 배포는 직렬화한다. 진행 중 배포는 취소하지 않고 대기 (도중 취소 시 어중간한 롤아웃 방지).
+# 진행 중 배포는 취소하지 않고 대기
 concurrency:
   group: cd-deploy
   cancel-in-progress: false
@@ -56,7 +54,6 @@ jobs:
           docker push "$REGISTRY/$APP_REPO:latest"
 
       - name: EMAIL_PASSWORD를 Secrets Manager에 주입
-        # 비밀 수동 주입 금지 정책을 CD 역할이 대신 만족한다. secret이 없으면 생성, 있으면 갱신.
         env:
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
         run: |
@@ -103,28 +100,19 @@ jobs:
             echo "치환되지 않은 플레이스홀더가 있습니다:"; grep -n '\${' /tmp/task-def.json; exit 1
           fi
 
-      - name: task-definition 등록
-        id: register
-        run: |
-          ARN=$(aws ecs register-task-definition \
-            --cli-input-json file:///tmp/task-def.json \
-            --query 'taskDefinition.taskDefinitionArn' --output text)
-          echo "task_def_arn=$ARN" >> "$GITHUB_OUTPUT"
-
-      - name: ECS 서비스 업데이트
-        run: |
-          aws ecs update-service \
-            --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" \
-            --task-definition "${{ steps.register.outputs.task_def_arn }}" \
-            --force-new-deployment >/dev/null
-
-      - name: ECS 배포 완료 대기
-        run: |
-          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+      - name: task-def 등록 · ECS 배포
+        # register-task-definition + update-service + services-stable
+        # eventual consistency로 인한 간헐 실패를 자동 재시도
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: /tmp/task-def.json
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: ${{ env.ECS_SERVICE }}
+          force-new-deployment: true
+          wait-for-service-stability: true
 
       - name: ECS 배포 상태 확인
         run: |
           aws ecs describe-services \
             --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
             --query "services[0].deployments" --output table
-          echo "배포 완료: ${{ steps.register.outputs.task_def_arn }}"
