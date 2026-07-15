@@ -10,9 +10,7 @@ WORKDIR /app
 RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
 
 # CI에서 미리 빌드한 실행 가능한 bootJar를 복사 (plain jar는 제외)
-COPY build/libs/*-SNAPSHOT.jar app.jar
-
-RUN chown appuser:appgroup app.jar
+COPY --chown=appuser:appgroup build/libs/*-SNAPSHOT.jar app.jar
 
 USER appuser
 
