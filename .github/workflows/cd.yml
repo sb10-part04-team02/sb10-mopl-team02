@@ -32,6 +32,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: JDK 17 설정
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Gradle 설정 · 캐시
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: bootJar 빌드 (러너 네이티브)
+        # 무거운 Gradle 빌드를 도커 밖에서 수행 → 도커 빌드는 JAR 복사만 하므로 ARM64 크로스빌드가 빨라짐
+        run: ./gradlew clean bootJar --no-daemon
+
       - name: AWS 자격 증명 (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
