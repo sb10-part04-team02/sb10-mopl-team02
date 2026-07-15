@@ -4,6 +4,7 @@ import com.team02.mopl.domain.contentchat.dto.ContentChatDto;
 import com.team02.mopl.domain.contentchat.dto.ContentChatSendRequest;
 import com.team02.mopl.domain.contentchat.service.ContentChatService;
 import com.team02.mopl.global.exception.ErrorResponse;
+import com.team02.mopl.global.websocket.redis.StompFanOutPublisher;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.Map;
@@ -15,7 +16,6 @@ import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
@@ -27,7 +27,7 @@ import org.springframework.validation.FieldError;
 public class ContentChatWebSocketController {
 
   private final ContentChatService contentChatService;
-  private final SimpMessagingTemplate messagingTemplate;
+  private final StompFanOutPublisher stompFanOutPublisher;
 
   @MessageMapping("/contents/{contentId}/chat")
   public void sendMessage(
@@ -37,7 +37,7 @@ public class ContentChatWebSocketController {
     // CONNECT 단계에서 JWT 인증을 강제하므로 principal은 항상 존재한다.
     UUID senderId = UUID.fromString(principal.getName());
     ContentChatDto message = contentChatService.createMessage(contentId, senderId, request);
-    messagingTemplate.convertAndSend("/sub/contents/" + contentId + "/chat", message);
+    stompFanOutPublisher.publish("/sub/contents/" + contentId + "/chat", message);
   }
 
   // @Valid 페이로드 검증 실패는 messaging 모듈의 MethodArgumentNotValidException으로 전달된다.

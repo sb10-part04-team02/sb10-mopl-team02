@@ -1,11 +1,11 @@
 package com.team02.mopl.domain.dm.service;
 
 import com.team02.mopl.domain.dm.dto.DmSentEvent;
+import com.team02.mopl.domain.dm.redis.DmSseFanOutPublisher;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.kafka.NotificationKafkaMessage;
 import com.team02.mopl.domain.notification.kafka.NotificationKafkaProducer;
-import com.team02.mopl.domain.sse.service.SseEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -17,7 +17,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class DmEventListener {
 
-  private final SseEventService sseEventService;
+  private final DmSseFanOutPublisher dmSseFanOutPublisher;
   private final NotificationKafkaProducer notificationKafkaProducer;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -39,6 +39,14 @@ public class DmEventListener {
           e);
     }
 
-    sseEventService.send(event.receiverUserId(), "direct-messages", event.eventId(), event.dto());
+    try {
+      dmSseFanOutPublisher.publish(event.receiverUserId(), event.eventId(), event.dto());
+    } catch (RuntimeException e) {
+      log.warn(
+          "DM 수신 SSE fan-out 발행 실패. receiverUserId={}, eventId={}",
+          event.receiverUserId(),
+          event.eventId(),
+          e);
+    }
   }
 }

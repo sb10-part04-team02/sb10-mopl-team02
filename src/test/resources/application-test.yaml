@@ -24,7 +24,7 @@ spring:
             enable: true    # TLS 보안설정
 
 app:
-  notification:
+  realtime:
     redis-fan-out:
       enabled: false
 

@@ -6,11 +6,11 @@ import static org.mockito.Mockito.verify;
 
 import com.team02.mopl.domain.dm.dto.DirectMessageDto;
 import com.team02.mopl.domain.dm.dto.DmSentEvent;
+import com.team02.mopl.domain.dm.redis.DmSseFanOutPublisher;
 import com.team02.mopl.domain.notification.entity.enums.NotificationLevel;
 import com.team02.mopl.domain.notification.entity.enums.NotificationType;
 import com.team02.mopl.domain.notification.kafka.NotificationKafkaMessage;
 import com.team02.mopl.domain.notification.kafka.NotificationKafkaProducer;
-import com.team02.mopl.domain.sse.service.SseEventService;
 import com.team02.mopl.domain.user.dto.UserSummary;
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -28,7 +28,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @ExtendWith(MockitoExtension.class)
 class DmEventListenerTest {
 
-  @Mock private SseEventService sseEventService;
+  @Mock private DmSseFanOutPublisher dmSseFanOutPublisher;
 
   @Mock private NotificationKafkaProducer notificationKafkaProducer;
 
@@ -69,7 +69,7 @@ class DmEventListenerTest {
     assertThat(message.level()).isEqualTo(NotificationLevel.INFO);
     assertThat(message.notificationType()).isEqualTo(NotificationType.DIRECT_MESSAGE_RECEIVED);
 
-    verify(sseEventService).send(eq(receiverId), eq("direct-messages"), eq(eventId), eq(dto));
+    verify(dmSseFanOutPublisher).publish(eq(receiverId), eq(eventId), eq(dto));
   }
 
   @Test
