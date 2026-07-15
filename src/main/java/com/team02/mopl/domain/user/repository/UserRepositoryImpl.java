@@ -59,6 +59,21 @@ public class UserRepositoryImpl implements UserRepositoryCustom {
         .fetch();
   }
 
+  @Override
+  public long countUsersByCursor(String emailLike, Role roleEqual, Boolean isLocked) {
+    Long count =
+        queryFactory
+            .select(user.count())
+            .from(user)
+            .where(
+                user.deletedAt.isNull(),
+                emailLikeEq(emailLike),
+                roleEq(roleEqual),
+                isLockedEq(isLocked))
+            .fetchOne();
+    return count != null ? count : 0L;
+  }
+
   private BooleanExpression emailLikeEq(String emailLike) {
     return StringUtils.hasText(emailLike) ? user.email.contains(emailLike) : null;
   }
