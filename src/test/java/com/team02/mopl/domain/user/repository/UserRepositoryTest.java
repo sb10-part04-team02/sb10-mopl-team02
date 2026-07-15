@@ -299,18 +299,18 @@ class UserRepositoryTest extends RepositoryTestSupport {
   }
 
   @Test
-  @DisplayName("검색 파라미터가 제공되면 조건에 맞는 유저 수를 반환한다")
+  @DisplayName("검색 파라미터가 제공되면 각 조건이 독립적으로 적용된 유저 수를 반환한다")
   void success_shouldCountMatchingUsers_whenSearchParametersAreProvided() {
     // given
     saveUser("user1", "user1@example.com", Role.USER, false);
     saveUser("user2", "user2@gmail.com", Role.ADMIN, false);
     saveUser("user3", "user3@example.com", Role.ADMIN, true);
 
-    // when
-    long count = userRepository.countUsersByCursor("example", Role.ADMIN, true);
-
-    // then
-    assertThat(count).isEqualTo(1);
+    // when & then (각 필터 단독 적용 시 전체 수(3)와 다른 값이어야 조건 누락 회귀를 잡을 수 있다)
+    assertThat(userRepository.countUsersByCursor("example", null, null)).isEqualTo(2);
+    assertThat(userRepository.countUsersByCursor(null, Role.ADMIN, null)).isEqualTo(2);
+    assertThat(userRepository.countUsersByCursor(null, null, true)).isEqualTo(1);
+    assertThat(userRepository.countUsersByCursor("example", Role.ADMIN, true)).isEqualTo(1);
   }
 
   private User saveUser(String name, String email, Role role, boolean isLocked) {
