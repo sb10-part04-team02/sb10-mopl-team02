@@ -51,6 +51,9 @@ management:
     web:
       exposure:
         include: health, info, prometheus
+  health:
+    mail:
+      enabled: false  # 메일은 부가 기능(비번 재설정 발송용)이라 SMTP 장애가 전체 health를 DOWN시키지 않도록 제외
   metrics:
     tags:
       application: ${spring.application.name}  # 인스턴스 여러 대일 때 메트릭 출처 구분용 공통 태그
