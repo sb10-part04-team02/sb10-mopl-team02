@@ -106,6 +106,7 @@ public class ContentIngestionJobConfig {
         .build();
   }
 
+  // tmdbStep과 sportsDbStep은 각자 자기 소스의 Reader·Writer를 받아 buildStep에 넘기는 게 전부 -> 공통 로직 추상화
   private Step buildStep(
       String name,
       JobRepository jobRepository,
@@ -117,10 +118,12 @@ public class ContentIngestionJobConfig {
         .<ExternalContentData, ExternalContentData>chunk(CHUNK_SIZE, transactionManager)
         .reader(reader)
         .writer(writer)
-        .faultTolerant()
-        .skip(Exception.class)
+        // 항목 단위 실패 격리
+        .faultTolerant() // Step 실행 중 오류가 발생했을 때 특정 오류를 건너뛰거나 다시 시도할 수 있는 기능 on
+        .skip(Exception.class) // 어떤 예외든
         .noSkip(ContentFetchException.class) // fetch 전체 실패는 skip이 아니라 스텝 실패로
         .skipLimit(SKIP_LIMIT)
+        // 리스너
         .listener(skipListener)
         .listener((StepExecutionListener) writer) // afterStep에서 집계를 ExecutionContext에 기록
         .listener((ChunkListener) writer) // 청크 커밋/롤백 시점에 집계 반영/폐기

@@ -37,11 +37,13 @@ public class ContentIngestionScheduler {
       log.error("수집 락 획득 실패(Redis 오류). 이번 주기 수집을 건너뜁니다.", e);
       return;
     }
+
     if (token == null) {
       // 다른 인스턴스가 락을 이미 가지고 있는 경우
       log.info("콘텐츠 수집이 이미 실행 중입니다. 이번 주기를 건너뜁니다.");
       return;
     }
+
     log.info("스케줄 콘텐츠 수집 시작");
     try {
       // 매 실행이 새 JobInstance가 되도록 timestamp를 식별 파라미터로 전달

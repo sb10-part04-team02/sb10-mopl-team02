@@ -20,6 +20,10 @@ import org.springframework.batch.item.ItemWriter;
 //   (롤백된 청크의 임시 집계는 폐기. skip 스캔이 건별 tx로 재처리하며 다시 집계됨)
 // - afterStep에서 누계를 ExecutionContext에 기록해 IngestionJobListener가 Job 요약에 사용한다
 // - 실행마다 집계가 초기화되도록 @StepScope 빈으로 생성한다 (ContentIngestionJobConfig)
+//
+// ItemWriter - 실제 저장 로직
+// ChunkListener - 청크 트랜잭션의 전후 실패 훅 받음
+// StepExecutionListener - 스텝 종료 시 결과를 밖으로 내보냄
 @Slf4j
 public class ContentUpsertItemWriter
     implements ItemWriter<ExternalContentData>, StepExecutionListener, ChunkListener {
@@ -35,7 +39,7 @@ public class ContentUpsertItemWriter
   private int inserted;
   private int updated;
   private int skipped;
-  // 현재 청크 tx 내 임시 집계
+  // 현재 청크 트랜잭션 내 임시 집계
   private int chunkInserted;
   private int chunkUpdated;
   private int chunkSkipped;
@@ -45,6 +49,7 @@ public class ContentUpsertItemWriter
     this.source = source;
   }
 
+  // 청크의 각 항목을 upsert하고 반환된 결과에 따라 임시 카운터를 올림
   @Override
   public void write(Chunk<? extends ExternalContentData> chunk) {
     for (ExternalContentData item : chunk) {
@@ -56,25 +61,30 @@ public class ContentUpsertItemWriter
     }
   }
 
+  // 임시 카운터는 청크 경계에서 항상 리셋되고, 오직 커밋된 청크만 누계에 반영된다.
+  // 청크 시작 전 임시 카운터를 0으로 초기화
   @Override
   public void beforeChunk(ChunkContext context) {
     resetChunkCounts();
   }
 
+  // 청크 트랜잭션이 커밋된 후 호출됨 - 임시 집계를 누계에 더함
   @Override
   public void afterChunk(ChunkContext context) {
     // 청크 tx 커밋 후 호출되므로 이 시점에만 누계에 반영
     inserted += chunkInserted;
     updated += chunkUpdated;
     skipped += chunkSkipped;
-    resetChunkCounts();
+    resetChunkCounts(); // 다시 reset해 다음 청크를 준비
   }
 
+  // 청크 실패(롤백)했을 때 호출됨 - 임시 카운터만 reset함
   @Override
   public void afterChunkError(ChunkContext context) {
     resetChunkCounts();
   }
 
+  // 결과 내보내기 - step이 끝나면 확정된 누계를 step의 ExecutionContext에 작성
   @Override
   public ExitStatus afterStep(StepExecution stepExecution) {
     ExecutionContext context = stepExecution.getExecutionContext();
