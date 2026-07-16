@@ -16,7 +16,7 @@
       "image": "${ECR_REGISTRY}/mopl-app:${APP_IMAGE_TAG}",
       "essential": true,
       "portMappings": [
-        { "containerPort": 8080, "protocol": "tcp" }
+        { "name": "app", "containerPort": 8080, "protocol": "tcp" }
       ],
       "environment": [
         { "name": "SPRING_PROFILES_ACTIVE", "value": "prod" },
