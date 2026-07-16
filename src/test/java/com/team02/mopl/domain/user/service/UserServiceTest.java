@@ -16,6 +16,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 
+import com.team02.mopl.domain.auth.oauth.provider.OAuth2UserInfo;
+import com.team02.mopl.domain.auth.oauth.provider.OAuthType;
 import com.team02.mopl.domain.user.dto.ChangePasswordRequest;
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
@@ -34,6 +36,7 @@ import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.mapper.UserMapper;
+import com.team02.mopl.domain.user.repository.SocialAccountRepository;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.global.dto.CursorResponse;
 import com.team02.mopl.global.enums.SortDirection;
@@ -75,6 +78,8 @@ class UserServiceTest {
   @Mock ApplicationEventPublisher eventPublisher;
 
   @Mock FileStorage fileStorage;
+
+  @Mock SocialAccountRepository socialAccountRepository;
 
   @InjectMocks UserService userService;
 
@@ -935,6 +940,45 @@ class UserServiceTest {
       assertThrows(
           BusinessException.class,
           () -> userService.updatePassword(userId, requesterId, mock(ChangePasswordRequest.class)));
+    }
+  }
+
+  @Nested
+  class RegisterSocialUser {
+    @Test
+    @DisplayName("기존에 회원이었으면 등록과정을 스킵한다")
+    void fail_shouldSkipRegisterUser_whenVisitorIsAlreadyUser() {
+      // given
+      OAuth2UserInfo info = mock(OAuth2UserInfo.class);
+      given(info.email()).willReturn("example@gmail.com");
+      given(userRepository.findByEmailAndDeletedAtIsNull(anyString()))
+          .willReturn(Optional.of(mock(User.class)));
+      given(socialAccountRepository.existsByUserIdAndProvider(any(), any())).willReturn(true);
+
+      // when
+      userService.registerSocialUser(info);
+
+      // then
+      then(socialAccountRepository).should(never()).save(any());
+    }
+
+    @Test
+    @DisplayName("처음들어오는 소셜회원이면 유저로 등록한다")
+    void success_shouldRegisterUser_whenVisitorIsInit() {
+      // given
+      OAuth2UserInfo info =
+          new OAuth2UserInfo(OAuthType.GOOGLE, "12345", "이름", "example@gmail.com", "url");
+      given(userRepository.findByEmailAndDeletedAtIsNull(anyString())).willReturn(Optional.empty());
+      User mockUser = mock(User.class);
+      given(mockUser.getId()).willReturn(UUID.randomUUID());
+      given(userRepository.save(any())).willReturn(mockUser);
+
+      // when
+      userService.registerSocialUser(info);
+
+      // then
+      then(userRepository).should(times(1)).save(any());
+      then(socialAccountRepository).should(times(1)).save(any());
     }
   }
 }
