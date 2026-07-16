@@ -23,6 +23,17 @@ spring:
           starttls:
             enable: true    # TLS 보안설정
 
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-google-id
+            client-secret: test-google-secret
+          kakao:
+            client-id: test-kakao-id
+            client-secret: test-kakao-secret
+
 app:
   notification:
     redis-fan-out:

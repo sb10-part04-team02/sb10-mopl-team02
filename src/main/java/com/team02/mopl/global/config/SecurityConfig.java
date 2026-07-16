@@ -2,7 +2,12 @@ package com.team02.mopl.global.config;
 
 import com.team02.mopl.domain.auth.jwt.JwtAuthenticationProvider;
 import com.team02.mopl.domain.auth.jwt.filter.JwtAuthenticationFilter;
+import com.team02.mopl.domain.auth.jwt.handler.JwtLoginFailureHandler;
+import com.team02.mopl.domain.auth.jwt.handler.JwtLoginSuccessHandler;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
+import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginFailureHandler;
+import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginSuccessHandler;
+import com.team02.mopl.domain.auth.oauth.service.MoplOidcUserService;
 import com.team02.mopl.domain.auth.provider.MoplAuthenticationProvider;
 import com.team02.mopl.global.config.auth.handler.SpaCsrfTokenRequestHandler;
 import java.util.Arrays;
@@ -16,12 +21,10 @@ import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
+import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.AuthenticationFailureHandler;
-import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
@@ -35,10 +38,13 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-  private final AuthenticationSuccessHandler jwtLoginSuccessHandler;
-  private final AuthenticationFailureHandler jwtLoginFailureHandler;
+  private final JwtLoginSuccessHandler jwtLoginSuccessHandler;
+  private final JwtLoginFailureHandler jwtLoginFailureHandler;
   private final LogoutHandler jwtLogoutHandler;
   private final AuthenticationEntryPoint jwtAuthenticationEntryPoint;
+  private final MoplOidcUserService oidcUserService;
+  private final OAuthLoginSuccessHandler oAuthLoginSuccessHandler;
+  private final OAuthLoginFailureHandler oAuthLoginFailureHandler;
 
   @Bean
   public SecurityFilterChain filterChain(
@@ -60,6 +66,12 @@ public class SecurityConfig {
                     .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .oauth2Login(
+            oauth ->
+                oauth
+                    // 소셜기능은 로그인할때만 사용하기에 OAuth토큰을 저장할 필요가 없음
+                    .successHandler(oAuthLoginSuccessHandler)
+                    .failureHandler(oAuthLoginFailureHandler))
         .formLogin(
             login ->
                 login
@@ -116,19 +128,23 @@ public class SecurityConfig {
   }
 
   @Bean
-  public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
-  }
-
-  @Bean
   public AuthenticationManager authenticationManager(
       MoplAuthenticationProvider moplAuthenticationProvider,
       JwtAuthenticationProvider jwtAuthenticationProvider) {
 
+    // OAuth2용 토큰 클라이언트 생성
+    RestClientAuthorizationCodeTokenResponseClient tokenResponseClient =
+        new RestClientAuthorizationCodeTokenResponseClient();
+
+    // oidcUserservice는 커스텀
+    OidcAuthorizationCodeAuthenticationProvider oidcProvider =
+        new OidcAuthorizationCodeAuthenticationProvider(tokenResponseClient, oidcUserService);
+
     return new ProviderManager(
         Arrays.asList(
             moplAuthenticationProvider, // 일반 로그인 + 임시비밀번호 포함
-            jwtAuthenticationProvider // 토큰용
+            jwtAuthenticationProvider, // 토큰용
+            oidcProvider // OIDC 소셜 로그인용(테스트)
             ));
   }
 }
