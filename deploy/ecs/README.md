@@ -1,9 +1,11 @@
-# ECS 1차 배포 기록
+# ECS 배포 기록
 
-모두의 플리(mopl) 1차 배포(단일 인스턴스, desired count=1)의 산출물과 진행 기록.
+모두의 플리(mopl) ECS 배포 산출물과 진행 기록.
 상세 절차 가이드는 [../../docs/deploy-ecs-guide.html](../../docs/deploy-ecs-guide.html) 참고.
 
 ## 목표 구조
+
+### 1차 (현재 운영, 사이드카)
 
 ```
 Client -> CloudFlare -> ALB -> ECS Task(사이드카) -> RDS / ElastiCache
@@ -11,8 +13,20 @@ Client -> CloudFlare -> ALB -> ECS Task(사이드카) -> RDS / ElastiCache
                                  └─ app   (:8080)
 ```
 
-- 1차 배포는 nginx + app을 같은 Task에 둔 사이드카 구성.
-- 2차 확장(desired count 2+) 시 app/nginx 서비스를 분리하고 Service Connect로 전환 필요.
+- nginx + app을 같은 Task에 둔 사이드카 구성. `task-definition.json` 사용.
+
+### 2차 (다중 인스턴스, 서비스 분리) — 산출물 준비 완료, 인프라 전환은 3단계
+
+```
+Client -> CloudFlare -> ALB -> nginx 서비스(desired 1, :8080)
+                                  └─ Service Connect (app.mopl.local:8080)
+                                       ├─ app Task 1 (desired 2)
+                                       └─ app Task 2
+```
+
+- `task-definition-app.json` / `task-definition-nginx.json` 분리.
+- nginx는 `nginxinc/nginx-unprivileged`(non-root, listen 8080), upstream은 Service Connect 별칭.
+- ALB 타겟그룹 포트 80 → 8080으로 변경(3단계).
 
 ## 리전 / 계정
 
@@ -34,7 +48,7 @@ Client -> CloudFlare -> ALB -> ECS Task(사이드카) -> RDS / ElastiCache
 | 이름 | 역할 | 인바운드 |
 |---|---|---|
 | `mopl-alb-sg` | ALB | 인터넷 80/443 |
-| `mopl-ecs-sg` | ECS Task | `mopl-alb-sg` → 80 (nginx) |
+| `mopl-ecs-sg` | ECS Task | `mopl-alb-sg` → 80 (1차 nginx) / 8080 (2차 nginx) |
 | `mopl-rds-sg` | RDS | `mopl-ecs-sg` → 5432 |
 | `mopl-redis-sg` | Redis | `mopl-ecs-sg` → 6379 |
 
@@ -61,10 +75,15 @@ Client -> CloudFlare -> ALB -> ECS Task(사이드카) -> RDS / ElastiCache
 
 ## 이 디렉터리의 파일
 
-- `nginx/Dockerfile` — 사이드카용 커스텀 nginx 이미지
-- `nginx/nginx.conf` — upstream을 `127.0.0.1:8080`으로. SSE/WebSocket/body size는 로컬과 동일.
+- `task-definition.json` — 1차 사이드카(nginx+app) 템플릿. CD가 dev push 시 사용.
+- `task-definition-app.json` — 2차 app 전용 템플릿.
+- `task-definition-nginx.json` — 2차 nginx 전용 템플릿(D3 healthCheck 포함).
+- `nginx/Dockerfile` — `nginxinc/nginx-unprivileged` 기반 커스텀 nginx 이미지(non-root, :8080).
+- `nginx/nginx.conf` — upstream `app.mopl.local:8080`(Service Connect). SSE/WebSocket/body size는 로컬과 동일.
 
 ### nginx 이미지 빌드/푸시 명령
+
+> **주의:** 2차 nginx 설정(`listen 8080`, upstream `app.mopl.local`)은 Service Connect 전환(3단계) 이후에만 ECR에 푸시한다. 3단계 전에 푸시하면 1차 사이드카(`task-definition.json`, port 80)가 깨진다.
 
 ```bash
 REGISTRY=<AWS_ACCOUNT_ID>.dkr.ecr.ap-northeast-2.amazonaws.com
@@ -77,8 +96,8 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 ## Task Definition 환경변수
 
-정의 파일 `deploy/ecs/task-definition.json`은 플레이스홀더(`${...}`) 템플릿이며,
-실제 값(엔드포인트·ARN·계정 ID 등)은 배포 시점에 주입한다.
+정의 파일(`task-definition*.json`)은 플레이스홀더(`${...}`) 템플릿이며,
+실제 값(엔드포인트·ARN·계정 ID 등)은 배포 시점에 주입한다. 값 목록은 `deploy.env.example` 참고.
 
 평문 환경변수(비밀 아님): `SPRING_PROFILES_ACTIVE`, `SERVER_PORT`, `DB_URL`, `DB_USERNAME`,
 `REDIS_HOST`, `REDIS_PORT`, `ADMIN_EMAIL`, `ADMIN_NAME`, `INGESTION_SCHEDULER_ENABLED`,
