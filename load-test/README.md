@@ -122,6 +122,45 @@ k6 run -e BASE_URL=http://localhost:8080 -e CONFIG=stress -e PEAK_RPS=300 "$SCEN
 | `TARGET_RPS` | 50 | `load` 의 목표 여정 시작률 |
 | `PEAK_RPS` | 300 | `stress` 의 피크 여정 시작률 |
 
+## Grafana 시각화 (#398)
+
+k6 메트릭을 Prometheus remote write 로 밀어넣고, 기존 Grafana 스택에서 실시간으로 본다.
+(Prometheus 는 `--web.enable-remote-write-receiver` 로 기동된다 — `docker-compose.yml` 참고)
+
+```bash
+# 1. Prometheus + Grafana 기동
+docker compose up -d prometheus grafana
+
+# 2. -o experimental-prometheus-rw 를 붙여 실행 (기존 실행 커맨드에 그대로 추가 가능)
+K6_PROMETHEUS_RW_SERVER_URL=http://localhost:9090/api/v1/write \
+K6_PROMETHEUS_RW_TREND_STATS="avg,min,max,p(90),p(95),p(99)" \
+k6 run -o experimental-prometheus-rw \
+  --tag testid=content-browse-$(date +%m%d-%H%M) \
+  -e BASE_URL=http://localhost:8080 -e CONFIG=load -e TARGET_RPS=50 \
+  load-test/scenarios/content-browse.js
+```
+
+- 대시보드: <http://localhost:3000> (admin/admin) → Mopl 폴더 → **k6 부하테스트**
+  (`config/monitoring/grafana/dashboards/k6-load-testing.json` 이 자동 프로비저닝된다)
+- `/api/v1/write` 는 POST 전용 수신 엔드포인트다. 브라우저로 열면 405 가 뜨는 게 정상이며, 상태 확인은 Prometheus UI(<http://localhost:9090>)로 한다.
+- k6 를 Docker 로 돌리면 컨테이너 안에서 `localhost` 는 k6 자신이다. compose 네트워크에 붙여 서비스명으로 접근한다:
+
+  ```bash
+  # 리포지토리 루트에서 실행 (시나리오가 ../lib 등을 임포트하므로 load-test 전체를 마운트)
+  docker run --rm --network sb10-mopl-team02-dev_default \
+    -v "$PWD/load-test:/load-test" \
+    -e K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write \
+    -e 'K6_PROMETHEUS_RW_TREND_STATS=avg,min,max,p(90),p(95),p(99)' \
+    grafana/k6 run -o experimental-prometheus-rw \
+    --tag testid=<실행ID> -e BASE_URL=http://host.docker.internal:8080 \
+    /load-test/scenarios/content-browse.js
+  ```
+- `--tag testid=...` 는 실행(run) 구분용 — 대시보드 상단 `Test ID` 변수로 특정 실행만 필터링한다.
+  시나리오·프로파일·시각을 담은 값(예: `content-browse-load-0715-1430`)을 권장.
+- `K6_PROMETHEUS_RW_TREND_STATS` 를 지정해야 p95/p99 게이지(`k6_http_req_duration_p95` 등)가 생성된다.
+  생략하면 기본값 `p(99)`만 남아 대시보드 패널 대부분이 비어 보인다.
+- 서버 쪽 지표(CPU/힙/GC/커넥션풀)는 같은 Grafana 의 **Mopl 서버 모니터링** 대시보드로 병행 관찰.
+
 ## 이 프로젝트의 인증 함정 (lib/auth.js 가 캡슐화)
 
 - 로그인은 컨트롤러가 아니라 Spring Security formLogin 필터가 처리한다.
