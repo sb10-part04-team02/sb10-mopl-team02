@@ -65,7 +65,7 @@ export function fetchCursorPages(urlBase, accessToken, name, maxPages = MAX_PAGE
   // page를 0부터 maxPages 미만까지 1씩 증가시키며 반복. 최대 maxPages번 실행
   for (let page = 0; page < maxPages; page++) {
     const url = cursor
-      ? `${urlBase}&cursor=${encodeURIComponent(cursor)}&idAfter=${idAfter}`
+      ? `${urlBase}&cursor=${encodeURIComponent(cursor)}&idAfter=${encodeURIComponent(idAfter)}`
       : urlBase;
     // 요청에 태그 붙임
     const res = http.get(url, authParams(accessToken, { tags: { name } }));

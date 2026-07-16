@@ -27,7 +27,8 @@
 --  정리: docker compose --env-file .env down -v (볼륨 삭제)가 가장 확실. 부분 정리는 하단 CLEANUP 참고.
 -- ============================================================================
 
-\set ON_ERROR_STOP on -- 에러 나면 즉시 중단
+-- 에러 나면 즉시 중단
+\set ON_ERROR_STOP on
 
 -- psql -v 로 안 넘기면 쓰는 기본값
 \if :{?user_count}  \else \set user_count 1000  \endif
@@ -137,7 +138,7 @@ FROM (
     SELECT id, row_number() OVER (ORDER BY md5(id::text)) AS rank
     FROM contents
     WHERE title LIKE 'loadtest %' AND deleted_at IS NULL
-)
+) c
 -- 콘텐츠 한 개당 시청자 수를 순위로 결정
 CROSS JOIN LATERAL generate_series(0, :user_count / c.rank - 1) AS j
 JOIN (
