@@ -6,6 +6,7 @@ import com.team02.mopl.domain.watching.service.WatchingSessionService;
 import com.team02.mopl.domain.watching.websocket.WatchingSubscriptionRegistry.WatchingSubscription;
 import com.team02.mopl.global.exception.BusinessException;
 import com.team02.mopl.global.exception.ErrorResponse;
+import com.team02.mopl.global.websocket.redis.StompFanOutPublisher;
 import java.security.Principal;
 import java.util.Map;
 import java.util.UUID;
@@ -15,7 +16,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
@@ -40,7 +40,7 @@ public class WatchingSessionWebSocketEventListener {
 
   private final WatchingSessionService watchingSessionService;
   private final WatchingSubscriptionRegistry subscriptionRegistry;
-  private final SimpMessagingTemplate messagingTemplate;
+  private final StompFanOutPublisher stompFanOutPublisher;
   // 브로커를 거치지 않고 특정 세션에만 프레임을 내려보내기 위한 채널 (필드명으로 bean 매칭)
   private final MessageChannel clientOutboundChannel;
   private final ObjectMapper objectMapper;
@@ -121,7 +121,7 @@ public class WatchingSessionWebSocketEventListener {
   }
 
   private void broadcast(UUID contentId, WatchingSessionChange change) {
-    messagingTemplate.convertAndSend("/sub/contents/" + contentId + "/watch", change);
+    stompFanOutPublisher.publish("/sub/contents/" + contentId + "/watch", change);
   }
 
   /**

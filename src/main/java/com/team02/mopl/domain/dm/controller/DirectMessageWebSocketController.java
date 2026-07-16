@@ -5,6 +5,7 @@ import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
 import com.team02.mopl.domain.dm.exception.ConversationForbiddenException;
 import com.team02.mopl.domain.dm.service.DirectMessageService;
 import com.team02.mopl.global.exception.ErrorResponse;
+import com.team02.mopl.global.websocket.redis.StompFanOutPublisher;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import java.security.Principal;
@@ -16,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Controller;
 
@@ -26,7 +26,7 @@ import org.springframework.stereotype.Controller;
 public class DirectMessageWebSocketController {
 
   private final DirectMessageService directMessageService;
-  private final SimpMessagingTemplate messagingTemplate;
+  private final StompFanOutPublisher stompFanOutPublisher;
 
   @MessageMapping("/conversations/{conversationId}/direct-messages")
   public void sendDirectMessage(
@@ -37,7 +37,7 @@ public class DirectMessageWebSocketController {
     UUID senderId = UUID.fromString(principal.getName());
     DirectMessageDto messageDto =
         directMessageService.sendDirectMessage(conversationId, senderId, request);
-    messagingTemplate.convertAndSend(
+    stompFanOutPublisher.publish(
         "/sub/conversations/" + conversationId + "/direct-messages", messageDto);
   }
 
