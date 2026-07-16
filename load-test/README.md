@@ -10,7 +10,7 @@
 ```text
 load-test/
   config/           # 실행 프로파일과 SLO (얼마나 부하를 주나)
-    thresholds.js   #   전 시나리오 공통 SLO (에러율/p95). 시나리오 고유 태그 SLO 는 각 시나리오가 선언
+    thresholds.js   #   전 시나리오 공통 SLO (에러율/검증 통과율 + sign-in). duration 은 무태그 글로벌로 두지 않고 시나리오가 태그로 선언
     smoke.js        #   constant-vus, 1분 sanity
     load.js         #   ramping-arrival-rate, 목표 RPS 유지
     stress.js       #   ramping-arrival-rate, RPS 점증으로 한계점 탐색

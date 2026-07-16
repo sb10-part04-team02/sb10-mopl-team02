@@ -2,12 +2,17 @@
 // 응답에 requester-relative subscribedByMe 가 포함된다.
 // 실행: k6 run -e BASE_URL=... -e CONFIG=smoke load-test/scenarios/playlist-read.js
 import http from 'k6/http';
-import { sleep, check } from 'k6';
-import { BASE_URL, authParams, checkCursorResponse } from '../lib/http.js';
-import { login } from '../lib/auth.js';
-import { pickUser } from '../data/users.js';
+import {check, sleep} from 'k6';
+import {authParams, BASE_URL, checkCursorResponse} from '../lib/http.js';
+import {login} from '../lib/auth.js';
+import {pickUser} from '../data/users.js';
+import {optionsWith} from '../config/index.js';
 
-export { options } from '../config/index.js';
+// 태그별 SLO(초안, 1차 측정 후 조정)
+export const options = optionsWith({
+  'http_req_duration{name:playlists-list}': ['p(95)<500'],
+  'http_req_duration{name:playlists-detail}': ['p(95)<500'],
+});
 
 export function setup() {
   const user = pickUser(0);

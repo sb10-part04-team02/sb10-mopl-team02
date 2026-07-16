@@ -2,12 +2,16 @@
 // review 조회는 contentId 기준이라 setup 에서 콘텐츠 id 를 하나 확보한다.
 // 실행: k6 run -e BASE_URL=... -e CONFIG=smoke load-test/scenarios/review-read.js
 import http from 'k6/http';
-import { sleep, fail } from 'k6';
-import { BASE_URL, authParams, checkCursorResponse } from '../lib/http.js';
-import { login } from '../lib/auth.js';
-import { pickUser } from '../data/users.js';
+import {fail, sleep} from 'k6';
+import {authParams, BASE_URL, checkCursorResponse} from '../lib/http.js';
+import {login} from '../lib/auth.js';
+import {pickUser} from '../data/users.js';
+import {optionsWith} from '../config/index.js';
 
-export { options } from '../config/index.js';
+// 태그별 SLO(초안, 1차 측정 후 조정)
+export const options = optionsWith({
+  'http_req_duration{name:reviews-list}': ['p(95)<500'],
+});
 
 export function setup() {
   const user = pickUser(0);
