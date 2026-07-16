@@ -25,8 +25,16 @@ services:
       - "6379:6379"
 
   # 메트릭 수집: 호스트에서 실행 중인 앱(:8080)의 /actuator/prometheus를 스크레이프한다.
+  # remote-write receiver는 k6가 부하테스트 메트릭을 밀어넣는 용도 (load-test/README.md 참고)
   prometheus:
     image: prom/prometheus:v2.53.0
+    command:
+      # 이미지 기본 CMD를 덮어쓰므로 기본 플래그 4개를 유지한 채 remote-write receiver만 추가
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+      - --web.enable-remote-write-receiver
     volumes:
       - ./config/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
