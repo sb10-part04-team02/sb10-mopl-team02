@@ -75,6 +75,11 @@ app:
       # 알림 SSE(notifications)·콘텐츠 채팅·DM(WebSocket + direct-messages SSE)·코워칭 브로드캐스트가 모두 이 키에 좌우된다.
       # false로 두면 세 경로 전부 로컬 전용으로 전환되어 다중 인스턴스에서 교차 노드 전달이 끊긴다(단일 인스턴스 전용).
       enabled: true
+  alert:
+    discord:
+      webhook-url: ${DISCORD_ALERT_WEBHOOK_URL:}  # 빈 값이면 알림 비활성 (운영에서 env로 주입)
+      connect-timeout: 2s
+      read-timeout: 5s
   admin:
     email: ${ADMIN_EMAIL}
     password: ${ADMIN_PASSWORD}
