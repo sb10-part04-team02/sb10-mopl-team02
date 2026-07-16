@@ -101,6 +101,10 @@ jobs:
           ARN=$(aws secretsmanager describe-secret --secret-id "$EMAIL_PASSWORD_SECRET_NAME" --query ARN --output text)
           echo "EMAIL_PASSWORD_SECRET_ARN=$ARN" >> "$GITHUB_ENV"
 
+      - name: envsubst 설치
+        # app·nginx 두 렌더링 스텝이 공통으로 쓰므로 선행 스텝으로 분리해 순서 의존성을 없앤다.
+        run: sudo apt-get update -y && sudo apt-get install -y gettext-base
+
       - name: app task-definition 렌더링
         env:
           AWS_REGION: ${{ env.AWS_REGION }}
@@ -126,7 +130,6 @@ jobs:
           KAFKA_API_SECRET_SECRET_ARN: ${{ secrets.KAFKA_API_SECRET_SECRET_ARN }}
           # EMAIL_PASSWORD_SECRET_ARN 은 앞 단계에서 GITHUB_ENV 로 주입됨
         run: |
-          sudo apt-get update -y && sudo apt-get install -y gettext-base
           DEFINED_VARS=$(env | cut -d= -f1 | awk '{printf "${%s} ", $1}')
           envsubst "$DEFINED_VARS" < deploy/ecs/task-definition-app.json > /tmp/task-def-app.json
           if grep -q '\${' /tmp/task-def-app.json; then
