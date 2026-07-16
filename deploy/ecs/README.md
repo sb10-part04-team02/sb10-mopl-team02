@@ -7,7 +7,7 @@
 
 ### 1차 (현재 운영, 사이드카)
 
-```
+```text
 Client -> CloudFlare -> ALB -> ECS Task(사이드카) -> RDS / ElastiCache
                                  ├─ nginx (:80)
                                  └─ app   (:8080)
@@ -15,9 +15,9 @@ Client -> CloudFlare -> ALB -> ECS Task(사이드카) -> RDS / ElastiCache
 
 - nginx + app을 같은 Task에 둔 사이드카 구성. `task-definition.json` 사용.
 
-### 2차 (다중 인스턴스, 서비스 분리) — 산출물 준비 완료, 인프라 전환은 3단계
+### 2차 (다중 인스턴스, 서비스 분리) — 산출물 준비 완료, 인프라 전환은 2차 전환 단계
 
-```
+```text
 Client -> CloudFlare -> ALB -> nginx 서비스(desired 1, :8080)
                                   └─ Service Connect (app.mopl.local:8080)
                                        ├─ app Task 1 (desired 2)
@@ -26,7 +26,8 @@ Client -> CloudFlare -> ALB -> nginx 서비스(desired 1, :8080)
 
 - `task-definition-app.json` / `task-definition-nginx.json` 분리.
 - nginx는 `nginxinc/nginx-unprivileged`(non-root, listen 8080), upstream은 Service Connect 별칭.
-- ALB 타겟그룹 포트 80 → 8080으로 변경(3단계).
+- ALB 타겟그룹 포트 80 → 8080으로 변경(2차 전환 단계).
+- nginx 서비스는 desired 1(의도된 제한). app은 2개로 다중화되지만 nginx는 단일 태스크라 교체·장애 중 순단 가능성이 있는 단일 장애점이다. 무중단이 필요하면 이후 nginx도 2개 이상으로 확장.
 
 ## 리전 / 계정
 
@@ -83,7 +84,7 @@ Client -> CloudFlare -> ALB -> nginx 서비스(desired 1, :8080)
 
 ### nginx 이미지 빌드/푸시 명령
 
-> **주의:** 2차 nginx 설정(`listen 8080`, upstream `app.mopl.local`)은 Service Connect 전환(3단계) 이후에만 ECR에 푸시한다. 3단계 전에 푸시하면 1차 사이드카(`task-definition.json`, port 80)가 깨진다.
+> **주의:** 2차 nginx 설정(`listen 8080`, upstream `app.mopl.local`)은 Service Connect 전환(2차 전환 단계) 이후에만 ECR에 푸시한다. 그 전에 푸시하면 1차 사이드카(`task-definition.json`, port 80)가 깨진다.
 
 ```bash
 REGISTRY=<AWS_ACCOUNT_ID>.dkr.ecr.ap-northeast-2.amazonaws.com
@@ -99,16 +100,15 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 정의 파일(`task-definition*.json`)은 플레이스홀더(`${...}`) 템플릿이며,
 실제 값(엔드포인트·ARN·계정 ID 등)은 배포 시점에 주입한다. 값 목록은 `deploy.env.example` 참고.
 
+주입할 값의 전체 목록과 예시는 `deploy.env.example`을 단일 소스로 참고한다(아래는 요약).
+
 평문 환경변수(비밀 아님): `SPRING_PROFILES_ACTIVE`, `SERVER_PORT`, `DB_URL`, `DB_USERNAME`,
 `REDIS_HOST`, `REDIS_PORT`, `ADMIN_EMAIL`, `ADMIN_NAME`, `INGESTION_SCHEDULER_ENABLED`,
-`AWS_S3_BUCKET`, `AWS_S3_REGION`, `AWS_S3_BASE_URL`
+`AWS_S3_BUCKET`, `AWS_S3_REGION`, `AWS_S3_BASE_URL`,
+`KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_CONSUMER_GROUP_ID`, `EMAIL_ACCOUNT`
 
-Secrets Manager 참조(비밀):
-```
-DB_PASSWORD     -> mopl/db-password
-JWT_SECRET_KEY  -> mopl/jwt-secret
-ADMIN_PASSWORD  -> mopl/admin-password
-```
+Secrets Manager 참조(비밀): `DB_PASSWORD`, `JWT_SECRET_KEY`, `ADMIN_PASSWORD`,
+`KAFKA_API_KEY`, `KAFKA_API_SECRET`, `EMAIL_PASSWORD`
 
 ## ECS / ALB 리소스
 

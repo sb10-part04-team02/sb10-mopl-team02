@@ -18,7 +18,7 @@
         { "containerPort": 8080, "protocol": "tcp" }
       ],
       "healthCheck": {
-        "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"],
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/nginx-health | grep -q healthy || exit 1"],
         "interval": 30,
         "timeout": 5,
         "retries": 3,
