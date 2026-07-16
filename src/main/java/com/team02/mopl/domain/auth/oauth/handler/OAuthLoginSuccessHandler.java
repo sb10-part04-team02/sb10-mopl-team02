@@ -1,0 +1,82 @@
+package com.team02.mopl.domain.auth.oauth.handler;
+
+import static com.team02.mopl.domain.auth.oauth.handler.OAuthLoginFailureHandler.generateErrorUrl;
+
+import com.team02.mopl.domain.auth.entity.MoplUserDetails;
+import com.team02.mopl.domain.auth.jwt.JwtRegistry;
+import com.team02.mopl.domain.auth.jwt.JwtTokenProvider;
+import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
+import com.team02.mopl.domain.user.entity.User;
+import com.team02.mopl.domain.user.mapper.UserMapper;
+import com.team02.mopl.domain.user.repository.UserRepository;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Optional;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.stereotype.Component;
+
+@Component
+@RequiredArgsConstructor
+public class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
+
+  private final UserMapper userMapper;
+  private final UserRepository userRepository;
+  private final JwtTokenProvider jwtTokenProvider;
+  private final JwtRegistry jwtRegistry;
+  private final JwtUtils jwtUtils;
+
+  @Override
+  public void onAuthenticationSuccess(
+      HttpServletRequest request, HttpServletResponse response, Authentication authentication)
+      throws IOException {
+
+    // oidcUser 타입이 아닌경우
+    if (!(authentication.getPrincipal() instanceof OidcUser oidcUser)) {
+      String baseUrl = extractBaseUrl(request);
+      String errorUrl = generateErrorUrl(baseUrl, "인증 객체 타입이 맞지 않습니다.");
+      response.sendRedirect(errorUrl);
+      return;
+    }
+
+    Optional<User> optionalUser =
+        userRepository.findBySubjectAndDeletedAtIsNull(oidcUser.getAttribute("sub"));
+    // 유저를 찾을 수 없는 경우
+    if (optionalUser.isEmpty()) {
+      String baseUrl = extractBaseUrl(request);
+      String errorUrl = generateErrorUrl(baseUrl, "유저를 찾을 수 없습니다.");
+      response.sendRedirect(errorUrl);
+      return;
+    }
+
+    User findUser = optionalUser.get();
+    // generateRefreshToken활용을 위한 생성
+    MoplUserDetails userDetails = new MoplUserDetails(userMapper.toDto(findUser), null);
+
+    // 토큰발급
+    String refreshToken = jwtTokenProvider.generateRefreshToken(userDetails);
+
+    // refresh 토큰 Redis 등록
+    jwtRegistry.registerRefreshToken(findUser.getId(), refreshToken);
+
+    // refresh 토큰 헤더에 등록
+    ResponseCookie cookie = jwtUtils.generateRefreshTokenCookie(refreshToken);
+    response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+    // baseUrl 추출
+    String baseUrl = extractBaseUrl(request);
+
+    response.sendRedirect(baseUrl);
+  }
+
+  public static String extractBaseUrl(HttpServletRequest request) {
+    String requestUrl = request.getRequestURL().toString();
+    String requestUri = request.getRequestURI();
+    return requestUrl.replace(requestUri, "/");
+  }
+}
