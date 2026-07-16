@@ -14,13 +14,15 @@ concurrency:
 env:
   AWS_REGION: ap-northeast-2
   ECS_CLUSTER: mopl-cluster
-  ECS_SERVICE: mopl-service
+  APP_SERVICE: mopl-app-service
+  NGINX_SERVICE: mopl-nginx-service
   APP_REPO: mopl-app
+  NGINX_REPO: mopl-nginx
   EMAIL_PASSWORD_SECRET_NAME: mopl/email-password
 
 jobs:
   deploy:
-    name: 이미지 빌드 · task-def 등록 · ECS 배포
+    name: 이미지 빌드 · task-def 등록 · ECS 배포(app + nginx)
     runs-on: ubuntu-latest
     permissions:
       id-token: write   # OIDC 토큰 발급
@@ -72,6 +74,17 @@ jobs:
             -t "$REGISTRY/$APP_REPO:latest" \
             --push .
 
+      - name: nginx 이미지 빌드 · 푸시 (ARM64)
+        # 2차 구성은 nginx가 별도 서비스라 app과 함께 빌드·푸시한다. 컨텍스트는 deploy/ecs/nginx.
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            -t "$REGISTRY/$NGINX_REPO:$IMAGE_TAG" \
+            -t "$REGISTRY/$NGINX_REPO:latest" \
+            --push deploy/ecs/nginx
+
       - name: EMAIL_PASSWORD를 Secrets Manager에 주입
         env:
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
@@ -88,12 +101,15 @@ jobs:
           ARN=$(aws secretsmanager describe-secret --secret-id "$EMAIL_PASSWORD_SECRET_NAME" --query ARN --output text)
           echo "EMAIL_PASSWORD_SECRET_ARN=$ARN" >> "$GITHUB_ENV"
 
-      - name: task-definition 렌더링
+      - name: envsubst 설치
+        # app·nginx 두 렌더링 스텝이 공통으로 쓰므로 선행 스텝으로 분리해 순서 의존성을 없앤다.
+        run: sudo apt-get update -y && sudo apt-get install -y gettext-base
+
+      - name: app task-definition 렌더링
         env:
           AWS_REGION: ${{ env.AWS_REGION }}
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
           APP_IMAGE_TAG: ${{ env.IMAGE_TAG }}
-          NGINX_IMAGE_TAG: v1
           EXECUTION_ROLE_ARN: ${{ secrets.EXECUTION_ROLE_ARN }}
           TASK_ROLE_ARN: ${{ secrets.TASK_ROLE_ARN }}
           DB_URL: ${{ secrets.DB_URL }}
@@ -114,26 +130,47 @@ jobs:
           KAFKA_API_SECRET_SECRET_ARN: ${{ secrets.KAFKA_API_SECRET_SECRET_ARN }}
           # EMAIL_PASSWORD_SECRET_ARN 은 앞 단계에서 GITHUB_ENV 로 주입됨
         run: |
-          sudo apt-get update -y && sudo apt-get install -y gettext-base
           DEFINED_VARS=$(env | cut -d= -f1 | awk '{printf "${%s} ", $1}')
-          envsubst "$DEFINED_VARS" < deploy/ecs/task-definition.json > /tmp/task-def.json
-          if grep -q '\${' /tmp/task-def.json; then
-            echo "치환되지 않은 플레이스홀더가 있습니다:"; grep -n '\${' /tmp/task-def.json; exit 1
+          envsubst "$DEFINED_VARS" < deploy/ecs/task-definition-app.json > /tmp/task-def-app.json
+          if grep -q '\${' /tmp/task-def-app.json; then
+            echo "치환되지 않은 플레이스홀더가 있습니다:"; grep -n '\${' /tmp/task-def-app.json; exit 1
           fi
 
-      - name: task-def 등록 · ECS 배포
-        # register-task-definition + update-service + services-stable
-        # eventual consistency로 인한 간헐 실패를 자동 재시도
+      - name: nginx task-definition 렌더링
+        # nginx 정의는 민감값이 없어 이미지 태그·레지스트리·역할·리전만 치환한다.
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+          NGINX_IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          EXECUTION_ROLE_ARN: ${{ secrets.EXECUTION_ROLE_ARN }}
+        run: |
+          DEFINED_VARS='${AWS_REGION} ${ECR_REGISTRY} ${NGINX_IMAGE_TAG} ${EXECUTION_ROLE_ARN}'
+          envsubst "$DEFINED_VARS" < deploy/ecs/task-definition-nginx.json > /tmp/task-def-nginx.json
+          if grep -q '\${' /tmp/task-def-nginx.json; then
+            echo "치환되지 않은 플레이스홀더가 있습니다:"; grep -n '\${' /tmp/task-def-nginx.json; exit 1
+          fi
+
+      - name: app task-def 등록 · 배포
+        # app이 nginx 뒤에 있으므로 먼저 등록·안정화한 뒤 nginx를 배포한다.
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
-          task-definition: /tmp/task-def.json
+          task-definition: /tmp/task-def-app.json
           cluster: ${{ env.ECS_CLUSTER }}
-          service: ${{ env.ECS_SERVICE }}
+          service: ${{ env.APP_SERVICE }}
+          force-new-deployment: true
+          wait-for-service-stability: true
+
+      - name: nginx task-def 등록 · 배포
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: /tmp/task-def-nginx.json
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: ${{ env.NGINX_SERVICE }}
           force-new-deployment: true
           wait-for-service-stability: true
 
       - name: ECS 배포 상태 확인
         run: |
           aws ecs describe-services \
-            --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
-            --query "services[0].deployments" --output table
+            --cluster "$ECS_CLUSTER" --services "$APP_SERVICE" "$NGINX_SERVICE" \
+            --query "services[].{name:serviceName,deployments:deployments}" --output table
