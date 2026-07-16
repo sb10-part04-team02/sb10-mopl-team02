@@ -1,24 +1,29 @@
 package com.team02.mopl.domain.content.ingestion.scheduler;
 
-import com.team02.mopl.domain.content.ingestion.CollectResult;
-import com.team02.mopl.domain.content.ingestion.ContentCollectService;
-import java.util.List;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobExecution;
+import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-// 콘텐츠 수집을 주기 실행하는 스케줄러 (app.ingestion.scheduler.enabled=true일 때만 등록)
+// 콘텐츠 수집 배치를 주기 실행하는 스케줄러 (app.ingestion.scheduler.enabled=true일 때만 등록)
 // - IngestionRunLock으로 인스턴스 간 중복 실행을 방지한다 (획득 실패 시 이번 주기 skip)
-// - 수집 실패가 다음 주기 실행을 막지 않도록 예외는 로그만 남김 (러너와 동일 정책)
+//   Spring Batch는 동일 JobInstance의 동시 실행만 막으므로 timestamp 파라미터 + 멀티 인스턴스 환경에서는 이 락이 필요
+// - 수집 실패가 다음 주기 실행을 막지 않도록 예외는 로그만 남김 (결과 요약/알림은 IngestionJobListener 담당)
 @Slf4j
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "app.ingestion.scheduler.enabled", havingValue = "true")
 public class ContentIngestionScheduler {
 
-  private final ContentCollectService contentCollectService;
+  private final JobLauncher jobLauncher;
+  private final Job contentIngestionJob;
   private final IngestionRunLock runLock;
   private final IngestionSchedulerProperties properties;
 
@@ -37,40 +42,21 @@ public class ContentIngestionScheduler {
       log.info("콘텐츠 수집이 이미 실행 중입니다. 이번 주기를 건너뜁니다.");
       return;
     }
-    long startedAt = System.currentTimeMillis();
     log.info("스케줄 콘텐츠 수집 시작");
     try {
-      List<CollectResult> results = contentCollectService.collectAll();
-      long elapsedMs = System.currentTimeMillis() - startedAt;
-      int fetched = results.stream().mapToInt(CollectResult::fetched).sum();
-      int inserted = results.stream().mapToInt(CollectResult::inserted).sum();
-      int updated = results.stream().mapToInt(CollectResult::updated).sum();
-      int skipped = results.stream().mapToInt(CollectResult::skipped).sum();
-      int failed = results.stream().mapToInt(CollectResult::failed).sum();
-      // 소스 단위 실패는 서비스가 이미 error 로그를 남기고 results에서 빠지므로 sources 수로 드러난다
-      if (failed > 0) {
-        log.warn(
-            "스케줄 콘텐츠 수집 완료(일부 항목 실패). sources={}, fetched={}, inserted={}, updated={}, skipped={}, failed={}, elapsedMs={}",
-            results.size(),
-            fetched,
-            inserted,
-            updated,
-            skipped,
-            failed,
-            elapsedMs);
-      } else {
-        log.info(
-            "스케줄 콘텐츠 수집 완료. sources={}, fetched={}, inserted={}, updated={}, skipped={}, failed={}, elapsedMs={}",
-            results.size(),
-            fetched,
-            inserted,
-            updated,
-            skipped,
-            failed,
-            elapsedMs);
-      }
+      // 매 실행이 새 JobInstance가 되도록 timestamp를 식별 파라미터로 전달
+      // (기본 JobLauncher는 동기 실행이므로 락이 배치 실행 내내 유지된다)
+      JobParameters parameters =
+          new JobParametersBuilder()
+              .addLocalDateTime("runDateTime", LocalDateTime.now())
+              .toJobParameters();
+      JobExecution execution = jobLauncher.run(contentIngestionJob, parameters);
+      log.info(
+          "스케줄 콘텐츠 수집 종료. status={}, exitCode={}",
+          execution.getStatus(),
+          execution.getExitStatus().getExitCode());
     } catch (Exception e) {
-      log.error("스케줄 콘텐츠 수집 실패. elapsedMs={}", System.currentTimeMillis() - startedAt, e);
+      log.error("스케줄 콘텐츠 수집 실행 실패.", e);
     } finally {
       try {
         runLock.release(token); // 락 해제가 실패해도 TTL이 최종 안전망

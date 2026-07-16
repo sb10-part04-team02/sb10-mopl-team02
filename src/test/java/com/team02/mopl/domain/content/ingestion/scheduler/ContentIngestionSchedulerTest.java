@@ -1,29 +1,35 @@
 package com.team02.mopl.domain.content.ingestion.scheduler;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
 
-import com.team02.mopl.domain.content.enums.ContentSource;
-import com.team02.mopl.domain.content.ingestion.CollectResult;
-import com.team02.mopl.domain.content.ingestion.ContentCollectService;
 import java.time.Duration;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.batch.core.BatchStatus;
+import org.springframework.batch.core.ExitStatus;
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobExecution;
+import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.launch.JobLauncher;
 
 @ExtendWith(MockitoExtension.class)
 class ContentIngestionSchedulerTest {
 
   private static final String TOKEN = "lock-token";
 
-  @Mock private ContentCollectService contentCollectService;
+  @Mock private JobLauncher jobLauncher;
+  @Mock private Job contentIngestionJob;
   @Mock private IngestionRunLock runLock;
 
   private ContentIngestionScheduler scheduler;
@@ -32,22 +38,25 @@ class ContentIngestionSchedulerTest {
   void setUp() {
     IngestionSchedulerProperties properties =
         new IngestionSchedulerProperties(true, "0 0 4 * * *", Duration.ofMinutes(30));
-    scheduler = new ContentIngestionScheduler(contentCollectService, runLock, properties);
+    scheduler =
+        new ContentIngestionScheduler(jobLauncher, contentIngestionJob, runLock, properties);
   }
 
   @Test
-  @DisplayName("락 획득에 성공하면 전체 소스 수집을 실행하고 락을 해제한다")
-  void collectAll_whenLockAcquired_collectsAndReleases() {
+  @DisplayName("락 획득에 성공하면 runDateTime 파라미터로 수집 Job을 실행하고 락을 해제한다")
+  void collectAll_whenLockAcquired_launchesJobAndReleases() throws Exception {
     // given - 락 획득이 성공해서 TOKEN을 돌려주는 상황
     given(runLock.tryAcquire(any())).willReturn(TOKEN);
-    given(contentCollectService.collectAll())
-        .willReturn(List.of(new CollectResult(ContentSource.TMDB, 10, 5, 3, 2, 0)));
+    given(jobLauncher.run(eq(contentIngestionJob), any(JobParameters.class)))
+        .willReturn(completedExecution());
 
     // when
     scheduler.collectAll();
 
-    // then
-    then(contentCollectService).should().collectAll();
+    // then - 매 실행이 새 JobInstance가 되도록 timestamp 식별 파라미터가 전달되어야 한다
+    ArgumentCaptor<JobParameters> captor = ArgumentCaptor.forClass(JobParameters.class);
+    then(jobLauncher).should().run(eq(contentIngestionJob), captor.capture());
+    assertThat(captor.getValue().getLocalDateTime("runDateTime")).isNotNull();
     then(runLock).should().release(TOKEN); // 락 해제 호출 확인
   }
 
@@ -61,15 +70,16 @@ class ContentIngestionSchedulerTest {
     scheduler.collectAll();
 
     // then
-    then(contentCollectService).shouldHaveNoInteractions();
+    then(jobLauncher).shouldHaveNoInteractions();
   }
 
   @Test
-  @DisplayName("수집이 실패해도 예외를 전파하지 않고 락은 해제한다 (스케줄 지속 보장)")
-  void collectAll_whenCollectFails_doesNotPropagateAndReleases() {
+  @DisplayName("Job 실행이 실패해도 예외를 전파하지 않고 락은 해제한다 (스케줄 지속 보장)")
+  void collectAll_whenLaunchFails_doesNotPropagateAndReleases() throws Exception {
     // given
     given(runLock.tryAcquire(any())).willReturn(TOKEN);
-    given(contentCollectService.collectAll()).willThrow(new RuntimeException("수집 실패"));
+    given(jobLauncher.run(eq(contentIngestionJob), any(JobParameters.class)))
+        .willThrow(new RuntimeException("실행 실패"));
 
     // when & then
     assertThatCode(() -> scheduler.collectAll()).doesNotThrowAnyException();
@@ -78,16 +88,16 @@ class ContentIngestionSchedulerTest {
 
   @Test
   @DisplayName("락 해제 중 Redis 오류가 나도 예외를 전파하지 않는다 (정상 완료 보장, TTL이 안전망)")
-  void collectAll_whenReleaseFails_doesNotPropagate() {
+  void collectAll_whenReleaseFails_doesNotPropagate() throws Exception {
     // given - 수집은 성공했지만 락 해제에서 Redis 오류가 발생하는 상황
     given(runLock.tryAcquire(any())).willReturn(TOKEN);
-    given(contentCollectService.collectAll())
-        .willReturn(List.of(new CollectResult(ContentSource.TMDB, 10, 5, 3, 2, 0)));
+    given(jobLauncher.run(eq(contentIngestionJob), any(JobParameters.class)))
+        .willReturn(completedExecution());
     willThrow(new RuntimeException("Redis 오류")).given(runLock).release(TOKEN);
 
     // when & then - 해제 실패가 성공한 수집을 예외로 뒤바꾸지 않아야 한다
     assertThatCode(() -> scheduler.collectAll()).doesNotThrowAnyException();
-    then(contentCollectService).should().collectAll();
+    then(jobLauncher).should().run(eq(contentIngestionJob), any(JobParameters.class));
   }
 
   @Test
@@ -98,6 +108,13 @@ class ContentIngestionSchedulerTest {
 
     // when & then
     assertThatCode(() -> scheduler.collectAll()).doesNotThrowAnyException();
-    then(contentCollectService).shouldHaveNoInteractions();
+    then(jobLauncher).shouldHaveNoInteractions();
+  }
+
+  private JobExecution completedExecution() {
+    JobExecution execution = new JobExecution(1L);
+    execution.setStatus(BatchStatus.COMPLETED);
+    execution.setExitStatus(ExitStatus.COMPLETED);
+    return execution;
   }
 }
