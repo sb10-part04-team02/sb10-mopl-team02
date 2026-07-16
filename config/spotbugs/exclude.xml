@@ -40,6 +40,10 @@
       <Class name="~com\.team02\.mopl\.domain\.auth\.jwt\.(JwtRegistry|JwtAuthenticationProvider|handler\..*)"/>
       <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
+    <Match>
+      <Class name="com.team02.mopl.domain.auth.oauth.handler.OAuthLoginSuccessHandler"/>
+      <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
     <!-- userService를 활용해서 여기서도 EI2 패턴을 제외 -->
     <Match>
       <Class name="~com\.team02\.mopl\.global\.init\..*" />
