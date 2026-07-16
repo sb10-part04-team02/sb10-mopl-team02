@@ -19,7 +19,8 @@
 --    - tags 테이블에는 updated_at 이 없다
 --
 --  실행 (docker compose 로 띄운 로컬 DB, 서비스명 db):
---    docker compose --env-file .env exec -T db psql -U "$DB_USERNAME" -d "$DB_NAME" \
+--    docker compose --env-file .env exec -T db \
+--      sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
 --      < load-test/seed/seed-content-read.sql
 --
 --    규모 조정: -v user_count=2000 -v movie_count=5000 -v tv_count=2000 -v sport_count=1000

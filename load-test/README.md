@@ -61,7 +61,8 @@ k6 run -e BASE_URL=http://localhost:8080 --iterations 1 --vus 1 load-test/seed-u
 
 ```bash
 # 예: 콘텐츠 조회 시나리오용 시드
-docker compose --env-file .env exec -T db psql -U "$DB_USERNAME" -d "$DB_NAME" \
+docker compose --env-file .env exec -T db \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
   < load-test/seed/seed-content-read.sql
 ```
 
