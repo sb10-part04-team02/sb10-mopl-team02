@@ -5,6 +5,12 @@ spring:
   profiles:
     active: dev
 
+  batch:
+    job:
+      enabled: false  # 기동 시 Job 자동 실행 방지 (스케줄러/러너가 JobLauncher로 실행)
+    jdbc:
+      initialize-schema: never  # BATCH_* 메타테이블은 Flyway(V3)가 관리
+
   flyway:
     enabled: true  # 기동 시 db/migration 마이그레이션 적용 (스키마 자동 생성·버전관리)
 
