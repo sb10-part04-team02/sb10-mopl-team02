@@ -147,7 +147,9 @@ k6 run -o experimental-prometheus-rw \
 
   ```bash
   # 리포지토리 루트에서 실행 (시나리오가 ../lib 등을 임포트하므로 load-test 전체를 마운트)
-  docker run --rm --network sb10-mopl-team02-dev_default \
+  # 네트워크 이름은 리포지토리 디렉터리명에 따라 다르다 — docker network ls 로 확인 (예: sb10-mopl-team02_default)
+  docker run --rm --network <compose-network-name> \
+    --add-host host.docker.internal:host-gateway \
     -v "$PWD/load-test:/load-test" \
     -e K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write \
     -e 'K6_PROMETHEUS_RW_TREND_STATS=avg,min,max,p(90),p(95),p(99)' \
@@ -155,6 +157,7 @@ k6 run -o experimental-prometheus-rw \
     --tag testid=<실행ID> -e BASE_URL=http://host.docker.internal:8080 \
     /load-test/scenarios/content-browse.js
   ```
+
 - `--tag testid=...` 는 실행(run) 구분용 — 대시보드 상단 `Test ID` 변수로 특정 실행만 필터링한다.
   시나리오·프로파일·시각을 담은 값(예: `content-browse-load-0715-1430`)을 권장.
 - `K6_PROMETHEUS_RW_TREND_STATS` 를 지정해야 p95/p99 게이지(`k6_http_req_duration_p95` 등)가 생성된다.
