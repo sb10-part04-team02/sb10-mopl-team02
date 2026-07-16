@@ -24,8 +24,13 @@ import com.team02.mopl.domain.auth.dto.JwtDto;
 import com.team02.mopl.domain.auth.dto.ResetPasswordRequest;
 import com.team02.mopl.domain.auth.dto.SignInRequest;
 import com.team02.mopl.domain.auth.exception.AuthException;
+import com.team02.mopl.domain.auth.jwt.handler.JwtLoginFailureHandler;
+import com.team02.mopl.domain.auth.jwt.handler.JwtLoginSuccessHandler;
 import com.team02.mopl.domain.auth.jwt.handler.JwtLogoutHandler;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
+import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginFailureHandler;
+import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginSuccessHandler;
+import com.team02.mopl.domain.auth.oauth.service.MoplOidcUserService;
 import com.team02.mopl.domain.auth.service.AuthService;
 import com.team02.mopl.domain.auth.service.AuthService.TokenResult;
 import com.team02.mopl.domain.auth.service.MailService;
@@ -57,8 +62,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.security.web.AuthenticationEntryPoint;
-import org.springframework.security.web.authentication.AuthenticationFailureHandler;
-import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -71,9 +74,12 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class AuthControllerTest {
 
+  @MockitoBean private MoplOidcUserService oidcUserService;
+  @MockitoBean private OAuthLoginSuccessHandler oAuthLoginSuccessHandler;
+  @MockitoBean private OAuthLoginFailureHandler oAuthLoginFailureHandler;
   @MockitoBean private AuthenticationEntryPoint jwtAuthenticationEntryPoint;
-  @MockitoBean private AuthenticationSuccessHandler jwtLoginSuccessHandler;
-  @MockitoBean private AuthenticationFailureHandler jwtLoginFailureHandler;
+  @MockitoBean private JwtLoginSuccessHandler jwtLoginSuccessHandler;
+  @MockitoBean private JwtLoginFailureHandler jwtLoginFailureHandler;
   @MockitoBean private AuthenticationManager authenticationManager;
   @MockitoBean private JwtLogoutHandler jwtLogoutHandler;
   @MockitoBean private AuthService authService;
