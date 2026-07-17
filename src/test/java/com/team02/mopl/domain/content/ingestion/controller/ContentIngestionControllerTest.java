@@ -66,6 +66,22 @@ class ContentIngestionControllerTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
+  @DisplayName("sources에 null이 섞여 있으면 400으로 막는다")
+  void triggerIngestion_withNullSource_returnsBadRequest() throws Exception {
+    // given
+    mockMvc
+        .perform(
+            post("/api/contents/ingestion")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"sources\":[null]}"))
+        .andExpect(status().isBadRequest());
+
+    // then
+    then(contentIngestionTrigger).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
   @DisplayName("수집이 이미 실행 중이면 409를 응답한다")
   void triggerIngestion_whenAlreadyRunning_returnsConflict() throws Exception {
     given(contentIngestionTrigger.trigger(any())).willThrow(new IngestionAlreadyRunningException());
