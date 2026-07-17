@@ -8,20 +8,31 @@ import {login} from '../lib/auth.js';
 import {users} from '../data/users.js';
 import {optionsWith} from '../config/index.js';
 
+const SEEDED_NOTIFICATION_READ_EMAILS = new Set([
+  'loadtest01@mopl.test',
+  'loadtest02@mopl.test',
+  'loadtest03@mopl.test',
+]);
+
 export const options = optionsWith({
   'http_req_duration{name:notifications-list}': ['p(95)<500'],
 });
 
 export function setup() {
-  // 테스트 시작 전에 seed 계정들을 각각 로그인해 accessToken 목록을 만든다.
-  // VU들이 서로 다른 사용자의 알림 목록을 조회하도록 분산해 단일 사용자 캐시 편향을 줄인다.
-  const tokens = users.map((user) => {
+  // 테스트 시작 전에 알림 seed 데이터가 들어간 계정만 로그인해 accessToken 목록을 만든다.
+  // users.json에 다른 부하테스트 계정이 추가되어도 빈 알림 목록 조회로 지표가 왜곡되지 않게 한다.
+  const seededUsers = users.filter(
+      (user) => SEEDED_NOTIFICATION_READ_EMAILS.has(user.email));
+
+  const tokens = seededUsers.map((user) => {
     const {accessToken} = login(user.email, user.password);
     return accessToken;
   });
 
   if (tokens.length === 0) {
-    throw new Error('load-test/data/users.json에 테스트 계정이 없습니다.');
+    throw new Error(
+        '알림 조회 seed 대상 계정을 찾지 못했습니다. load-test/data/users.json을 확인하세요.'
+    );
   }
 
   return {tokens};
