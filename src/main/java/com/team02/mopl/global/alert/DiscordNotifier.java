@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 // 운영 알림용 디스코드 웹훅 전송기
 // - webhook-url 미설정(빈 값)이면 아무것도 하지 않는다 (로컬/테스트 기본 비활성)
@@ -38,8 +39,11 @@ public class DiscordNotifier {
           .body(Map.of("content", truncate(message)))
           .retrieve()
           .toBodilessEntity();
+    } catch (RestClientResponseException e) {
+      // 예외를 통째로 로깅하지 않고 원인 분석에 필요한 수준으로만 축약한다 (웹훅 URL 노출 방지)
+      log.warn("디스코드 알림 전송에 실패했습니다. status={}", e.getStatusCode().value());
     } catch (Exception e) {
-      log.warn("디스코드 알림 전송에 실패했습니다.", e);
+      log.warn("디스코드 알림 전송에 실패했습니다. cause={}", e.getClass().getSimpleName());
     }
   }
 
