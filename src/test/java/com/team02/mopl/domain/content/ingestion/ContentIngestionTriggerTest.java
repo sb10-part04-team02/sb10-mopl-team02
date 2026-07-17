@@ -11,6 +11,7 @@ import com.team02.mopl.domain.content.enums.ContentSource;
 import com.team02.mopl.domain.content.ingestion.batch.ContentIngestionJobConfig;
 import com.team02.mopl.domain.content.ingestion.exception.IngestionAlreadyRunningException;
 import com.team02.mopl.domain.content.ingestion.scheduler.IngestionRunLock;
+import java.time.Duration;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,15 +27,16 @@ import org.springframework.core.task.TaskExecutor;
 @ExtendWith(MockitoExtension.class)
 class ContentIngestionTriggerTest {
 
+  private static final Duration LOCK_TTL = Duration.ofMinutes(45);
+  // 백그라운드로 넘긴 작업을 그대로 실행해 검증한다 (실제 운영에서는 별도 스레드)
+  private final TaskExecutor directExecutor = Runnable::run;
   @Mock private JobLauncher jobLauncher;
   @Mock private Job contentIngestionJob;
   @Mock private IngestionRunLock runLock;
 
-  // 백그라운드로 넘긴 작업을 그대로 실행해 검증한다 (실제 운영에서는 별도 스레드)
-  private final TaskExecutor directExecutor = Runnable::run;
-
   private ContentIngestionTrigger trigger() {
-    return new ContentIngestionTrigger(jobLauncher, contentIngestionJob, runLock, directExecutor);
+    return new ContentIngestionTrigger(
+        jobLauncher, contentIngestionJob, runLock, directExecutor, LOCK_TTL);
   }
 
   private JobParameters capturedParameters() throws Exception {
@@ -89,6 +91,19 @@ class ContentIngestionTriggerTest {
   }
 
   @Test
+  @DisplayName("락은 설정된 lock-ttl로 획득한다")
+  void trigger_acquiresLockWithConfiguredTtl() {
+    // given
+    given(runLock.tryAcquire(any())).willReturn("token");
+
+    // when
+    trigger().trigger(Set.of(ContentSource.TMDB));
+
+    // then
+    then(runLock).should().tryAcquire(LOCK_TTL);
+  }
+
+  @Test
   @DisplayName("매 실행이 새 JobInstance가 되도록 runDateTime을 식별 파라미터로 넘긴다")
   void trigger_passesRunDateTimeParameter() throws Exception {
     // given
@@ -126,7 +141,8 @@ class ContentIngestionTriggerTest {
           throw new java.util.concurrent.RejectedExecutionException("큐 가득");
         };
     ContentIngestionTrigger trigger =
-        new ContentIngestionTrigger(jobLauncher, contentIngestionJob, runLock, rejectingExecutor);
+        new ContentIngestionTrigger(
+            jobLauncher, contentIngestionJob, runLock, rejectingExecutor, LOCK_TTL);
 
     // when & then
     assertThatThrownBy(() -> trigger.trigger(Set.of(ContentSource.TMDB)))

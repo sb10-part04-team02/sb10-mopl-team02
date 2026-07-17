@@ -15,6 +15,7 @@ import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
 
@@ -23,28 +24,28 @@ import org.springframework.stereotype.Service;
 //   (이미 실행 중이면 IngestionAlreadyRunningException -> 409)
 // - 기본 JobLauncher는 동기라서 전용 실행기 스레드에서 run()을 호출하고 그 스레드에서 락을 해제한다.
 //   전역 JobLauncher를 비동기로 바꾸면 스케줄러의 "run() 반환 = 수집 종료" 전제가 깨지므로 건드리지 않는다.
-// - 락 TTL은 IngestionSchedulerProperties에서 가져오지 않는다.
-//   그 빈은 app.ingestion.scheduler.enabled=false인 프로필(dev)에서는 등록되지 않기 때문이다.
+// - lock-ttl은 스케줄러/기동 러너와 같은 값을 공유
 @Slf4j
 @Service
 public class ContentIngestionTrigger {
-
-  private static final Duration LOCK_TTL = Duration.ofMinutes(30);
 
   private final JobLauncher jobLauncher;
   private final Job contentIngestionJob;
   private final IngestionRunLock runLock;
   private final TaskExecutor triggerExecutor;
+  private final Duration lockTtl;
 
   public ContentIngestionTrigger(
       JobLauncher jobLauncher,
       Job contentIngestionJob,
       IngestionRunLock runLock,
-      @Qualifier(IngestionTriggerConfig.TRIGGER_EXECUTOR) TaskExecutor triggerExecutor) {
+      @Qualifier(IngestionTriggerConfig.TRIGGER_EXECUTOR) TaskExecutor triggerExecutor,
+      @Value("${app.ingestion.scheduler.lock-ttl}") Duration lockTtl) {
     this.jobLauncher = jobLauncher;
     this.contentIngestionJob = contentIngestionJob;
     this.runLock = runLock;
     this.triggerExecutor = triggerExecutor;
+    this.lockTtl = lockTtl;
   }
 
   // 수집을 시작하고 실제 대상 소스를 반환한다. requested가 비어 있으면 전체 소스를 수집한다
@@ -55,7 +56,7 @@ public class ContentIngestionTrigger {
             : EnumSet.copyOf(requested);
 
     // Redis 장애는 감추지 않고 그대로 전파해 500으로 드러낸다 (수동 트리거는 즉시 재시도가 가능하다)
-    String token = runLock.tryAcquire(LOCK_TTL);
+    String token = runLock.tryAcquire(lockTtl);
     if (token == null) {
       throw new IngestionAlreadyRunningException();
     }
