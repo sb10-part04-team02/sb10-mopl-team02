@@ -63,6 +63,18 @@ class ContentIngestionRunnerTest {
   }
 
   @Test
+  @DisplayName("락 획득 중 Redis 오류가 나면 예외를 전파하지 않고 Job 실행/락 해제 없이 건너뛴다")
+  void run_whenLockAcquireThrows_skipsJobWithoutRelease() throws Exception {
+    // given - 락 획득 시도가 Redis 장애로 예외를 던진다
+    given(runLock.tryAcquire(any())).willThrow(new RuntimeException("Redis 연결 오류"));
+
+    // when & then - fail-closed: 예외를 전파하지 않고 이번 기동 수집을 건너뛴다
+    assertThatCode(() -> runner.run(null)).doesNotThrowAnyException();
+    then(jobLauncher).should(never()).run(any(), any());
+    then(runLock).should(never()).release(any());
+  }
+
+  @Test
   @DisplayName("Job 실행이 실패해도 예외를 전파하지 않고 락을 해제한다 (애플리케이션 기동 보호)")
   void run_whenLaunchFails_doesNotPropagateAndReleasesLock() throws Exception {
     // given

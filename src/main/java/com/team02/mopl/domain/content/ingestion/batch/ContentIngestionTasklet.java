@@ -72,8 +72,7 @@ public class ContentIngestionTasklet implements Tasklet {
               e);
           if (failed > skipLimit) {
             // 항목 단위 실패는 skip으로 격리하되, 전부 실패(DB 다운 등)는 스텝 실패로 드러낸다
-            throw new IllegalStateException(
-                "수집 실패 건수가 skipLimit(" + skipLimit + ")을 초과했습니다. source=" + fetcher.source(), e);
+            throw ContentUpsertFailureException.skipLimitExceeded(fetcher.source(), skipLimit, e);
           }
         }
       }
@@ -89,8 +88,7 @@ public class ContentIngestionTasklet implements Tasklet {
     }
 
     if (!contents.isEmpty() && failed == contents.size()) { // 항목 <= 100개 && 전부 실패
-      throw new IllegalStateException(
-          "수집 대상 전부가 실패했습니다. source=" + fetcher.source() + ", failed=" + failed);
+      throw ContentUpsertFailureException.allFailed(fetcher.source(), failed);
     }
 
     log.info(
