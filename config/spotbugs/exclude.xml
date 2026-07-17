@@ -63,6 +63,11 @@
       <Class name="~com\.team02\.mopl\.domain\.content\.ingestion\..*" />
       <Bug pattern="EI_EXPOSE_REP2" />
     </Match>
+    <!-- 운영 알림(alert) 컴포넌트: DI 주입 협력 빈(RestClient 싱글톤)을 필드에 저장하는 동일 패턴 -> 오탐 제외 -->
+    <Match>
+      <Class name="~com\.team02\.mopl\.global\.alert\..*" />
+      <Bug pattern="EI_EXPOSE_REP2" />
+    </Match>
     <Match>
       <Class name="com.team02.mopl.domain.auth.provider.MoplAuthenticationProvider" />
       <Bug pattern="EI_EXPOSE_REP2" />
