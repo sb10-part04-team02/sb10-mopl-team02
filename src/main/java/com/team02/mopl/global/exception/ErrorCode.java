@@ -69,7 +69,8 @@ public enum ErrorCode {
   NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_404", "알림을 찾을 수 없습니다."),
 
   // External (콘텐츠 수집)
-  EXTERNAL_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXTERNAL_500", "외부 API 호출에 실패했습니다.");
+  EXTERNAL_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXTERNAL_500", "외부 API 호출에 실패했습니다."),
+  INGESTION_ALREADY_RUNNING(HttpStatus.CONFLICT, "INGESTION_409", "콘텐츠 수집이 이미 실행 중입니다.");
 
   private final HttpStatus status;
   private final String code;

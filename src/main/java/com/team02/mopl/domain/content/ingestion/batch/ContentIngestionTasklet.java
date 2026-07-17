@@ -3,6 +3,7 @@ package com.team02.mopl.domain.content.ingestion.batch;
 import com.team02.mopl.domain.content.ingestion.ContentFetcher;
 import com.team02.mopl.domain.content.ingestion.ContentUpsertService;
 import com.team02.mopl.domain.content.ingestion.ExternalContentData;
+import java.util.Arrays;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.StepContribution;
@@ -21,6 +22,7 @@ import org.springframework.batch.repeat.RepeatStatus;
 //   tasklet 본문을 DB 트랜잭션으로 감싸지 않으므로, 불량 1건의 롤백이 다른 항목을 오염시키지 않는다
 //   (ContentIngestionJobConfig 참고)
 // - 집계(inserted/updated/skipped)는 스텝 ExecutionContext에 기록해 IngestionJobListener가 Job 요약에 사용한다
+// - JOB_PARAM_SOURCES로 수집 대상이 한정되면(어드민 수동 수집) 자기 소스가 빠진 스텝은 fetch 없이 건너뛴다
 @Slf4j
 public class ContentIngestionTasklet implements Tasklet {
 
@@ -41,6 +43,11 @@ public class ContentIngestionTasklet implements Tasklet {
 
   @Override
   public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
+    if (!isSourceSelected(chunkContext)) {
+      log.info("수집 대상 소스가 아니라 이 스텝을 건너뜁니다. source={}", fetcher.source());
+      return RepeatStatus.FINISHED;
+    }
+
     List<ExternalContentData> contents;
     try {
       contents = fetcher.fetch(); // 페이지/리그 단위 실패는 fetcher가 이미 격리
@@ -100,5 +107,21 @@ public class ContentIngestionTasklet implements Tasklet {
         skipped,
         failed);
     return RepeatStatus.FINISHED;
+  }
+
+  // 수집 대상 소스가 한정됐는지 판정한다. 파라미터가 없으면(스케줄러/기동 러너) 모든 스텝이 수집한다
+  private boolean isSourceSelected(ChunkContext chunkContext) {
+    String selected =
+        chunkContext
+            .getStepContext()
+            .getStepExecution()
+            .getJobParameters()
+            .getString(ContentIngestionJobConfig.JOB_PARAM_SOURCES);
+    if (selected == null || selected.isBlank()) {
+      return true;
+    }
+    return Arrays.stream(selected.split(","))
+        .map(String::trim)
+        .anyMatch(name -> name.equals(fetcher.source().name()));
   }
 }
