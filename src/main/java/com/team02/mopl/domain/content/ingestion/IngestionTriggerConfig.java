@@ -20,6 +20,9 @@ public class IngestionTriggerConfig {
     executor.setCorePoolSize(1);
     executor.setMaxPoolSize(1);
     executor.setQueueCapacity(1);
+    // 종료 시 진행 중인 수집 배치가 인터럽트로 끊기지 않도록 최대 60초 대기한다.
+    executor.setWaitForTasksToCompleteOnShutdown(true);
+    executor.setAwaitTerminationSeconds(60);
     executor.initialize();
     return executor;
   }
