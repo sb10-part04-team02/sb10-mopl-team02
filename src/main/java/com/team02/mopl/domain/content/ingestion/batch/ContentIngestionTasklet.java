@@ -14,8 +14,9 @@ import org.springframework.batch.repeat.RepeatStatus;
 // 소스 1개(TMDB/SportsDB ...)의 수집을 담당하는 Tasklet
 // - fetch -> 건별 멱등 upsert 흐름을 하나의 execute()에서 순회한다 (chunk reader/processor/writer 불필요)
 // - fetch 전체 실패는 ContentFetchException으로 전파해 스텝을 즉시 실패시킨다 (소스 수준 장애)
-// - 개별 항목 실패는 catch로 격리해 failed로 집계하고, skipLimit을 초과하면(전부 실패=DB 다운 등)
-//   스텝 실패로 승격한다 (기존 ContentCollectService의 건별 catch 집계 + 시스템 장애 구분과 동등)
+// - 개별 항목 실패는 catch로 격리해 failed로 집계한다. 단, (1) 실패 건수가 skipLimit을 초과하거나
+//   (2) 항목 <= 100개 & 전부 실패한 경우는 스텝 실패로 승격해 시스템/소스 장애를 드러낸다
+//   (기존 ContentCollectService의 건별 catch 집계 + 시스템 장애 구분과 동등)
 // - 각 upsert는 자기 트랜잭션에서 커밋된다: 이 스텝은 ResourcelessTransactionManager로 구성되어
 //   tasklet 본문을 DB 트랜잭션으로 감싸지 않으므로, 불량 1건의 롤백이 다른 항목을 오염시키지 않는다
 //   (ContentIngestionJobConfig 참고)
@@ -85,6 +86,11 @@ public class ContentIngestionTasklet implements Tasklet {
       context.putInt(CONTEXT_KEY_INSERTED, inserted);
       context.putInt(CONTEXT_KEY_UPDATED, updated);
       context.putInt(CONTEXT_KEY_SKIPPED, skipped);
+    }
+
+    if (!contents.isEmpty() && failed == contents.size()) { // 항목 <= 100개 && 전부 실패
+      throw new IllegalStateException(
+          "수집 대상 전부가 실패했습니다. source=" + fetcher.source() + ", failed=" + failed);
     }
 
     log.info(
