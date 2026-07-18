@@ -5,7 +5,7 @@
 FROM nginxinc/nginx-unprivileged:1.27-alpine
 
 COPY nginx.conf.template /etc/nginx/nginx.conf.template
-COPY render-upstream.sh /docker-entrypoint.d/05-render-upstream.sh
+COPY --chmod=755 render-upstream.sh /docker-entrypoint.d/05-render-upstream.sh
 
 EXPOSE 8080
 
