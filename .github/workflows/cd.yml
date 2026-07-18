@@ -27,30 +27,42 @@ jobs:
     permissions:
       id-token: write   # OIDC 토큰 발급
       contents: read
+      actions: read     # nginx 변경 감지가 마지막 성공 런을 조회(gh run list)할 때 필요
 
     steps:
       - name: 코드 체크아웃
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          # nginx 변경 감지의 git diff가 push 이전 커밋(github.event.before)을 참조하므로 전체 이력을 받는다.
+          # nginx 변경 감지의 git diff가 마지막 성공 런의 커밋을 참조하므로 전체 이력을 받는다
+          # (기준 커밋은 event.before보다 오래될 수 있다).
           fetch-depth: 0
 
       - name: nginx 변경 감지
         id: nginx-changes
         # nginx 관련 파일이 바뀐 커밋에서만 nginx를 빌드·배포한다(평상시 app-only 커밋에서 nginx 롤아웃 제거).
-        # 비교 기준이 없으면(수동 실행, force push 등) 안전하게 배포하는 쪽(fail-open)으로 판단한다.
+        # 비교 기준은 마지막 성공 CD 런의 head SHA다. event.before는 concurrency로 취소된 중간 런·실패 런
+        # 탓에 "실제 배포된 상태"라는 보장이 없지만, 성공 런의 커밋은 nginx 배포 상태와 일치함이 보장된다.
+        # 기준을 얻지 못하면(수동 실행, 조회 실패, 기준 커밋 유실 등) 안전하게 배포하는 쪽(fail-open)으로 간다.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "${{ github.event_name }}" != "push" ] || ! git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
-            echo "deploy=true" >> "$GITHUB_OUTPUT"
-            echo "비교 기준이 없어 nginx를 배포합니다."
-          elif git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- deploy/ecs/nginx deploy/ecs/task-definition-nginx.json | grep -q .; then
-            echo "deploy=true" >> "$GITHUB_OUTPUT"
-            echo "nginx 관련 변경이 있어 배포합니다."
+          deploy=true
+          if [ "$GITHUB_EVENT_NAME" != "push" ]; then
+            echo "수동 실행이라 nginx를 배포합니다."
           else
-            echo "deploy=false" >> "$GITHUB_OUTPUT"
-            echo "nginx 관련 변경이 없어 배포를 건너뜁니다."
+            BASELINE=$(gh run list -R "$GITHUB_REPOSITORY" --workflow cd.yml --branch "$GITHUB_REF_NAME" \
+              --status success --limit 1 --json headSha --jq '.[0].headSha // empty' || true)
+            if [ -z "$BASELINE" ] || ! git cat-file -e "$BASELINE" 2>/dev/null; then
+              echo "비교 기준을 얻지 못해 nginx를 배포합니다."
+            elif git diff --name-only "$BASELINE" "$GITHUB_SHA" -- deploy/ecs/nginx deploy/ecs/task-definition-nginx.json | grep -q .; then
+              echo "nginx 관련 변경이 있어 배포합니다. (기준: $BASELINE)"
+            else
+              deploy=false
+              echo "마지막 성공 배포($BASELINE) 이후 nginx 관련 변경이 없어 배포를 건너뜁니다."
+            fi
           fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
 
       - name: JDK 17 설정
         uses: actions/setup-java@v4
@@ -197,9 +209,11 @@ jobs:
         # 두 배포를 순차로 기다리지 않고 병렬로 한 번에 기다린다(순차 합산 대비 대기 시간 절반 수준).
         # waiter 1회는 10분(15초×40회) 고정이라 2회 루프로 최대 20분까지 허용한다
         # (실측 안정화 6~7분의 여유분. 실패 배포는 circuit breaker가 서버 측에서 자동 롤백).
+        env:
+          NGINX_DEPLOYED: ${{ steps.nginx-changes.outputs.deploy }}
         run: |
           SERVICES="$APP_SERVICE"
-          if [ "${{ steps.nginx-changes.outputs.deploy }}" = "true" ]; then
+          if [ "$NGINX_DEPLOYED" = "true" ]; then
             SERVICES="$SERVICES $NGINX_SERVICE"
           fi
           echo "안정화 대기: $SERVICES"
@@ -214,6 +228,9 @@ jobs:
       - name: ECS 배포 상태 확인
         # 앞 스텝이 실패해도 실패 시점의 배포 상태를 남기기 위해 자격 증명만 있으면 항상 실행한다.
         if: always() && steps.aws-creds.outcome == 'success'
+        env:
+          APP_TASKDEF_ARN: ${{ steps.deploy-app.outputs.task-definition-arn }}
+          NGINX_TASKDEF_ARN: ${{ steps.deploy-nginx.outputs.task-definition-arn }}
         run: |
           aws ecs describe-services \
             --cluster "$ECS_CLUSTER" --services "$APP_SERVICE" "$NGINX_SERVICE" \
@@ -232,5 +249,7 @@ jobs:
             fi
             echo "$svc: PRIMARY task-def 일치 확인"
           }
-          verify "$APP_SERVICE" "${{ steps.deploy-app.outputs.task-definition-arn }}"
-          verify "$NGINX_SERVICE" "${{ steps.deploy-nginx.outputs.task-definition-arn }}"
+          status=0
+          verify "$APP_SERVICE" "$APP_TASKDEF_ARN" || status=1
+          verify "$NGINX_SERVICE" "$NGINX_TASKDEF_ARN" || status=1
+          exit "$status"
