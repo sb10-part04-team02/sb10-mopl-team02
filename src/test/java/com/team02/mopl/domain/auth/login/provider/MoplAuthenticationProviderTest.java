@@ -171,7 +171,6 @@ class MoplAuthenticationProviderTest {
       MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
       given(userDetailsService.loadUserByUsername(anyString())).willReturn(mockUserDetails);
 
-      UserDto mockUserDto = mock(UserDto.class);
       given(mockUserDetails.isAccountNonLocked()).willReturn(false);
 
       // when & then

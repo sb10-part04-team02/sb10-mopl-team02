@@ -196,10 +196,14 @@ public class JwtRegistry {
   }
 
   public boolean verifyAndUseTempPassword(UUID userId, String inputPassword) {
-    String tempKey = tempPwKey(userId);
-    Long result = redisTemplate.execute(RELEASE_SCRIPT, List.of(tempKey), inputPassword);
-
-    return result != null && result == 1;
+    try {
+      String tempKey = tempPwKey(userId);
+      Long result = redisTemplate.execute(RELEASE_SCRIPT, List.of(tempKey), inputPassword);
+      return result == 1L;
+    } catch (Exception e) {
+      log.error("[Redis] 임시 비밀번호 검증 실패: userId={}", userId);
+      return false;
+    }
   }
 
   private String tempPwKey(UUID userId) {

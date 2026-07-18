@@ -445,7 +445,9 @@ class JwtRegistryTest {
     @DisplayName("Redis 장애로 null을 반환하면 예외를 터트리지 않고 false를 반환한다")
     void success_ShouldReturnFalse_whenRedisIsDown() {
       // given
-      given(redisTemplate.execute(any(), any(), any())).willReturn(null);
+      willThrow(RedisConnectionFailureException.class)
+          .given(redisTemplate)
+          .execute(any(), any(), any());
 
       // when
       boolean result = jwtRegistry.verifyAndUseTempPassword(UUID.randomUUID(), "inputPassword");
