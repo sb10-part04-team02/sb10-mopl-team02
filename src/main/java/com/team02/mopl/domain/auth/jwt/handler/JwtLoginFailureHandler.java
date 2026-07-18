@@ -6,7 +6,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
@@ -24,8 +26,19 @@ public class JwtLoginFailureHandler implements AuthenticationFailureHandler {
 
     response.setCharacterEncoding("UTF-8");
     response.setContentType("application/json");
-    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-    ErrorResponse errorResponse = new ErrorResponse("BadCredentialsException", "인증이 실패했습니다.", null);
+
+    String exceptionName = "BadCredentialsException";
+    int status = HttpServletResponse.SC_UNAUTHORIZED;
+    Map<String, String> details = null;
+
+    if (exception instanceof AuthenticationServiceException servEx) {
+      exceptionName = "BadRequestException";
+      status = HttpServletResponse.SC_BAD_REQUEST;
+      details = Map.of("reason", servEx.getMessage());
+    }
+
+    response.setStatus(status);
+    ErrorResponse errorResponse = new ErrorResponse(exceptionName, "인증이 실패했습니다.", details);
     response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
   }
 }

@@ -9,7 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import java.util.Set;
-import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter;
@@ -35,7 +35,8 @@ public class MoplAuthenticationFilter extends AbstractAuthenticationProcessingFi
     SignInRequest signInRequest = new SignInRequest(email, password);
     Set<ConstraintViolation<SignInRequest>> violations = validator.validate(signInRequest);
     if (!violations.isEmpty()) {
-      throw new BadCredentialsException("이메일 또는 비밀번호가 일치하지 않습니다.");
+      ConstraintViolation<SignInRequest> firstViolation = violations.iterator().next();
+      throw new AuthenticationServiceException(firstViolation.getMessage());
     }
 
     MoplAuthenticationToken authToken = new MoplAuthenticationToken(email, password);

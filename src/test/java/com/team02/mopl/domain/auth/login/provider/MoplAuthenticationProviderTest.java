@@ -23,6 +23,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -58,6 +59,7 @@ class MoplAuthenticationProviderTest {
 
       UserDto mockUserDto = mock(UserDto.class);
       given(mockUserDetails.getUserDto()).willReturn(mockUserDto);
+      given(mockUserDetails.isAccountNonLocked()).willReturn(true);
 
       UUID userId = UUID.randomUUID();
       given(mockUserDto.id()).willReturn(userId);
@@ -74,8 +76,9 @@ class MoplAuthenticationProviderTest {
     }
 
     @Test
-    @DisplayName("입력된 비밀번호가 임시비밀번호와 일치하면 임시비밀번호를 삭제하고 authentication을 반환한다")
-    void success_shouldDeleteTempPasswordAndReturnAuthentication_whenInputMatchesTempPassword() {
+    @DisplayName("입력된 비밀번호가 임시비밀번호와 일치하면 삭제를 위임하고 authentication을 반환한다")
+    void
+        success_shouldDelegateToDeleteTempPasswordAndReturnAuthentication_whenInputMatchesTempPassword() {
       // given
       Authentication auth = new MoplAuthenticationToken(email, password);
       MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
@@ -83,18 +86,20 @@ class MoplAuthenticationProviderTest {
 
       UserDto mockUserDto = mock(UserDto.class);
       given(mockUserDetails.getUserDto()).willReturn(mockUserDto);
+      given(mockUserDetails.isAccountNonLocked()).willReturn(true);
 
       UUID userId = UUID.randomUUID();
       given(mockUserDto.id()).willReturn(userId);
 
       String tempPassword = password;
       given(jwtRegistry.getTempPassword(userId)).willReturn(tempPassword);
+      given(jwtRegistry.verifyAndUseTempPassword(userId, password)).willReturn(true);
 
       // when
       Authentication result = authProvider.authenticate(auth);
 
       // then
-      then(jwtRegistry).should(times(1)).deleteTempPassword(eq(userId));
+      then(jwtRegistry).should(times(1)).verifyAndUseTempPassword(eq(userId), eq(password));
       assertThat(result.getPrincipal()).isEqualTo(mockUserDetails);
     }
 
@@ -121,6 +126,7 @@ class MoplAuthenticationProviderTest {
 
       UserDto mockUserDto = mock(UserDto.class);
       given(mockUserDetails.getUserDto()).willReturn(mockUserDto);
+      given(mockUserDetails.isAccountNonLocked()).willReturn(true);
 
       UUID userId = UUID.randomUUID();
       given(mockUserDto.id()).willReturn(userId);
@@ -143,6 +149,7 @@ class MoplAuthenticationProviderTest {
 
       UserDto mockUserDto = mock(UserDto.class);
       given(mockUserDetails.getUserDto()).willReturn(mockUserDto);
+      given(mockUserDetails.isAccountNonLocked()).willReturn(true);
 
       UUID userId = UUID.randomUUID();
       given(mockUserDto.id()).willReturn(userId);
@@ -153,6 +160,22 @@ class MoplAuthenticationProviderTest {
 
       // when & then
       assertThrows(BadCredentialsException.class, () -> authProvider.authenticate(auth));
+    }
+
+    @Test
+    @DisplayName("잠금처리된 유저가 로그인을 시도하면 예외를 던진다")
+    void fail_shouldThrowException_whenUserAccountIsLocked() {
+      // given
+      Authentication auth = new MoplAuthenticationToken(email, password);
+
+      MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
+      given(userDetailsService.loadUserByUsername(anyString())).willReturn(mockUserDetails);
+
+      UserDto mockUserDto = mock(UserDto.class);
+      given(mockUserDetails.isAccountNonLocked()).willReturn(false);
+
+      // when & then
+      assertThrows(LockedException.class, () -> authProvider.authenticate(auth));
     }
   }
 
