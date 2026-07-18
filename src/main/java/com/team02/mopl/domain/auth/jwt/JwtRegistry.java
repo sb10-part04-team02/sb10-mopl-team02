@@ -199,7 +199,7 @@ public class JwtRegistry {
     try {
       String tempKey = tempPwKey(userId);
       Long result = redisTemplate.execute(RELEASE_SCRIPT, List.of(tempKey), inputPassword);
-      return result == 1L;
+      return Objects.equals(result, 1L);
     } catch (Exception e) {
       log.error("[Redis] 임시 비밀번호 검증 실패: userId={}", userId);
       return false;
