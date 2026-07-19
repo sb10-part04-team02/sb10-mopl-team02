@@ -1,0 +1,63 @@
+{
+  "family": "mopl-app-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "runtimePlatform": {
+    "cpuArchitecture": "ARM64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "executionRoleArn": "${EXECUTION_ROLE_ARN}",
+  "taskRoleArn": "${TASK_ROLE_ARN}",
+  "containerDefinitions": [
+    {
+      "name": "app",
+      "image": "${ECR_REGISTRY}/mopl-app:${APP_IMAGE_TAG}",
+      "essential": true,
+      "portMappings": [
+        { "name": "app", "containerPort": 8080, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "prod" },
+        { "name": "SERVER_PORT", "value": "8080" },
+        { "name": "DB_URL", "value": "${DB_URL}" },
+        { "name": "DB_USERNAME", "value": "${DB_USERNAME}" },
+        { "name": "REDIS_HOST", "value": "${REDIS_HOST}" },
+        { "name": "REDIS_PORT", "value": "6379" },
+        { "name": "ADMIN_EMAIL", "value": "${ADMIN_EMAIL}" },
+        { "name": "ADMIN_NAME", "value": "${ADMIN_NAME}" },
+        { "name": "INGESTION_SCHEDULER_ENABLED", "value": "false" },
+        { "name": "AWS_S3_BUCKET", "value": "${AWS_S3_BUCKET}" },
+        { "name": "AWS_S3_REGION", "value": "${AWS_S3_REGION}" },
+        { "name": "AWS_S3_BASE_URL", "value": "${AWS_S3_BASE_URL}" },
+        { "name": "KAFKA_BOOTSTRAP_SERVERS", "value": "${KAFKA_BOOTSTRAP_SERVERS}" },
+        { "name": "KAFKA_CONSUMER_GROUP_ID", "value": "${KAFKA_CONSUMER_GROUP_ID}" },
+        { "name": "EMAIL_ACCOUNT", "value": "${EMAIL_ACCOUNT}" }
+      ],
+      "secrets": [
+        { "name": "DB_PASSWORD", "valueFrom": "${DB_PASSWORD_SECRET_ARN}" },
+        { "name": "JWT_SECRET_KEY", "valueFrom": "${JWT_SECRET_ARN}" },
+        { "name": "ADMIN_PASSWORD", "valueFrom": "${ADMIN_PASSWORD_SECRET_ARN}" },
+        { "name": "KAFKA_API_KEY", "valueFrom": "${KAFKA_API_KEY_SECRET_ARN}" },
+        { "name": "KAFKA_API_SECRET", "valueFrom": "${KAFKA_API_SECRET_SECRET_ARN}" },
+        { "name": "EMAIL_PASSWORD", "valueFrom": "${EMAIL_PASSWORD_SECRET_ARN}" }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 90
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/mopl",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "app"
+        }
+      }
+    }
+  ]
+}

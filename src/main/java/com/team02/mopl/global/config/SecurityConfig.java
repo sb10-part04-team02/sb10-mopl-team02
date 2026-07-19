@@ -5,24 +5,22 @@ import com.team02.mopl.domain.auth.jwt.filter.JwtAuthenticationFilter;
 import com.team02.mopl.domain.auth.jwt.handler.JwtLoginFailureHandler;
 import com.team02.mopl.domain.auth.jwt.handler.JwtLoginSuccessHandler;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
+import com.team02.mopl.domain.auth.login.filter.MoplAuthenticationFilter;
+import com.team02.mopl.domain.auth.login.provider.MoplAuthenticationProvider;
 import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginFailureHandler;
 import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginSuccessHandler;
 import com.team02.mopl.domain.auth.oauth.service.MoplOidcUserService;
-import com.team02.mopl.domain.auth.provider.MoplAuthenticationProvider;
 import com.team02.mopl.global.config.auth.handler.SpaCsrfTokenRequestHandler;
-import java.util.Arrays;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
-import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -38,29 +36,23 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+  private final MoplAuthenticationProvider moplAuthenticationProvider;
+  private final JwtAuthenticationProvider jwtAuthenticationProvider;
   private final JwtLoginSuccessHandler jwtLoginSuccessHandler;
   private final JwtLoginFailureHandler jwtLoginFailureHandler;
   private final LogoutHandler jwtLogoutHandler;
   private final AuthenticationEntryPoint jwtAuthenticationEntryPoint;
-  private final MoplOidcUserService oidcUserService;
+  private final MoplOidcUserService moplOidcUserService;
   private final OAuthLoginSuccessHandler oAuthLoginSuccessHandler;
   private final OAuthLoginFailureHandler oAuthLoginFailureHandler;
 
   @Bean
-  public SecurityFilterChain filterChain(
-      HttpSecurity http, AuthenticationManager authenticationManager, JwtUtils jwtUtils)
+  public SecurityFilterChain filterChain(HttpSecurity http, JwtUtils jwtUtils, Validator validator)
       throws Exception {
     RequestMatcher apiMatcher = PathPatternRequestMatcher.withDefaults().matcher("/api/**");
     RequestMatcher nonApiMatcher = new NegatedRequestMatcher(apiMatcher);
 
-    http
-        // 수동으로 만든걸 추가해야 formLogin에서 Provider가 제대로 인식됨
-        .authenticationManager(authenticationManager)
-        .addFilterBefore(
-            new JwtAuthenticationFilter(
-                jwtUtils, authenticationManager, jwtAuthenticationEntryPoint),
-            UsernamePasswordAuthenticationFilter.class)
-        .csrf(
+    http.csrf(
             csrf ->
                 csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                     .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
@@ -70,14 +62,9 @@ public class SecurityConfig {
             oauth ->
                 oauth
                     // 소셜기능은 로그인할때만 사용하기에 OAuth토큰을 저장할 필요가 없음
+                    .userInfoEndpoint(info -> info.oidcUserService(moplOidcUserService))
                     .successHandler(oAuthLoginSuccessHandler)
                     .failureHandler(oAuthLoginFailureHandler))
-        .formLogin(
-            login ->
-                login
-                    .loginProcessingUrl("/api/auth/sign-in")
-                    .successHandler(jwtLoginSuccessHandler)
-                    .failureHandler(jwtLoginFailureHandler))
         .logout(
             logout ->
                 logout
@@ -124,27 +111,33 @@ public class SecurityConfig {
                 except
                     // 토큰이 없거나(익명), 인증에 실패한 채로 보호된 리소스에 접근할 때
                     .authenticationEntryPoint(jwtAuthenticationEntryPoint));
-    return http.build();
+
+    // jwt 토큰 검증 및 provider
+    JwtAuthenticationFilter jwtAuthenticationFilter =
+        new JwtAuthenticationFilter(jwtUtils, jwtAuthenticationEntryPoint);
+    http.authenticationProvider(jwtAuthenticationProvider)
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+    // 일반/임시 패스워드 로그인 필터 및 provider
+    MoplAuthenticationFilter moplAuthenticationFilter = getMoplAuthenticationFilter(validator);
+    http.authenticationProvider(moplAuthenticationProvider)
+        .addFilterAt(moplAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+    // filterChain 빌드
+    SecurityFilterChain securityFilterChain = http.build();
+
+    // securityFilterChian이 build가 된 이후에야 authenticationManager를 불러올 수 있음
+    AuthenticationManager authenticationManager = http.getSharedObject(AuthenticationManager.class);
+    jwtAuthenticationFilter.setAuthenticationManager(authenticationManager);
+    moplAuthenticationFilter.setAuthenticationManager(authenticationManager);
+
+    return securityFilterChain;
   }
 
-  @Bean
-  public AuthenticationManager authenticationManager(
-      MoplAuthenticationProvider moplAuthenticationProvider,
-      JwtAuthenticationProvider jwtAuthenticationProvider) {
-
-    // OAuth2용 토큰 클라이언트 생성
-    RestClientAuthorizationCodeTokenResponseClient tokenResponseClient =
-        new RestClientAuthorizationCodeTokenResponseClient();
-
-    // oidcUserservice는 커스텀
-    OidcAuthorizationCodeAuthenticationProvider oidcProvider =
-        new OidcAuthorizationCodeAuthenticationProvider(tokenResponseClient, oidcUserService);
-
-    return new ProviderManager(
-        Arrays.asList(
-            moplAuthenticationProvider, // 일반 로그인 + 임시비밀번호 포함
-            jwtAuthenticationProvider, // 토큰용
-            oidcProvider // OIDC 소셜 로그인용(테스트)
-            ));
+  private MoplAuthenticationFilter getMoplAuthenticationFilter(Validator validator) {
+    MoplAuthenticationFilter filter = new MoplAuthenticationFilter(validator);
+    filter.setAuthenticationSuccessHandler(jwtLoginSuccessHandler);
+    filter.setAuthenticationFailureHandler(jwtLoginFailureHandler);
+    return filter;
   }
 }

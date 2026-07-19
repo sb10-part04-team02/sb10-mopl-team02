@@ -12,6 +12,7 @@ import com.team02.mopl.domain.dm.dto.DirectMessageSendRequest;
 import com.team02.mopl.domain.dm.exception.ConversationForbiddenException;
 import com.team02.mopl.domain.dm.service.DirectMessageService;
 import com.team02.mopl.domain.user.dto.UserSummary;
+import com.team02.mopl.global.websocket.redis.StompFanOutPublisher;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.UUID;
@@ -21,13 +22,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 @ExtendWith(MockitoExtension.class)
 class DirectMessageWebSocketControllerTest {
 
   @Mock private DirectMessageService directMessageService;
-  @Mock private SimpMessagingTemplate messagingTemplate;
+  @Mock private StompFanOutPublisher stompFanOutPublisher;
 
   @InjectMocks private DirectMessageWebSocketController controller;
 
@@ -56,8 +56,8 @@ class DirectMessageWebSocketControllerTest {
     controller.sendDirectMessage(conversationId, request, principal);
 
     verify(directMessageService).sendDirectMessage(conversationId, senderId, request);
-    verify(messagingTemplate)
-        .convertAndSend(eq("/sub/conversations/" + conversationId + "/direct-messages"), eq(dto));
+    verify(stompFanOutPublisher)
+        .publish(eq("/sub/conversations/" + conversationId + "/direct-messages"), eq(dto));
   }
 
   @Test
@@ -76,7 +76,7 @@ class DirectMessageWebSocketControllerTest {
             () -> controller.sendDirectMessage(conversationId, request, principal))
         .isInstanceOf(ConversationForbiddenException.class);
 
-    verify(messagingTemplate, never()).convertAndSend(any(String.class), any(Object.class));
+    verify(stompFanOutPublisher, never()).publish(any(String.class), any(Object.class));
   }
 
   private Principal mockPrincipal(UUID userId) {

@@ -1,7 +1,11 @@
 package com.team02.mopl.global.config;
 
+import com.team02.mopl.domain.dm.redis.DmSseFanOutSubscriber;
+import com.team02.mopl.domain.dm.redis.DmSseRedisChannels;
 import com.team02.mopl.domain.notification.redis.NotificationRedisChannels;
 import com.team02.mopl.domain.notification.redis.NotificationSseFanOutSubscriber;
+import com.team02.mopl.global.websocket.redis.StompFanOutSubscriber;
+import com.team02.mopl.global.websocket.redis.StompRedisChannels;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,7 +26,7 @@ public class RedisConfig {
 
   @Bean
   @ConditionalOnProperty(
-      name = "app.notification.redis-fan-out.enabled",
+      name = "app.realtime.redis-fan-out.enabled",
       havingValue = "true",
       matchIfMissing = true)
   public TaskExecutor redisMessageListenerTaskExecutor() {
@@ -37,12 +41,14 @@ public class RedisConfig {
 
   @Bean
   @ConditionalOnProperty(
-      name = "app.notification.redis-fan-out.enabled",
+      name = "app.realtime.redis-fan-out.enabled",
       havingValue = "true",
       matchIfMissing = true)
   public RedisMessageListenerContainer redisMessageListenerContainer(
       RedisConnectionFactory connectionFactory,
       NotificationSseFanOutSubscriber notificationSseFanOutSubscriber,
+      StompFanOutSubscriber stompFanOutSubscriber,
+      DmSseFanOutSubscriber dmSseFanOutSubscriber,
       TaskExecutor redisMessageListenerTaskExecutor) {
     RedisMessageListenerContainer container = new RedisMessageListenerContainer();
     container.setConnectionFactory(connectionFactory);
@@ -50,6 +56,10 @@ public class RedisConfig {
     container.addMessageListener(
         notificationSseFanOutSubscriber,
         new ChannelTopic(NotificationRedisChannels.NOTIFICATION_SSE_FAN_OUT));
+    container.addMessageListener(
+        stompFanOutSubscriber, new ChannelTopic(StompRedisChannels.STOMP_FANOUT));
+    container.addMessageListener(
+        dmSseFanOutSubscriber, new ChannelTopic(DmSseRedisChannels.DM_SSE_FAN_OUT));
     return container;
   }
 }

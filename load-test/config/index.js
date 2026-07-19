@@ -14,3 +14,14 @@ if (__ENV.CONFIG && !CONFIGS[selected]) {
 }
 
 export const options = CONFIGS[selected] || smoke;
+
+// 선택된 프로파일에 시나리오 자신의 태그별 threshold 를 병합해 돌려준다.
+// 시나리오가 `export const options = optionsWith({ 'http_req_duration{name:contents-list}': [...] })`
+// 처럼 자기 SLO 를 선언하면, 그 태그가 없는 다른 시나리오에는 노이즈가 안 생기고 모듈이 독립적이 된다.
+export function optionsWith(extraThresholds) {
+  const base = CONFIGS[selected] || smoke;
+  return {
+    ...base,
+    thresholds: { ...base.thresholds, ...extraThresholds },
+  };
+}

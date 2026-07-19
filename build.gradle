@@ -33,6 +33,7 @@ dependencies {
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'  // /actuator/prometheus 메트릭 노출
     implementation 'org.springframework.kafka:spring-kafka'
     implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework.boot:spring-boot-starter-batch'
 
     // === 보안 / 인증 ===
     implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -91,6 +92,7 @@ dependencies {
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:localstack'
     testImplementation 'org.springframework.kafka:spring-kafka-test'
+    testImplementation 'org.springframework.batch:spring-batch-test'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -163,6 +165,12 @@ tasks.spotbugsMain {
         html.required = true
         xml.required = true
     }
+}
+
+// 실행 불가능한 plain jar 생성을 끈다. 배포 이미지는 bootJar만 복사하므로
+// build/libs 에 실행 가능한 jar 하나만 남겨 COPY 대상이 모호해지지 않게 한다.
+tasks.named('jar') {
+    enabled = false
 }
 
 // Git pre-commit 훅 자동 설치 — 커밋 시 spotlessApply 가 자동 실행되어 포맷 위반이 커밋되지 않게 한다.

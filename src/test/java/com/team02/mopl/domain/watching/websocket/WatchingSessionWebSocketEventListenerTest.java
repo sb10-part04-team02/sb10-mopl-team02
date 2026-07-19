@@ -17,6 +17,7 @@ import com.team02.mopl.domain.watching.dto.WatchingSessionChange;
 import com.team02.mopl.domain.watching.dto.WatchingSessionDto;
 import com.team02.mopl.domain.watching.enums.ChangeType;
 import com.team02.mopl.domain.watching.service.WatchingSessionService;
+import com.team02.mopl.global.websocket.redis.StompFanOutPublisher;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.time.Instant;
@@ -33,7 +34,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
@@ -46,7 +46,7 @@ import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 class WatchingSessionWebSocketEventListenerTest {
 
   @Mock private WatchingSessionService watchingSessionService;
-  @Mock private SimpMessagingTemplate messagingTemplate;
+  @Mock private StompFanOutPublisher stompFanOutPublisher;
   @Mock private MessageChannel clientOutboundChannel;
   @Captor private ArgumentCaptor<Message<byte[]>> errorMessageCaptor;
 
@@ -65,7 +65,7 @@ class WatchingSessionWebSocketEventListenerTest {
         new WatchingSessionWebSocketEventListener(
             watchingSessionService,
             subscriptionRegistry,
-            messagingTemplate,
+            stompFanOutPublisher,
             clientOutboundChannel,
             new ObjectMapper());
   }
@@ -81,7 +81,7 @@ class WatchingSessionWebSocketEventListenerTest {
     listener.handleSubscribe(subscribeEvent("ws1", "sub1", watchDestination()));
 
     // then
-    verify(messagingTemplate).convertAndSend(watchDestination(), change);
+    verify(stompFanOutPublisher).publish(watchDestination(), change);
   }
 
   @Test
@@ -91,7 +91,7 @@ class WatchingSessionWebSocketEventListenerTest {
     listener.handleSubscribe(subscribeEvent("ws1", "sub1", "/sub/contents/" + contentId + "/chat"));
 
     // then
-    verifyNoInteractions(watchingSessionService, messagingTemplate);
+    verifyNoInteractions(watchingSessionService, stompFanOutPublisher);
   }
 
   @Test
@@ -101,7 +101,7 @@ class WatchingSessionWebSocketEventListenerTest {
     listener.handleSubscribe(subscribeEvent("ws1", "sub1", "/sub/contents/not-a-uuid/watch"));
 
     // then
-    verifyNoInteractions(watchingSessionService, messagingTemplate);
+    verifyNoInteractions(watchingSessionService, stompFanOutPublisher);
   }
 
   @Test
@@ -122,7 +122,7 @@ class WatchingSessionWebSocketEventListenerTest {
     assertThat(accessor.getDestination()).isEqualTo(watchDestination());
     assertThat(new String(errorMessageCaptor.getValue().getPayload(), StandardCharsets.UTF_8))
         .contains("ContentNotFoundException");
-    verifyNoInteractions(messagingTemplate);
+    verifyNoInteractions(stompFanOutPublisher);
     verify(watchingSessionService).join(contentId, userId);
     verifyNoMoreInteractions(watchingSessionService);
   }
@@ -170,7 +170,7 @@ class WatchingSessionWebSocketEventListenerTest {
 
     // then
     verify(watchingSessionService).leave(watchingSessionId, userId);
-    verify(messagingTemplate).convertAndSend(watchDestination(), leaveChange);
+    verify(stompFanOutPublisher).publish(watchDestination(), leaveChange);
   }
 
   @Test
@@ -204,7 +204,7 @@ class WatchingSessionWebSocketEventListenerTest {
 
     // then
     verify(watchingSessionService, times(1)).leave(watchingSessionId, userId);
-    verify(messagingTemplate).convertAndSend(watchDestination(), leaveChange);
+    verify(stompFanOutPublisher).publish(watchDestination(), leaveChange);
   }
 
   @Test
@@ -218,7 +218,7 @@ class WatchingSessionWebSocketEventListenerTest {
     listener.handleUnsubscribe(unsubscribeEvent("ws1", "sub1"));
 
     // then
-    verifyNoMoreInteractions(messagingTemplate);
+    verifyNoMoreInteractions(stompFanOutPublisher);
   }
 
   @Test
@@ -232,7 +232,7 @@ class WatchingSessionWebSocketEventListenerTest {
     // when & then
     assertThatCode(() -> listener.handleUnsubscribe(unsubscribeEvent("ws1", "sub1")))
         .doesNotThrowAnyException();
-    verifyNoMoreInteractions(messagingTemplate);
+    verifyNoMoreInteractions(stompFanOutPublisher);
   }
 
   // 구독(JOIN)까지 마친 상태를 만든다. 이때 발생한 JOIN 브로드캐스트 상호작용은 검증 대상에서 제외한다.
@@ -240,7 +240,7 @@ class WatchingSessionWebSocketEventListenerTest {
     WatchingSessionChange joinChange = change(ChangeType.JOIN, 1L);
     given(watchingSessionService.join(contentId, userId)).willReturn(joinChange);
     listener.handleSubscribe(subscribeEvent(wsSessionId, subscriptionId, watchDestination()));
-    verify(messagingTemplate).convertAndSend(watchDestination(), joinChange);
+    verify(stompFanOutPublisher).publish(watchDestination(), joinChange);
   }
 
   private String watchDestination() {
