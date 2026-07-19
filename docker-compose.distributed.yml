@@ -122,6 +122,9 @@ services:
       EMAIL_ACCOUNT: ${EMAIL_ACCOUNT:?EMAIL_ACCOUNT is required}
       EMAIL_PASSWORD: ${EMAIL_PASSWORD:?EMAIL_PASSWORD is required}
 
+      # TMDB 콘텐츠 수집용 v4 Read Access Token
+      TMDB_ACCESS_TOKEN: ${TMDB_ACCESS_TOKEN:?TMDB_ACCESS_TOKEN is required}
+
       # Nginx 경유 접근 기준 public URL
       STORAGE_PUBLIC_BASE_URL: http://localhost:8080
     ports:
@@ -168,6 +171,9 @@ services:
       # 부하테스트에서는 비밀번호 초기화 메일을 사용하지 않더라도 MailService bean 생성에 필요하다.
       EMAIL_ACCOUNT: ${EMAIL_ACCOUNT:?EMAIL_ACCOUNT is required}
       EMAIL_PASSWORD: ${EMAIL_PASSWORD:?EMAIL_PASSWORD is required}
+
+      # TMDB 콘텐츠 수집용 v4 Read Access Token
+      TMDB_ACCESS_TOKEN: ${TMDB_ACCESS_TOKEN:?TMDB_ACCESS_TOKEN is required}
 
       STORAGE_PUBLIC_BASE_URL: http://localhost:8080
     ports:
