@@ -32,6 +32,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,7 +53,7 @@ class OAuthLoginSuccessHandlerTest {
   void setUp() {
     request = new MockHttpServletRequest();
     response = new MockHttpServletResponse();
-    mockAuth = mock(Authentication.class);
+    mockAuth = mock(OAuth2AuthenticationToken.class);
 
     request.setScheme("https");
     request.setServerName("localhost");
@@ -83,7 +84,12 @@ class OAuthLoginSuccessHandlerTest {
     OidcUser mockOidcUser = mock(OidcUser.class);
     given(mockAuth.getPrincipal()).willReturn(mockOidcUser);
     given(mockOidcUser.getAttribute(anyString())).willReturn("socialUserId");
-    given(userRepository.findBySubjectAndDeletedAtIsNull(anyString())).willReturn(Optional.empty());
+
+    String registrationId = "google";
+    given(((OAuth2AuthenticationToken) mockAuth).getAuthorizedClientRegistrationId())
+        .willReturn(registrationId);
+    given(userRepository.findBySubjectAndProviderAndDeletedAtIsNull(any(), anyString()))
+        .willReturn(Optional.empty());
 
     // when
     successHandler.onAuthenticationSuccess(request, response, mockAuth);
@@ -104,7 +110,10 @@ class OAuthLoginSuccessHandlerTest {
     given(mockOidcUser.getAttribute(anyString())).willReturn("socialUserId");
 
     User mockUser = mock(User.class);
-    given(userRepository.findBySubjectAndDeletedAtIsNull(anyString()))
+    String registrationId = "google";
+    given(((OAuth2AuthenticationToken) mockAuth).getAuthorizedClientRegistrationId())
+        .willReturn(registrationId);
+    given(userRepository.findBySubjectAndProviderAndDeletedAtIsNull(any(), anyString()))
         .willReturn(Optional.of(mockUser));
 
     UserDto mockUserDto = mock(UserDto.class);

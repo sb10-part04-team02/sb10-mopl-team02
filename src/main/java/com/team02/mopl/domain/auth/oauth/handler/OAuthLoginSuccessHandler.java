@@ -6,6 +6,7 @@ import com.team02.mopl.domain.auth.entity.MoplUserDetails;
 import com.team02.mopl.domain.auth.jwt.JwtRegistry;
 import com.team02.mopl.domain.auth.jwt.JwtTokenProvider;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
+import com.team02.mopl.domain.auth.oauth.provider.OAuthType;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -36,25 +38,35 @@ public class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
       HttpServletRequest request, HttpServletResponse response, Authentication authentication)
       throws IOException {
 
+    // baseUrl 추출
+    String baseUrl = extractBaseUrl(request);
+
     // oidcUser 타입이 아닌경우
     if (!(authentication.getPrincipal() instanceof OidcUser oidcUser)) {
-      String baseUrl = extractBaseUrl(request);
       String errorUrl = generateErrorUrl(baseUrl, "인증 객체 타입이 맞지 않습니다.");
       response.sendRedirect(errorUrl);
       return;
     }
 
+    String registrationId =
+        ((OAuth2AuthenticationToken) authentication).getAuthorizedClientRegistrationId();
+    OAuthType provider = OAuthType.of(registrationId);
     Optional<User> optionalUser =
-        userRepository.findBySubjectAndDeletedAtIsNull(oidcUser.getAttribute("sub"));
+        userRepository.findBySubjectAndProviderAndDeletedAtIsNull(
+            provider, oidcUser.getAttribute("sub"));
     // 유저를 찾을 수 없는 경우
     if (optionalUser.isEmpty()) {
-      String baseUrl = extractBaseUrl(request);
       String errorUrl = generateErrorUrl(baseUrl, "유저를 찾을 수 없습니다.");
       response.sendRedirect(errorUrl);
       return;
     }
 
     User findUser = optionalUser.get();
+    // 계정이 잠긴 경우
+    if (findUser.isLocked()) {
+      response.sendRedirect(generateErrorUrl(baseUrl, "잠긴 계정입니다."));
+    }
+
     // generateRefreshToken활용을 위한 생성
     MoplUserDetails userDetails = new MoplUserDetails(userMapper.toDto(findUser), null);
 
@@ -67,9 +79,6 @@ public class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
     // refresh 토큰 헤더에 등록
     ResponseCookie cookie = jwtUtils.generateRefreshTokenCookie(refreshToken);
     response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
-
-    // baseUrl 추출
-    String baseUrl = extractBaseUrl(request);
 
     response.sendRedirect(baseUrl);
   }

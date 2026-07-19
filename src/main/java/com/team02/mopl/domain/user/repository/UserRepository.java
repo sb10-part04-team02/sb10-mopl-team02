@@ -1,5 +1,6 @@
 package com.team02.mopl.domain.user.repository;
 
+import com.team02.mopl.domain.auth.oauth.provider.OAuthType;
 import com.team02.mopl.domain.user.entity.User;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,9 +19,10 @@ public interface UserRepository extends JpaRepository<User, UUID>, UserRepositor
       """
       SELECT u FROM User u
         JOIN SocialAccount sa ON sa.userId = u.id
-       WHERE sa.providerUserId = :subject
+       WHERE sa.provider = :provider
+         AND sa.providerUserId = :subject
          AND sa.deletedAt IS NULL
          AND u.deletedAt IS NULL
       """)
-  Optional<User> findBySubjectAndDeletedAtIsNull(String subject);
+  Optional<User> findBySubjectAndProviderAndDeletedAtIsNull(OAuthType provider, String subject);
 }

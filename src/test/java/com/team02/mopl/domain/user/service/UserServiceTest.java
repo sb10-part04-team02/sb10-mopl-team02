@@ -950,16 +950,16 @@ class UserServiceTest {
     void fail_shouldSkipRegisterUser_whenVisitorIsAlreadyUser() {
       // given
       OAuth2UserInfo info = mock(OAuth2UserInfo.class);
-      given(info.email()).willReturn("example@gmail.com");
-      given(userRepository.findByEmailAndDeletedAtIsNull(anyString()))
-          .willReturn(Optional.of(mock(User.class)));
-      given(socialAccountRepository.existsByUserIdAndProvider(any(), any())).willReturn(true);
+      given(
+              socialAccountRepository.existsByProviderAndProviderUserIdAndDeletedAtIsNull(
+                  any(), any()))
+          .willReturn(true);
 
       // when
       userService.registerSocialUser(info);
 
       // then
-      then(socialAccountRepository).should(never()).save(any());
+      then(userRepository).should(never()).save(any());
     }
 
     @Test

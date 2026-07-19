@@ -211,8 +211,15 @@ public class UserService {
 
   @Transactional
   public void registerSocialUser(OAuth2UserInfo userInfo) {
+    // 소셜계정이 이미 있는 경우
+    if (socialAccountRepository.existsByProviderAndProviderUserIdAndDeletedAtIsNull(
+        userInfo.authType(), userInfo.socialUserId())) {
+      return;
+    }
+
     User user =
         userRepository
+            // 소셜계정이메일과 동일한 일반이메일계정이 있는경우
             .findByEmailAndDeletedAtIsNull(userInfo.email())
             .orElseGet(
                 () -> {
@@ -233,11 +240,6 @@ public class UserService {
                       userInfo.authType());
                   return savedUser;
                 });
-
-    // 소셜계정도 이미 있는 경우
-    if (socialAccountRepository.existsByUserIdAndProvider(user.getId(), userInfo.authType())) {
-      return;
-    }
 
     SocialAccount socialAccount =
         new SocialAccount(user.getId(), userInfo.authType(), userInfo.socialUserId());

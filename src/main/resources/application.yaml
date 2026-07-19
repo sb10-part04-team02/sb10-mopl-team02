@@ -62,7 +62,7 @@ spring:
             client-id: ${KAKAO_CLIENT_ID}
             client-secret: ${KAKAO_CLIENT_SECRET}
             authorization-grant-type: authorization_code
-            redirect-uri: http://localhost:8080/login/oauth2/code/kakao
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             client-authentication-method: client_secret_post
             scope: profile_nickname, profile_image, openid
         provider: # 구글은 default로 등록되어있음
@@ -72,6 +72,10 @@ spring:
             user-info-uri: https://kapi.kakao.com/v2/user/me
             jwk-set-uri: https://kauth.kakao.com/.well-known/jwks.json
             user-name-attribute: sub
+
+server:
+  # 프록시의 X-Forwarded-* 헤더를 신뢰해서 사용
+  forward-headers-strategy: framework
 
 # 모니터링(Prometheus/Grafana): health/info 외에 prometheus 메트릭 엔드포인트만 노출한다.
 # 나머지 actuator 엔드포인트는 SecurityConfig에서 접근을 차단한다.
