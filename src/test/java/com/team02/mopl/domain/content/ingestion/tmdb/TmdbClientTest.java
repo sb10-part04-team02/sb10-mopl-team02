@@ -2,6 +2,7 @@ package com.team02.mopl.domain.content.ingestion.tmdb;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam;
@@ -13,8 +14,10 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withUnauthorizedRequest;
 
 import com.team02.mopl.domain.content.ingestion.exception.TmdbApiException;
+import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbContentRatingsResponse;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbMovieDto;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbPageResponse;
+import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbReleaseDatesResponse;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbTvDto;
 import java.net.SocketTimeoutException;
 import java.time.Duration;
@@ -148,6 +151,75 @@ class TmdbClientTest {
 
     // then
     assertThat(genres).containsExactlyInAnyOrderEntriesOf(Map.of(28, "액션", 35, "코미디"));
+  }
+
+  @Test
+  @DisplayName("fetchMovieReleaseDates는 국가별 등급을 DTO로 역직렬화하고 미등록 등급은 빈 문자열로 남긴다")
+  void fetchMovieReleaseDates_deserializesResponse() {
+    // given - type 필드는 DTO에 없지만 무시되어야 한다
+    server
+        .expect(requestTo(Matchers.startsWith(BASE_URL + "/movie/550/release_dates")))
+        .andExpect(method(HttpMethod.GET))
+        .andExpect(header("Authorization", "Bearer test-token"))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "id": 550,
+                  "results": [
+                    {
+                      "iso_3166_1": "KR",
+                      "release_dates": [
+                        {"certification": "19", "type": 3},
+                        {"certification": "", "type": 4}
+                      ]
+                    },
+                    {"iso_3166_1": "US", "release_dates": [{"certification": "R", "type": 3}]}
+                  ]
+                }
+                """,
+                MediaType.APPLICATION_JSON));
+
+    // when
+    TmdbReleaseDatesResponse response = tmdbClient.fetchMovieReleaseDates(550);
+
+    // then
+    assertThat(response.id()).isEqualTo(550L);
+    TmdbReleaseDatesResponse.Result kr = response.results().get(0);
+    assertThat(kr.country()).isEqualTo("KR");
+    assertThat(kr.releaseDates())
+        .extracting(TmdbReleaseDatesResponse.ReleaseDate::certification)
+        .containsExactly("19", "");
+  }
+
+  @Test
+  @DisplayName("fetchTvContentRatings는 국가별 등급을 DTO로 역직렬화한다")
+  void fetchTvContentRatings_deserializesResponse() {
+    // given
+    server
+        .expect(requestTo(Matchers.startsWith(BASE_URL + "/tv/1399/content_ratings")))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "id": 1399,
+                  "results": [
+                    {"iso_3166_1": "KR", "rating": "19"},
+                    {"iso_3166_1": "US", "rating": "TV-MA"}
+                  ]
+                }
+                """,
+                MediaType.APPLICATION_JSON));
+
+    // when
+    TmdbContentRatingsResponse response = tmdbClient.fetchTvContentRatings(1399);
+
+    // then
+    assertThat(response.results())
+        .extracting(
+            TmdbContentRatingsResponse.Result::country, TmdbContentRatingsResponse.Result::rating)
+        .containsExactly(tuple("KR", "19"), tuple("US", "TV-MA"));
   }
 
   @Test

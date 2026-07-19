@@ -26,6 +26,7 @@ public class TmdbTvMapper extends AbstractTmdbMapper<TmdbTvDto> {
         raw.name(),
         raw.overview(),
         raw.posterPath(),
-        raw.genreIds());
+        raw.genreIds(),
+        raw.adult());
   }
 }

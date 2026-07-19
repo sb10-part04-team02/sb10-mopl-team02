@@ -58,6 +58,27 @@ class TmdbMovieMapperTest {
   }
 
   @Test
+  @DisplayName("adult가 true면 건너뛴다")
+  void map_whenAdult_returnsEmpty() {
+    // given
+    TmdbMovieDto raw = new TmdbMovieDto(550, "제목", "줄거리", "/poster.jpg", List.of(28), true);
+
+    // when & then
+    assertThat(mapper.map(raw)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("응답에 adult가 없으면 성인물이 아닌 것으로 보고 수집한다")
+  void map_whenAdultAbsent_defaultsToNotAdult() {
+    // given - adult 없이 생성하는 편의 생성자
+    TmdbMovieDto raw = new TmdbMovieDto(550, "제목", "줄거리", "/poster.jpg", List.of(28));
+
+    // when & then
+    assertThat(raw.adult()).isFalse();
+    assertThat(mapper.map(raw)).isPresent();
+  }
+
+  @Test
   @DisplayName("제목이 100자를 넘으면 말줄임표를 붙여 100자로 자른다")
   void map_whenTitleTooLong_truncates() {
     // given

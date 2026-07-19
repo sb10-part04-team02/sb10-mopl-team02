@@ -46,13 +46,19 @@ abstract class AbstractTmdbMapper<T> implements ExternalContentMapper<T> {
       String title,
       String overview,
       String posterPath,
-      List<Integer> genreIds) {
+      List<Integer> genreIds,
+      boolean adult) {
     if (id <= 0) {
       log.warn("TMDB 응답에 유효한 id가 없어 건너뜁니다. type={}, title={}", contentType, title);
       return Optional.empty();
     }
     if (!StringUtils.hasText(title)) {
       log.warn("TMDB 응답에 제목이 없어 건너뜁니다. type={}, id={}", contentType, id);
+      return Optional.empty();
+    }
+    // 등급 조회로는 걸러지지 않는 항목(포르노는 KR/US 등급이 모두 없는 경우가 많음)을 여기서 차단
+    if (adult) {
+      log.warn("TMDB 성인 콘텐츠라 건너뜁니다. type={}, id={}", contentType, id);
       return Optional.empty();
     }
 

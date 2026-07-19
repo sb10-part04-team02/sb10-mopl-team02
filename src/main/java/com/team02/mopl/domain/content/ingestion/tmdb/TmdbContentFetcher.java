@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.IntFunction;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,14 +24,17 @@ import org.springframework.stereotype.Component;
 public class TmdbContentFetcher implements ContentFetcher {
 
   private final TmdbClient tmdbClient;
+  private final TmdbAgeRatingPolicy ageRatingPolicy;
   private final TmdbProperties properties;
   private final String defaultThumbnailUrl;
 
   public TmdbContentFetcher(
       TmdbClient tmdbClient,
+      TmdbAgeRatingPolicy ageRatingPolicy,
       TmdbProperties properties,
       @Value("${app.storage.default-thumbnail-url:}") String defaultThumbnailUrl) {
     this.tmdbClient = tmdbClient;
+    this.ageRatingPolicy = ageRatingPolicy;
     this.properties = properties;
     this.defaultThumbnailUrl = defaultThumbnailUrl;
   }
@@ -50,6 +54,7 @@ public class TmdbContentFetcher implements ContentFetcher {
             fetchGenresSafely(tmdbClient::fetchMovieGenres, "/genre/movie/list"),
             properties.imageBaseUrl(),
             defaultThumbnailUrl),
+        raw -> ageRatingPolicy.isRestrictedMovie(raw.id()),
         results);
     collectPages(
         "/tv/popular",
@@ -58,6 +63,7 @@ public class TmdbContentFetcher implements ContentFetcher {
             fetchGenresSafely(tmdbClient::fetchTvGenres, "/genre/tv/list"),
             properties.imageBaseUrl(),
             defaultThumbnailUrl),
+        raw -> ageRatingPolicy.isRestrictedTv(raw.id()),
         results);
     return results;
   }
@@ -77,13 +83,17 @@ public class TmdbContentFetcher implements ContentFetcher {
       String pathForLog,
       IntFunction<TmdbPageResponse<T>> pageFetcher,
       ExternalContentMapper<T> mapper,
+      Predicate<T> restricted,
       List<ExternalContentData> results) {
     for (int page = 1; page <= properties.pages(); page++) {
       try {
-        pageFetcher.apply(page).results().stream() // 응답 순회
-            .map(mapper::map) // 원본 DTO를 Optional<ExternalContentData>로 변환
-            .flatMap(Optional::stream) // 유효한 항목만 남김
-            .forEach(results::add); // 결과 리스트에 추가
+        for (T raw : pageFetcher.apply(page).results()) {
+          // 등급 판정은 항목마다 추가 호출이 드므로, 매핑에서 걸러진 항목에는 호출을 낭비하지 않는다
+          Optional<ExternalContentData> mapped = mapper.map(raw);
+          if (mapped.isPresent() && !restricted.test(raw)) {
+            results.add(mapped.get());
+          }
+        }
       } catch (ExternalApiException e) {
         log.warn("TMDB 페이지 수집 실패로 해당 페이지를 건너뜁니다. path={}, page={}", pathForLog, page, e);
       }

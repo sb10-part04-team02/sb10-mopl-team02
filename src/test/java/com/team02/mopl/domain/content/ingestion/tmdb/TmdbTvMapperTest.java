@@ -45,6 +45,13 @@ class TmdbTvMapperTest {
   }
 
   @Test
+  @DisplayName("adult가 true면 건너뛴다")
+  void map_whenAdult_returnsEmpty() {
+    assertThat(mapper.map(new TmdbTvDto(1399, "제목", "줄거리", "/poster.jpg", List.of(), true)))
+        .isEmpty();
+  }
+
+  @Test
   @DisplayName("영화와 같은 숫자 id라도 externalId가 충돌하지 않는다 (movie:/tv: 네임스페이스 분리)")
   void map_whenSameNumericIdAsMovie_producesDistinctExternalId() {
     // given - TMDB의 movie id와 tv id는 독립 시퀀스라 같은 숫자가 다른 작품일 수 있다

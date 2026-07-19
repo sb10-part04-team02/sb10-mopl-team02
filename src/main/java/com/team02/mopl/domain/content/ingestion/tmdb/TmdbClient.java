@@ -1,10 +1,12 @@
 package com.team02.mopl.domain.content.ingestion.tmdb;
 
 import com.team02.mopl.domain.content.ingestion.exception.TmdbApiException;
+import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbContentRatingsResponse;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbGenreDto;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbGenreListResponse;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbMovieDto;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbPageResponse;
+import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbReleaseDatesResponse;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbTvDto;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -47,6 +49,15 @@ public class TmdbClient {
     return getPage("/tv/popular", page, TV_PAGE_TYPE);
   }
 
+  // 국가별 관람 등급은 목록 API에 없어 항목별로 조회해야 한다
+  public TmdbReleaseDatesResponse fetchMovieReleaseDates(long movieId) {
+    return getById("/movie/" + movieId + "/release_dates", TmdbReleaseDatesResponse.class);
+  }
+
+  public TmdbContentRatingsResponse fetchTvContentRatings(long seriesId) {
+    return getById("/tv/" + seriesId + "/content_ratings", TmdbContentRatingsResponse.class);
+  }
+
   public Map<Integer, String> fetchMovieGenres() {
     return fetchGenres("/genre/movie/list");
   }
@@ -71,6 +82,18 @@ public class TmdbClient {
                                 .build())
                     .retrieve() // 실제 HTTP 요청을 보내고 응답을 받아옴
                     .body(responseType))); // 역직렬화 + null 체크
+  }
+
+  // 등급 조회용. 등급 코드는 언어에 따라 달라지지 않으므로 language 파라미터를 붙이지 않는다
+  private <T> T getById(String path, Class<T> responseType) {
+    return fetch(
+        () ->
+            requireBody(
+                restClient
+                    .get()
+                    .uri(uriBuilder -> uriBuilder.path(path).build())
+                    .retrieve()
+                    .body(responseType)));
   }
 
   private Map<Integer, String> fetchGenres(String path) {

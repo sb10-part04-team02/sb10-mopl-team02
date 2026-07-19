@@ -26,6 +26,7 @@ public class TmdbMovieMapper extends AbstractTmdbMapper<TmdbMovieDto> {
         raw.title(),
         raw.overview(),
         raw.posterPath(),
-        raw.genreIds());
+        raw.genreIds(),
+        raw.adult());
   }
 }
