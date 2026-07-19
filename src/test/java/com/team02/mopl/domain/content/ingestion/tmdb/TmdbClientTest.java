@@ -199,6 +199,7 @@ class TmdbClientTest {
     server
         .expect(requestTo(Matchers.startsWith(BASE_URL + "/tv/1399/content_ratings")))
         .andExpect(method(HttpMethod.GET))
+        .andExpect(header("Authorization", "Bearer test-token"))
         .andRespond(
             withSuccess(
                 """
