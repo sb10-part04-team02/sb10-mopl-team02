@@ -65,6 +65,7 @@ public class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
     // 계정이 잠긴 경우
     if (findUser.isLocked()) {
       response.sendRedirect(generateErrorUrl(baseUrl, "잠긴 계정입니다."));
+      return;
     }
 
     // generateRefreshToken활용을 위한 생성
