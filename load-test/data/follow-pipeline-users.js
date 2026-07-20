@@ -8,13 +8,13 @@ function range(count) {
   return Array.from({length: count}, (_, index) => index + 1);
 }
 
-export const followerUsers = range(80).map((n) => ({
+export const followerUsers = range(240).map((n) => ({
   name: `follow-follower-${String(n).padStart(3, '0')}`,
   email: `follow-follower-${String(n).padStart(3, '0')}@mopl.test`,
   password: PASSWORD,
 }));
 
-export const followeeUsers = range(20).map((n) => ({
+export const followeeUsers = range(40).map((n) => ({
   name: `follow-followee-${String(n).padStart(3, '0')}`,
   email: `follow-followee-${String(n).padStart(3, '0')}@mopl.test`,
   password: PASSWORD,
