@@ -41,7 +41,14 @@ public class CookieUtils {
 
   public static void deleteCookie(
       HttpServletRequest request, HttpServletResponse response, String name) {
-    ResponseCookie cookie = ResponseCookie.from(name, "").path("/").maxAge(0).build();
+    ResponseCookie cookie =
+        ResponseCookie.from(name, "")
+            .path("/")
+            .maxAge(0)
+            .httpOnly(true)
+            .secure(true)
+            .sameSite("Lax")
+            .build();
     response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
   }
 
@@ -50,8 +57,9 @@ public class CookieUtils {
   }
 
   public static <T> T deserialize(Cookie cookie, Class<T> cls) {
-    byte[] bytes = Base64.getUrlDecoder().decode(cookie.getValue());
-    try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
+    try (ByteArrayInputStream bais =
+            new ByteArrayInputStream(Base64.getUrlDecoder().decode(cookie.getValue()));
+        ObjectInputStream ois = new ObjectInputStream(bais)) {
       // OAuth2 관련 클래스와 기본 패키지만 허용
       ObjectInputFilter filter =
           ObjectInputFilter.Config.createFilter(

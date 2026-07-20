@@ -80,6 +80,22 @@ class MoplCookieOAuth2AuthorizationRequestRepositoryTest {
       // then
       assertThat(loadedRequest).isNull();
     }
+
+    @Test
+    @DisplayName("비정상의 쿠키들어와 역직렬화 실패시 null을 반환한다")
+    void fail_shouldReturnNull_whenRequestCookieIsInvalid() {
+      // given
+      MockCookie invalidCookie =
+          new MockCookie(OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME, "invalid-cookie");
+      request.setCookies(invalidCookie);
+
+      // when
+      OAuth2AuthorizationRequest loadedRequest =
+          requestRepository.loadAuthorizationRequest(request);
+
+      // then
+      assertThat(loadedRequest).isNull();
+    }
   }
 
   @Nested
