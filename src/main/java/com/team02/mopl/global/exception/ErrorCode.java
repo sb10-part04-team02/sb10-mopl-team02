@@ -58,6 +58,10 @@ public enum ErrorCode {
   // Watching Session
   WATCHING_SESSION_ALREADY_EXITED(HttpStatus.CONFLICT, "WATCHING_SESSION_409", "이미 종료된 시청 세션입니다."),
 
+  // Content Chat
+  CONTENT_CHAT_NOT_WATCHING(
+      HttpStatus.FORBIDDEN, "CONTENT_CHAT_403", "해당 콘텐츠를 시청 중인 사용자만 채팅을 보낼 수 있습니다."),
+
   // Follow
   FOLLOW_NOT_FOUND(HttpStatus.NOT_FOUND, "FOLLOW_404", "팔로우 정보를 찾을 수 없습니다."),
   FOLLOW_FORBIDDEN(HttpStatus.FORBIDDEN, "FOLLOW_403", "해당 팔로우에 접근할 권한이 없습니다."),

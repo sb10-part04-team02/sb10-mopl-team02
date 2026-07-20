@@ -10,9 +10,11 @@ import com.team02.mopl.domain.content.exception.ContentNotFoundException;
 import com.team02.mopl.domain.content.repository.ContentRepository;
 import com.team02.mopl.domain.contentchat.dto.ContentChatDto;
 import com.team02.mopl.domain.contentchat.dto.ContentChatSendRequest;
+import com.team02.mopl.domain.contentchat.exception.NotWatchingContentException;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.domain.watching.repository.WatchingSessionRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +29,7 @@ class ContentChatServiceTest {
 
   @Mock private UserRepository userRepository;
   @Mock private ContentRepository contentRepository;
+  @Mock private WatchingSessionRepository watchingSessionRepository;
 
   @InjectMocks private ContentChatService contentChatService;
 
@@ -39,6 +42,11 @@ class ContentChatServiceTest {
     given(contentRepository.findByIdAndDeletedAtIsNull(contentId))
         .willReturn(Optional.of(mock(Content.class)));
     given(userRepository.findByIdAndDeletedAtIsNull(senderId)).willReturn(Optional.of(sender));
+    given(
+            watchingSessionRepository
+                .existsByContent_IdAndUser_IdAndExitedAtIsNullAndDeletedAtIsNull(
+                    contentId, senderId))
+        .willReturn(true);
 
     ContentChatDto result =
         contentChatService.createMessage(contentId, senderId, new ContentChatSendRequest("안녕하세요"));
@@ -76,6 +84,28 @@ class ContentChatServiceTest {
                 contentChatService.createMessage(
                     contentId, senderId, new ContentChatSendRequest("안녕하세요")))
         .isInstanceOf(UserNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("발신자가 해당 콘텐츠의 활성 시청 세션에 참여 중이 아니면 NotWatchingContentException을 던진다")
+  void createMessage_notWatching() {
+    UUID contentId = UUID.randomUUID();
+    UUID senderId = UUID.randomUUID();
+    given(contentRepository.findByIdAndDeletedAtIsNull(contentId))
+        .willReturn(Optional.of(mock(Content.class)));
+    given(userRepository.findByIdAndDeletedAtIsNull(senderId))
+        .willReturn(Optional.of(mock(User.class)));
+    given(
+            watchingSessionRepository
+                .existsByContent_IdAndUser_IdAndExitedAtIsNullAndDeletedAtIsNull(
+                    contentId, senderId))
+        .willReturn(false);
+
+    assertThatThrownBy(
+            () ->
+                contentChatService.createMessage(
+                    contentId, senderId, new ContentChatSendRequest("안녕하세요")))
+        .isInstanceOf(NotWatchingContentException.class);
   }
 
   private User mockUser(UUID id, String name, String profileImageUrl) {
