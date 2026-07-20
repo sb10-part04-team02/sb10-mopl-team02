@@ -51,6 +51,11 @@ class TmdbBackfillContentFetcherTest {
     return new TmdbMovieDto(id, "영화" + id, "줄거리", "/p.jpg", releaseDate, List.of());
   }
 
+  // 포스터/줄거리가 없는 항목 (strict backfill에서 수집 제외 대상)
+  private static TmdbMovieDto incompleteMovie(long id, String releaseDate) {
+    return new TmdbMovieDto(id, "영화" + id, null, null, releaseDate, List.of());
+  }
+
   @BeforeEach
   void setUp() {
     TmdbProperties properties =
@@ -92,7 +97,24 @@ class TmdbBackfillContentFetcherTest {
   }
 
   @Test
-  @DisplayName("이미 백필 완료된 매체는 조회 없이 건너뛴다")
+  @DisplayName("포스터/줄거리가 없는 항목은 수집하지 않지만 커서는 그 항목 개봉일까지 전진한다")
+  void backfill_skipsIncompleteItemsButStillAdvancesCursor() {
+    given(cursorService.read(TmdbMediaType.MOVIE)).willReturn(new CursorState(null, false));
+    given(cursorService.read(TmdbMediaType.TV)).willReturn(new CursorState(null, false));
+    // 2번은 포스터/줄거리 누락 -> 수집 제외, 하지만 가장 오래된 개봉일이라 커서 전진 기준이 됨
+    given(tmdbClient.discoverMovies(eq(1), any()))
+        .willReturn(moviePage(1, movie(1, "2026-05-10"), incompleteMovie(2, "2026-01-15")));
+    noTv();
+
+    List<ExternalContentData> results = fetcher.fetch();
+
+    assertThat(results).extracting(ExternalContentData::externalId).containsExactly("movie:1");
+    // 수집은 movie:1만, 커서는 누락 항목의 개봉일 2026-01-15까지 전진
+    then(cursorService).should().advance(TmdbMediaType.MOVIE, LocalDate.of(2026, 1, 15), false);
+  }
+
+  @Test
+  @DisplayName("이미 backfill 완료된 매체는 조회 없이 건너뛴다")
   void backfill_whenBackfillComplete_skips() {
     given(cursorService.read(TmdbMediaType.MOVIE)).willReturn(new CursorState(FLOOR, true));
     given(cursorService.read(TmdbMediaType.TV)).willReturn(new CursorState(null, false));

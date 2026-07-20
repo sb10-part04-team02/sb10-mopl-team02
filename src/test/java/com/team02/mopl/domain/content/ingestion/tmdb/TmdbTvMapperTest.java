@@ -45,6 +45,24 @@ class TmdbTvMapperTest {
   }
 
   @Test
+  @DisplayName("requireCompleteMedia면 poster_path나 overview가 없을 때 폴백 대신 건너뛴다")
+  void map_whenStrictAndIncomplete_returnsEmpty() {
+    // given
+    TmdbTvMapper strictMapper =
+        new TmdbTvMapper(
+            Map.of(10765, "SF"), IMAGE_BASE_URL, "https://cdn.example.com/default.png", true);
+
+    // when & then
+    assertThat(strictMapper.map(new TmdbTvDto(1399, "제목", "줄거리", null, null, List.of())))
+        .isEmpty(); // poster 없음
+    assertThat(strictMapper.map(new TmdbTvDto(1399, "제목", null, "/poster.jpg", null, List.of())))
+        .isEmpty(); // overview 없음
+    // 둘 다 있으면 정상 매핑
+    assertThat(strictMapper.map(new TmdbTvDto(1399, "제목", "줄거리", "/poster.jpg", null, List.of())))
+        .isPresent();
+  }
+
+  @Test
   @DisplayName("영화와 같은 숫자 id라도 externalId가 충돌하지 않는다 (movie:/tv: 네임스페이스 분리)")
   void map_whenSameNumericIdAsMovie_producesDistinctExternalId() {
     // given - TMDB의 movie id와 tv id는 독립 시퀀스라 같은 숫자가 다른 작품일 수 있다

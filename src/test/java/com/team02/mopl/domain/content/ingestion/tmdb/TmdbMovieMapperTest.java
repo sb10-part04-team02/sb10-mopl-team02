@@ -125,6 +125,52 @@ class TmdbMovieMapperTest {
   }
 
   @Test
+  @DisplayName("requireCompleteMedia면 poster_path가 없을 때 폴백 대신 건너뛴다")
+  void map_whenStrictAndNoPoster_returnsEmpty() {
+    // given
+    TmdbMovieMapper strictMapper =
+        new TmdbMovieMapper(GENRES, IMAGE_BASE_URL, DEFAULT_THUMBNAIL_URL, true);
+
+    // when & then
+    assertThat(strictMapper.map(new TmdbMovieDto(550, "제목", "줄거리", null, null, List.of())))
+        .isEmpty();
+    assertThat(strictMapper.map(new TmdbMovieDto(550, "제목", "줄거리", " ", null, List.of())))
+        .isEmpty();
+  }
+
+  @Test
+  @DisplayName("requireCompleteMedia면 overview가 없을 때 기본 문구 대신 건너뛴다")
+  void map_whenStrictAndNoOverview_returnsEmpty() {
+    // given
+    TmdbMovieMapper strictMapper =
+        new TmdbMovieMapper(GENRES, IMAGE_BASE_URL, DEFAULT_THUMBNAIL_URL, true);
+
+    // when & then
+    assertThat(strictMapper.map(new TmdbMovieDto(550, "제목", null, "/poster.jpg", null, List.of())))
+        .isEmpty();
+    assertThat(strictMapper.map(new TmdbMovieDto(550, "제목", " ", "/poster.jpg", null, List.of())))
+        .isEmpty();
+  }
+
+  @Test
+  @DisplayName("requireCompleteMedia여도 poster_path와 overview가 모두 있으면 정상 매핑된다")
+  void map_whenStrictAndComplete_maps() {
+    // given
+    TmdbMovieMapper strictMapper =
+        new TmdbMovieMapper(GENRES, IMAGE_BASE_URL, DEFAULT_THUMBNAIL_URL, true);
+
+    // when
+    ExternalContentData data =
+        strictMapper
+            .map(new TmdbMovieDto(550, "제목", "줄거리", "/poster.jpg", null, List.of()))
+            .orElseThrow();
+
+    // then
+    assertThat(data.thumbnailUrl()).isEqualTo(IMAGE_BASE_URL + "/poster.jpg");
+    assertThat(data.description()).isEqualTo("줄거리");
+  }
+
+  @Test
   @DisplayName("장르 맵에 없는 id는 태그에서 제외하고 중복 이름은 하나만 남긴다")
   void map_filtersUnknownAndDuplicateGenres() {
     // when

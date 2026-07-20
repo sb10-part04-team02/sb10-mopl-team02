@@ -17,6 +17,14 @@ public class TmdbTvMapper extends AbstractTmdbMapper<TmdbTvDto> {
     super(genreNames, imageBaseUrl, defaultThumbnailUrl);
   }
 
+  public TmdbTvMapper(
+      Map<Integer, String> genreNames,
+      String imageBaseUrl,
+      String defaultThumbnailUrl,
+      boolean requireCompleteMedia) {
+    super(genreNames, imageBaseUrl, defaultThumbnailUrl, requireCompleteMedia);
+  }
+
   @Override
   public Optional<ExternalContentData> map(TmdbTvDto raw) {
     return mapFields(

@@ -22,7 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-// TMDB discover 백필 수집기
+// TMDB discover backfill 수집기
 // - 매체(movie/tv)별로 개봉일 내림차순 상한(lte=커서)부터 pages-per-run 페이지를 훑고,
 //   응답의 최소 개봉일을 다음 커서로 저장해 매 실행 과거로 한 칸씩 내려간다
 // - 경계 날짜는 inclusive로 다시 요청한다
@@ -74,7 +74,8 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
         new TmdbMovieMapper(
             fetchGenresSafely(tmdbClient::fetchMovieGenres, "/genre/movie/list"),
             properties.imageBaseUrl(),
-            defaultThumbnailUrl),
+            defaultThumbnailUrl,
+            true), // 썸네일/줄거리가 모두 있는 항목만 수집
         results);
     backfill(
         TmdbMediaType.TV,
@@ -83,12 +84,13 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
         new TmdbTvMapper(
             fetchGenresSafely(tmdbClient::fetchTvGenres, "/genre/tv/list"),
             properties.imageBaseUrl(),
-            defaultThumbnailUrl),
+            defaultThumbnailUrl,
+            true), // 썸네일/줄거리가 모두 있는 항목만 수집
         results);
     return results;
   }
 
-  // 매체 1개의 백필 1회: 커서 상한 이하에서 pages-per-run 페이지를 훑고 커서를 전진시킨다.
+  // 매체 1개의 backfill 1회: 커서 상한 이하에서 pages-per-run 페이지를 훑고 커서를 전진시킨다.
   private <T> void backfill(
       TmdbMediaType mediaType,
       BiFunction<Integer, LocalDate, TmdbPageResponse<T>> pageFetcher,
@@ -98,7 +100,7 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
 
     CursorState state = cursorService.read(mediaType);
     if (state.backfillComplete()) {
-      log.info("discover 백필이 완료된 매체라 건너뜁니다. mediaType={}", mediaType);
+      log.info("discover backfill이 완료된 매체라 건너뜁니다. mediaType={}", mediaType);
       return;
     }
 
@@ -112,7 +114,8 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
       try {
         response = pageFetcher.apply(page, lte);
       } catch (ExternalApiException e) {
-        log.warn("discover 백필 페이지 수집 실패로 이번 매체를 중단합니다. mediaType={}, page={}", mediaType, page, e);
+        log.warn(
+            "discover backfill 페이지 수집 실패로 이번 매체를 중단합니다. mediaType={}, page={}", mediaType, page, e);
         break;
       }
       if (response.results().isEmpty()) {
@@ -142,7 +145,7 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
     boolean backfillComplete = !next.isAfter(floor); // next <= floorDate
     cursorService.advance(mediaType, next, backfillComplete);
     log.info(
-        "discover 백필 커서 전진. mediaType={}, nextCursorDate={}, backfillComplete={}",
+        "discover backfill 커서 전진. mediaType={}, nextCursorDate={}, backfillComplete={}",
         mediaType,
         next,
         backfillComplete);
@@ -154,7 +157,7 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
     try {
       return genreFetcher.get();
     } catch (ExternalApiException e) {
-      log.warn("TMDB 장르 조회 실패로 태그 없이 백필을 계속합니다. path={}", pathForLog, e);
+      log.warn("TMDB 장르 조회 실패로 태그 없이 backfill을 계속합니다. path={}", pathForLog, e);
       return Map.of();
     }
   }
