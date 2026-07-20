@@ -9,6 +9,7 @@ import com.team02.mopl.domain.auth.login.filter.MoplAuthenticationFilter;
 import com.team02.mopl.domain.auth.login.provider.MoplAuthenticationProvider;
 import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginFailureHandler;
 import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginSuccessHandler;
+import com.team02.mopl.domain.auth.oauth.repository.MoplCookieOAuth2AuthorizationRequestRepository;
 import com.team02.mopl.domain.auth.oauth.service.MoplOidcUserService;
 import com.team02.mopl.global.config.auth.handler.SpaCsrfTokenRequestHandler;
 import jakarta.validation.Validator;
@@ -36,6 +37,8 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+  private final MoplCookieOAuth2AuthorizationRequestRepository
+      moplCookieOAuth2AuthorizationRequestRepository;
   private final MoplAuthenticationProvider moplAuthenticationProvider;
   private final JwtAuthenticationProvider jwtAuthenticationProvider;
   private final JwtLoginSuccessHandler jwtLoginSuccessHandler;
@@ -61,7 +64,10 @@ public class SecurityConfig {
         .oauth2Login(
             oauth ->
                 oauth
-                    // 소셜기능은 로그인할때만 사용하기에 OAuth토큰을 저장할 필요가 없음
+                    .authorizationEndpoint(
+                        auth ->
+                            auth.authorizationRequestRepository(
+                                moplCookieOAuth2AuthorizationRequestRepository))
                     .userInfoEndpoint(info -> info.oidcUserService(moplOidcUserService))
                     .successHandler(oAuthLoginSuccessHandler)
                     .failureHandler(oAuthLoginFailureHandler))

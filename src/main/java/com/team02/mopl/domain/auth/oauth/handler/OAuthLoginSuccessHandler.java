@@ -22,6 +22,7 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @Component
 @RequiredArgsConstructor
@@ -85,8 +86,6 @@ public class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
   }
 
   public static String extractBaseUrl(HttpServletRequest request) {
-    String requestUrl = request.getRequestURL().toString();
-    String requestUri = request.getRequestURI();
-    return requestUrl.replace(requestUri, "/");
+    return ServletUriComponentsBuilder.fromContextPath(request).path("/").build().toUriString();
   }
 }
