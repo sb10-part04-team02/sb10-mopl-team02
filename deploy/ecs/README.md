@@ -1,168 +1,105 @@
-# ECS 배포 기록
+# ECS 배포
 
-모두의 플리(mopl) ECS 배포 산출물과 진행 기록.
-상세 절차 가이드는 [../../docs/deploy-ecs-guide.html](../../docs/deploy-ecs-guide.html) 참고.
+모두의 플리(mopl) 백엔드의 AWS ECS(Fargate) 배포 산출물.
+`dev` 브랜치에 push하면 CD 워크플로우(`.github/workflows/cd.yml`)가 자동으로 배포한다.
 
-## 목표 구조
-
-### 1차 (현재 운영, 사이드카)
+## 아키텍처
 
 ```text
-Client -> CloudFlare -> ALB -> ECS Task(사이드카) -> RDS / ElastiCache
-                                 ├─ nginx (:80)
-                                 └─ app   (:8080)
+Client → CloudFlare(HTTPS) → ALB(HTTP:80)
+          → nginx 서비스 (mopl-nginx-service, desired 1, :8080)
+             → Service Connect (app.mopl.local:8080)
+                → app 서비스 (mopl-app-service, desired 2)
+                   → RDS PostgreSQL / ElastiCache Redis
+                   → Confluent Kafka / S3 + CloudFront
 ```
 
-- nginx + app을 같은 Task에 둔 사이드카 구성. `task-definition.json` 사용.
-
-### 2차 (다중 인스턴스, 서비스 분리) — 산출물 준비 완료, 인프라 전환은 2차 전환 단계
-
-```text
-Client -> CloudFlare -> ALB -> nginx 서비스(desired 1, :8080)
-                                  └─ Service Connect (app.mopl.local:8080)
-                                       ├─ app Task 1 (desired 2)
-                                       └─ app Task 2
-```
-
-- `task-definition-app.json` / `task-definition-nginx.json` 분리.
-- nginx는 `nginxinc/nginx-unprivileged`(non-root, listen 8080), upstream은 Service Connect 별칭.
-- ALB 타겟그룹 포트 80 → 8080으로 변경(2차 전환 단계).
-- nginx 서비스는 desired 1(의도된 제한). app은 2개로 다중화되지만 nginx는 단일 태스크라 교체·장애 중 순단 가능성이 있는 단일 장애점이다. 무중단이 필요하면 이후 nginx도 2개 이상으로 확장.
-
-## 리전 / 계정
-
-- 리전: `ap-northeast-2` (서울)
-- 계정 ID: `<AWS_ACCOUNT_ID>`
-- VPC: 기본 VPC (4 서브넷 / 4 AZ)
-- 접속 주소: `https://api.<도메인>` (CloudFlare → ALB)
-
-## CloudFlare (10단계)
-
-- 도메인: 레지스트라에서 구매, 네임서버를 CloudFlare로 변경
-- DNS 레코드: `api` CNAME → `<ALB DNS 이름>` (Proxied, 주황 구름)
-- HTTPS: CloudFlare Universal SSL 자동 발급. 클라이언트↔CloudFlare HTTPS, CloudFlare↔ALB HTTP(80).
-- 프론트는 `VITE_API_BASE_URL=https://api.<도메인>`로 설정 필요.
-
-## 생성된 리소스
-
-### 보안 그룹
-| 이름 | 역할 | 인바운드 |
-|---|---|---|
-| `mopl-alb-sg` | ALB | 인터넷 80/443 |
-| `mopl-ecs-sg` | ECS Task | `mopl-alb-sg` → 80 (1차 nginx) / 8080 (2차 nginx) |
-| `mopl-rds-sg` | RDS | `mopl-ecs-sg` → 5432 |
-| `mopl-redis-sg` | Redis | `mopl-ecs-sg` → 6379 |
-
-### RDS PostgreSQL
-- 엔드포인트: `<RDS 엔드포인트>:5432`
-- DB 이름: `mopl` / 사용자: `mopl`
-- 엔진: PostgreSQL 16, `db.t4g.micro`, 단일 AZ
-- 스키마: `src/main/resources/01_schema_v8.sql` 수동 주입 완료 (테이블 14개). `ddl-auto=validate`.
-- 후속: Flyway 도입 예정 (스키마 마이그레이션 자동화)
-
-### ElastiCache Redis
-- 엔진: Redis OSS 7.1, `cache.t4g.micro`, 클러스터 모드 비활성화, 복제본 0
-- 전송 중 암호화 OFF (앱이 평문 접속), 보안그룹 `mopl-redis-sg`
-- 엔드포인트: `<ElastiCache 엔드포인트>:6379` → `REDIS_HOST`
-
-### Confluent Kafka — 1차 배포에서 스킵
-- 앱은 Kafka 브로커 없이도 정상 기동함(검증 완료). 팔로우 알림만 미동작.
-- SASL_SSL 설정 추가는 후속 작업으로 진행 예정.
-
-### ECR 이미지 (멀티아키 amd64 + arm64)
-- 앱: `<ECR_REGISTRY>/mopl-app:<tag>`
-- Nginx: `<ECR_REGISTRY>/mopl-nginx:<tag>`
-- `<ECR_REGISTRY>` = `<AWS_ACCOUNT_ID>.dkr.ecr.ap-northeast-2.amazonaws.com`
+- nginx와 app은 별도 ECS 서비스로 분리되어 있고, nginx가 Service Connect 별칭(`app.mopl.local`)으로 app 인스턴스 2대에 요청을 분산한다.
+- 모든 태스크는 ARM64(Graviton) Fargate에서 실행된다.
+- nginx 서비스는 desired 1이라 교체·장애 시 순단 가능성이 있는 단일 지점이다. 무중단이 필요해지면 nginx도 2대 이상으로 확장한다.
 
 ## 이 디렉터리의 파일
 
-- `task-definition.json` — 1차 사이드카(nginx+app) 템플릿. CD가 dev push 시 사용.
-- `task-definition-app.json` — 2차 app 전용 템플릿.
-- `task-definition-nginx.json` — 2차 nginx 전용 템플릿(D3 healthCheck 포함).
-- `nginx/Dockerfile` — `nginxinc/nginx-unprivileged` 기반 커스텀 nginx 이미지(non-root, :8080).
-- `nginx/nginx.conf` — upstream `app.mopl.local:8080`(Service Connect). SSE/WebSocket/body size는 로컬과 동일.
+| 파일 | 용도 |
+|---|---|
+| `task-definition-app.json` | app 서비스 태스크 정의 템플릿 (512 CPU / 1024 MB) |
+| `task-definition-nginx.json` | nginx 서비스 태스크 정의 템플릿 (256 CPU / 512 MB) |
+| `nginx/Dockerfile` | 커스텀 nginx 이미지. `nginxinc/nginx-unprivileged` 기반(non-root, listen 8080) |
+| `nginx/nginx.conf.template` | nginx 설정 템플릿. upstream은 `${APP_IPV4}` 플레이스홀더 |
+| `nginx/render-upstream.sh` | 컨테이너 기동 시 Service Connect IPv4 VIP를 추출해 설정을 렌더링 |
+| `deploy.env.example` | 태스크 정의 템플릿에 주입할 값 목록 (실제 값 파일은 커밋 금지) |
 
-### nginx 이미지 빌드/푸시 명령
+태스크 정의는 플레이스홀더(`${...}`) 템플릿이며, 실제 값(엔드포인트·ARN 등)은
+CD가 GitHub Secrets/Variables에서 `envsubst`로 주입해 등록한다.
 
-> **주의:** 2차 nginx 설정(`listen 8080`, upstream `app.mopl.local`)은 Service Connect 전환(2차 전환 단계) 이후에만 ECR에 푸시한다. 그 전에 푸시하면 1차 사이드카(`task-definition.json`, port 80)가 깨진다.
+## CD 파이프라인
 
-```bash
-REGISTRY=<AWS_ACCOUNT_ID>.dkr.ecr.ap-northeast-2.amazonaws.com
-aws ecr get-login-password --region ap-northeast-2 --profile <profile> \
-  | docker login --username AWS --password-stdin $REGISTRY
-cd deploy/ecs/nginx
-docker buildx build --platform linux/amd64,linux/arm64 \
-  -t $REGISTRY/mopl-nginx:v1 -t $REGISTRY/mopl-nginx:latest --push .
-```
+`dev` push 시 자동 실행되며, 수동 실행(`workflow_dispatch`)도 가능하다. 흐름:
 
-## Task Definition 환경변수
+1. bootJar를 러너에서 네이티브 빌드 (도커 빌드는 JAR 복사만 수행)
+2. app 이미지를 ARM64로 크로스빌드해 ECR push (태그: 커밋 short SHA)
+3. nginx는 관련 파일(`deploy/ecs/nginx`, `task-definition-nginx.json`)이 마지막 성공 배포 이후 바뀐 커밋에서만 빌드·배포 (수동 실행 시에는 항상 배포)
+4. 태스크 정의 렌더링·등록 후 서비스 업데이트, 두 서비스의 안정화를 병렬로 대기 (최대 20분)
+5. 이번 런이 등록한 태스크 정의가 실제 PRIMARY로 남았는지 검증 (circuit breaker 롤백을 성공으로 오인하지 않기 위함)
 
-정의 파일(`task-definition*.json`)은 플레이스홀더(`${...}`) 템플릿이며,
-실제 값(엔드포인트·ARN·계정 ID 등)은 배포 시점에 주입한다. 값 목록은 `deploy.env.example` 참고.
+- 인증은 GitHub OIDC로 배포 역할을 AssumeRole한다 (장기 액세스 키 없음).
+- 실패한 배포는 ECS deployment circuit breaker가 서버 측에서 자동 롤백한다.
+- 소요 시간은 nginx를 건너뛰는 평상시 커밋 기준 약 8분.
 
-주입할 값의 전체 목록과 예시는 `deploy.env.example`을 단일 소스로 참고한다(아래는 요약).
+### 롤백
 
-평문 환경변수(비밀 아님): `SPRING_PROFILES_ACTIVE`, `SERVER_PORT`, `DB_URL`, `DB_USERNAME`,
-`REDIS_HOST`, `REDIS_PORT`, `ADMIN_EMAIL`, `ADMIN_NAME`, `INGESTION_SCHEDULER_ENABLED`,
-`AWS_S3_BUCKET`, `AWS_S3_REGION`, `AWS_S3_BASE_URL`,
-`KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_CONSUMER_GROUP_ID`, `EMAIL_ACCOUNT`
+- 배포 실패(태스크 기동 불가 등)는 circuit breaker가 자동으로 이전 revision으로 되돌린다.
+- 코드 문제로 수동 롤백이 필요하면 해당 커밋을 revert해 `dev`에 push한다 (새 배포로 이전 상태 복원).
 
-Secrets Manager 참조(비밀): `DB_PASSWORD`, `JWT_SECRET_KEY`, `ADMIN_PASSWORD`,
-`KAFKA_API_KEY`, `KAFKA_API_SECRET`, `EMAIL_PASSWORD`
+## nginx 구성 참고
 
-## ECS / ALB 리소스
+- Service Connect 별칭은 DNS가 아니라 태스크 `/etc/hosts`에 주입된 VIP로 해석된다. IPv4·IPv6 VIP가 함께 주입되지만 로컬 프록시(Envoy)는 IPv4에서만 수신하므로, 기동 시 `render-upstream.sh`가 IPv4 VIP만 추출해 설정을 렌더링한다. nginx의 `resolver`는 `/etc/hosts`를 읽지 않으므로 동적 해석으로는 대체할 수 없다.
+- `/actuator/**`는 엣지에서 403으로 차단하고, ALB 헬스체크가 쓰는 `/actuator/health`만 정확 매치로 통과시킨다.
+- SSE(`/api/sse`)는 버퍼링 off·long timeout, WebSocket(`/ws`)은 upgrade 헤더 처리로 분리했다.
+- 프록시 연결 실패 시 재시도(`proxy_next_upstream`)로 app 태스크 교체 중 순단을 완화한다.
+- `/nginx-health`는 nginx 자체 생존 확인용이며 app 상태와 결합하지 않는다 (end-to-end 확인은 ALB 헬스체크 담당).
 
-### IAM
-- Task 실행 역할: `moplEcsTaskExecutionRole`
-  - `AmazonECSTaskExecutionRolePolicy`(관리형) + `moplReadSecrets`(인라인, 시크릿 3개만 읽기)
-- Task 역할: `moplEcsTaskRole` (사전 프로비저닝, S3 파일 스토리지 도입 후 활용 예정)
-  - 인라인 `moplS3Write`(`s3:PutObject`/`s3:DeleteObject`만) — S3 파일 스토리지용
-  - 현재 배포된 앱(v1, 로컬 저장)은 미사용. task-definition에는 `taskRoleArn`로 선언돼 있음.
+## AWS 리소스
 
-### Secrets Manager
-- `mopl/db-password` → `DB_PASSWORD`
-- `mopl/jwt-secret` → `JWT_SECRET_KEY`
-- `mopl/admin-password` → `ADMIN_PASSWORD`
+리전 `ap-northeast-2`, 접속 주소 `https://api.<도메인>` (CloudFlare → ALB).
 
-### ECS
-- 클러스터: `mopl-cluster` (Fargate)
-- Task Definition: `mopl-task` (ARM64, 512 CPU / 1024 MB, nginx+app 사이드카)
-  - 정의 파일: `deploy/ecs/task-definition.json`
-- 서비스: `mopl-service` (desired count=1)
-- 로그 그룹: `/ecs/mopl` (스트림 접두사 app / nginx)
+| 리소스 | 이름 | 비고 |
+|---|---|---|
+| ECS 클러스터 | `mopl-cluster` | Fargate |
+| ECS 서비스 | `mopl-app-service` | desired 2, Service Connect `app.mopl.local:8080` |
+| ECS 서비스 | `mopl-nginx-service` | desired 1, ALB 타겟 등록 |
+| 태스크 정의 | `mopl-app-task` / `mopl-nginx-task` | ARM64 |
+| ALB | `mopl-alb` | HTTP:80 리스너 → `mopl-nginx-tg`(8080, 헬스체크 `/actuator/health`) |
+| RDS | PostgreSQL 16 | `db.t4g.micro`, 스키마는 Flyway가 관리 |
+| ElastiCache | Redis OSS 7.1 | `cache.t4g.micro`, 세션·실시간 Pub/Sub |
+| Kafka | Confluent Cloud | 알림 fan-out (SASL_SSL) |
+| S3 + CloudFront | 파일 스토리지 | OAC로 버킷 비공개 유지 |
+| 로그 그룹 | `/ecs/mopl` | 스트림 접두사 `app` / `nginx` |
 
-### ALB
-- ALB: `mopl-alb` (internet-facing)
-- DNS: `<ALB DNS 이름>`
-- 리스너: HTTP:80 → 타겟 그룹
-- 타겟 그룹: `mopl-ecs-tg` (IP 타입, HTTP:80, 헬스체크 `/actuator/health`)
-- 서비스가 nginx 컨테이너 80포트를 타겟 그룹에 자동 등록
-- SG 보강: `mopl-ecs-sg`에 `mopl-alb-sg`→80 인바운드 추가 (ALB→nginx)
+### 보안 그룹
 
-## 진행 상태
+| 이름 | 역할 | 인바운드 |
+|---|---|---|
+| `mopl-alb-sg` | ALB | 인터넷 80/443 |
+| `mopl-ecs-sg` | ECS 태스크 | `mopl-alb-sg` → 8080, self → 8080 (nginx → app) |
+| `mopl-rds-sg` | RDS | `mopl-ecs-sg` → 5432 |
+| `mopl-redis-sg` | Redis | `mopl-ecs-sg` → 6379 |
 
-- [x] 1단계 VPC / 보안그룹
-- [x] 2단계 RDS + 스키마 주입
-- [x] 3단계 ElastiCache Redis
-- [x] 4단계 Confluent — 스킵 (SASL_SSL 설정 후속)
-- [x] 5단계 ECR 이미지 (app + nginx 멀티아키)
-- [x] 6단계 IAM 역할 / Secrets / 클러스터 / Task Definition / 서비스
-- [x] 7단계 서비스 기동 확인 (태스크 RUNNING/HEALTHY, 타겟 healthy, ALB 200)
-- [x] 8단계 (사이드카에 통합됨)
-- [x] 9단계 ALB / 타겟 그룹 / 리스너
-- [x] 10단계 CloudFlare 도메인 / HTTPS (`api.<도메인>`)
+### IAM / Secrets
 
-## 기동 확인 결과 (7단계)
+- 실행 역할 `moplEcsTaskExecutionRole`: 이미지 pull·로그·시크릿 읽기.
+- 태스크 역할 `moplEcsTaskRole`: S3 업로드/삭제 최소 권한 (app 태스크만 사용).
+- 비밀 값(DB 비밀번호, JWT 서명 키, 관리자 비밀번호, Kafka API 키, 메일 비밀번호)은
+  Secrets Manager 참조로 태스크에 주입한다. 주입 대상 환경변수 목록은 태스크 정의 템플릿과
+  `deploy.env.example`을 참고한다 (시크릿 이름·ARN은 저장소에 기재하지 않는다).
 
-ALB DNS로 직접 확인:
-- `GET /actuator/health` → `200 {"status":"UP"}`
-- `GET /` → `200`
-- `GET /api/contents` → `401` (인증 요구, 정상)
+## 데이터베이스 스키마
 
-app 컨테이너 HEALTHY, nginx RUNNING, 타겟 그룹 `healthy` 등록 확인.
+스키마는 Flyway가 앱 기동 시 자동 마이그레이션한다 (`src/main/resources/db/migration`,
+`ddl-auto=validate`). 수동 스키마 주입은 더 이상 사용하지 않는다.
 
-## 후속 작업
+## 운영 참고
 
-- Flyway 도입 (스키마 마이그레이션 자동화)
-- Confluent SASL_SSL 설정 (팔로우 알림 Kafka 연동)
-- IAM 최소 권한 조정 (배포용 임시 AdministratorAccess → 최소 권한)
+- 배포 상태 확인: GitHub Actions CD 런 로그, 또는 ECS 콘솔 `mopl-cluster` 서비스 이벤트.
+- 앱 로그: CloudWatch `/ecs/mopl` (접두사 `app`), nginx 접근 로그: 접두사 `nginx` (`upstreamlog` 포맷).
+- nginx 이미지를 손대는 커밋은 CD가 자동으로 감지해 함께 배포하므로 수동 빌드·푸시가 필요 없다.
