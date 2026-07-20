@@ -31,16 +31,26 @@ public class ContentIngestionTasklet implements Tasklet {
   private final ContentFetcher fetcher;
   private final ContentUpsertService contentUpsertService;
   private final int skipLimit;
+  private final IngestionMode stepMode;
 
   public ContentIngestionTasklet(
-      ContentFetcher fetcher, ContentUpsertService contentUpsertService, int skipLimit) {
+      ContentFetcher fetcher,
+      ContentUpsertService contentUpsertService,
+      int skipLimit,
+      IngestionMode stepMode) {
     this.fetcher = fetcher;
     this.contentUpsertService = contentUpsertService;
     this.skipLimit = skipLimit;
+    this.stepMode = stepMode;
   }
 
   @Override
   public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
+    if (!isModeSelected(chunkContext)) {
+      log.info("이번 실행 모드의 스텝이 아니라 건너뜁니다. stepMode={}, source={}", stepMode, fetcher.source());
+      return RepeatStatus.FINISHED;
+    }
+
     List<ExternalContentData> contents;
     try {
       contents = fetcher.fetch(); // 페이지/리그 단위 실패는 fetcher가 이미 격리
@@ -100,5 +110,21 @@ public class ContentIngestionTasklet implements Tasklet {
         skipped,
         failed);
     return RepeatStatus.FINISHED;
+  }
+
+  // 이번 실행 모드(JOB_PARAM_MODE)가 이 스텝의 모드와 일치하는지 판정
+  // 파라미터가 없으면 DAILY로 간주
+  private boolean isModeSelected(ChunkContext chunkContext) {
+    String requested =
+        chunkContext
+            .getStepContext()
+            .getStepExecution()
+            .getJobParameters()
+            .getString(ContentIngestionJobConfig.JOB_PARAM_MODE);
+    IngestionMode mode =
+        (requested == null || requested.isBlank())
+            ? IngestionMode.DAILY
+            : IngestionMode.valueOf(requested);
+    return mode == stepMode;
   }
 }

@@ -18,6 +18,7 @@ import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbPageResponse;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbTvDto;
 import java.net.SocketTimeoutException;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.Map;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +47,7 @@ class TmdbClientTest {
             "https://image.tmdb.org/t/p/w500",
             "ko-KR",
             2,
+            new TmdbProperties.Backfill(25, LocalDate.of(1950, 1, 1)),
             Duration.ofSeconds(3),
             Duration.ofSeconds(10));
     RestClient.Builder builder = RestClient.builder();

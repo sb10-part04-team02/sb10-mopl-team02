@@ -37,17 +37,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
-/**
- * 콘텐츠 수집 배치 Job 통합 테스트.
- *
- * <p>실제 JobRepository(Flyway V3 메타테이블)와 DB upsert를 거쳐 건별 처리/멱등성/실패 격리/알림 트리거를 검증한다. 외부 API 호출을 배제하기
- * 위해 fetcher는 목으로 대체하고, 디스코드 전송도 목으로 검증한다.
- *
- * <p>공유 Testcontainers DB이므로 테스트마다 유일한 externalId를 사용해 상호 간섭을 막는다.
- *
- * <p>{@code @SpringBatchTest}는 사용하지 않는다: 이 테스트는 Job을 실제로 실행하므로 스텝 스코프 시뮬레이션이 불필요하고, 해당 애너테이션의 리스너가
- * {@link StepExecution}을 반환하는 테스트 헬퍼를 팩터리 메서드로 오인해 실패한다.
- */
+// 콘텐츠 수집 배치 Job 통합 테스트
 class ContentIngestionJobIntegrationTest extends IntegrationTestSupport {
 
   @Autowired private JobLauncher jobLauncher;
@@ -74,7 +64,7 @@ class ContentIngestionJobIntegrationTest extends IntegrationTestSupport {
 
     // then
     assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
-    StepExecution tmdbStep = stepByName(execution, "tmdbStep");
+    StepExecution tmdbStep = stepByName(execution, "popularTmdbStep");
     assertThat(tmdbStep.getWriteCount()).isEqualTo(2);
     assertThat(tmdbStep.getExecutionContext().getInt(ContentIngestionTasklet.CONTEXT_KEY_INSERTED))
         .isEqualTo(2);
@@ -107,7 +97,7 @@ class ContentIngestionJobIntegrationTest extends IntegrationTestSupport {
 
     // then - 2회차는 전부 UPDATED, 신규 생성 없음
     assertThat(second.getStatus()).isEqualTo(BatchStatus.COMPLETED);
-    StepExecution tmdbStep = stepByName(second, "tmdbStep");
+    StepExecution tmdbStep = stepByName(second, "popularTmdbStep");
     assertThat(tmdbStep.getExecutionContext().getInt(ContentIngestionTasklet.CONTEXT_KEY_INSERTED))
         .isZero();
     assertThat(tmdbStep.getExecutionContext().getInt(ContentIngestionTasklet.CONTEXT_KEY_UPDATED))
@@ -139,7 +129,7 @@ class ContentIngestionJobIntegrationTest extends IntegrationTestSupport {
 
     // then - 항목 단위 실패는 Job을 실패시키지 않고 해당 건만 건너뛴다
     assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
-    StepExecution tmdbStep = stepByName(execution, "tmdbStep");
+    StepExecution tmdbStep = stepByName(execution, "popularTmdbStep");
     assertThat(tmdbStep.getSkipCount()).isEqualTo(1);
     assertThat(tmdbStep.getExecutionContext().getInt(ContentIngestionTasklet.CONTEXT_KEY_INSERTED))
         .isEqualTo(2);
@@ -166,7 +156,7 @@ class ContentIngestionJobIntegrationTest extends IntegrationTestSupport {
     // then - 소스 간 실패 격리 + 부분 실패가 COMPLETED로 가려지지 않음
     assertThat(execution.getStatus()).isEqualTo(BatchStatus.FAILED);
     // 실패한 스텝을 지나 flow가 진행되면 스텝 상태는 ABANDONED로 남고 실패는 ExitStatus에 남는다
-    assertThat(stepByName(execution, "tmdbStep").getExitStatus().getExitCode())
+    assertThat(stepByName(execution, "popularTmdbStep").getExitStatus().getExitCode())
         .isEqualTo(ExitStatus.FAILED.getExitCode());
     assertThat(stepByName(execution, "sportsDbStep").getStatus()).isEqualTo(BatchStatus.COMPLETED);
     assertThat(

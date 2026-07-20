@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,12 +21,34 @@ class TmdbPropertiesTest {
   private static final String imageBaseUrl = "https://image.tmdb.org/t/p/w500";
   private static final String language = "ko-KR";
   private static final Duration timeout = Duration.ofSeconds(3);
+  private static final TmdbProperties.Backfill backfill =
+      new TmdbProperties.Backfill(25, LocalDate.of(1950, 1, 1));
 
   @Test
   @DisplayName("유효한 값이면 생성에 성공하고, accessToken은 blank여도 허용된다")
   void success_shouldAllowBlankAccessToken() {
     assertDoesNotThrow(
-        () -> new TmdbProperties("", baseUrl, imageBaseUrl, language, 3, timeout, timeout));
+        () ->
+            new TmdbProperties("", baseUrl, imageBaseUrl, language, 3, backfill, timeout, timeout));
+  }
+
+  @Test
+  @DisplayName("backfill 설정이 없으면 IllegalStateException을 발생시킨다")
+  void fail_whenBackfillNull() {
+    assertThrows(
+        IllegalStateException.class,
+        () ->
+            new TmdbProperties(
+                "token", baseUrl, imageBaseUrl, language, 3, null, timeout, timeout));
+  }
+
+  @Test
+  @DisplayName("backfill의 pages-per-run이 1 미만이거나 floor-date가 없으면 실패한다")
+  void fail_whenBackfillInvalid() {
+    assertThrows(
+        IllegalStateException.class,
+        () -> new TmdbProperties.Backfill(0, LocalDate.of(1950, 1, 1)));
+    assertThrows(IllegalStateException.class, () -> new TmdbProperties.Backfill(25, null));
   }
 
   // 실패 케이스 데이터
@@ -60,6 +83,13 @@ class TmdbPropertiesTest {
         IllegalStateException.class,
         () ->
             new TmdbProperties(
-                "token", baseUrl, imageBaseUrl, language, pages, connectTimeout, readTimeout));
+                "token",
+                baseUrl,
+                imageBaseUrl,
+                language,
+                pages,
+                backfill,
+                connectTimeout,
+                readTimeout));
   }
 }

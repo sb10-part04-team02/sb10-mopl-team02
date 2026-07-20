@@ -25,7 +25,7 @@ class TmdbMovieMapperTest {
   @DisplayName("정상 응답은 MOVIE 타입의 수집 데이터로 매핑된다")
   void map_success() {
     // given
-    TmdbMovieDto raw = new TmdbMovieDto(550, "파이트 클럽", "줄거리", "/poster.jpg", List.of(28, 35));
+    TmdbMovieDto raw = new TmdbMovieDto(550, "파이트 클럽", "줄거리", "/poster.jpg", null, List.of(28, 35));
 
     // when
     ExternalContentData data = mapper.map(raw).orElseThrow();
@@ -44,7 +44,7 @@ class TmdbMovieMapperTest {
   @DisplayName("id가 0 이하면 건너뛴다")
   void map_whenInvalidId_returnsEmpty() {
     // given
-    TmdbMovieDto raw = new TmdbMovieDto(0, "제목", "줄거리", "/poster.jpg", List.of());
+    TmdbMovieDto raw = new TmdbMovieDto(0, "제목", "줄거리", "/poster.jpg", null, List.of());
 
     // when & then
     assertThat(mapper.map(raw)).isEmpty();
@@ -53,8 +53,8 @@ class TmdbMovieMapperTest {
   @Test
   @DisplayName("제목이 없거나 공백이면 건너뛴다")
   void map_whenBlankTitle_returnsEmpty() {
-    assertThat(mapper.map(new TmdbMovieDto(550, null, "줄거리", null, List.of()))).isEmpty();
-    assertThat(mapper.map(new TmdbMovieDto(550, "  ", "줄거리", null, List.of()))).isEmpty();
+    assertThat(mapper.map(new TmdbMovieDto(550, null, "줄거리", null, null, List.of()))).isEmpty();
+    assertThat(mapper.map(new TmdbMovieDto(550, "  ", "줄거리", null, null, List.of()))).isEmpty();
   }
 
   @Test
@@ -65,7 +65,7 @@ class TmdbMovieMapperTest {
 
     // when
     ExternalContentData data =
-        mapper.map(new TmdbMovieDto(550, longTitle, "줄거리", null, List.of())).orElseThrow();
+        mapper.map(new TmdbMovieDto(550, longTitle, "줄거리", null, null, List.of())).orElseThrow();
 
     // then
     assertThat(data.title()).hasSize(100).endsWith("...").startsWith("가".repeat(97));
@@ -76,7 +76,7 @@ class TmdbMovieMapperTest {
   void map_whenBlankOverview_usesDefaultDescription() {
     // when
     ExternalContentData data =
-        mapper.map(new TmdbMovieDto(550, "제목", " ", null, List.of())).orElseThrow();
+        mapper.map(new TmdbMovieDto(550, "제목", " ", null, null, List.of())).orElseThrow();
 
     // then
     assertThat(data.description()).isEqualTo("줄거리 정보가 제공되지 않았습니다.");
@@ -90,7 +90,7 @@ class TmdbMovieMapperTest {
 
     // when
     ExternalContentData data =
-        mapper.map(new TmdbMovieDto(550, "제목", longOverview, null, List.of())).orElseThrow();
+        mapper.map(new TmdbMovieDto(550, "제목", longOverview, null, null, List.of())).orElseThrow();
 
     // then
     assertThat(data.description().codePointCount(0, data.description().length())).isEqualTo(255);
@@ -102,7 +102,7 @@ class TmdbMovieMapperTest {
   void map_whenNoPoster_usesDefaultThumbnail() {
     // when
     ExternalContentData data =
-        mapper.map(new TmdbMovieDto(550, "제목", "줄거리", null, List.of())).orElseThrow();
+        mapper.map(new TmdbMovieDto(550, "제목", "줄거리", null, null, List.of())).orElseThrow();
 
     // then
     assertThat(data.thumbnailUrl()).isEqualTo(DEFAULT_THUMBNAIL_URL);
@@ -116,7 +116,9 @@ class TmdbMovieMapperTest {
 
     // when
     ExternalContentData data =
-        noDefaultMapper.map(new TmdbMovieDto(550, "제목", "줄거리", null, List.of())).orElseThrow();
+        noDefaultMapper
+            .map(new TmdbMovieDto(550, "제목", "줄거리", null, null, List.of()))
+            .orElseThrow();
 
     // then
     assertThat(data.thumbnailUrl()).isNotBlank();
@@ -127,7 +129,9 @@ class TmdbMovieMapperTest {
   void map_filtersUnknownAndDuplicateGenres() {
     // when
     ExternalContentData data =
-        mapper.map(new TmdbMovieDto(550, "제목", "줄거리", null, List.of(28, 28, 99999))).orElseThrow();
+        mapper
+            .map(new TmdbMovieDto(550, "제목", "줄거리", null, null, List.of(28, 28, 99999)))
+            .orElseThrow();
 
     // then
     assertThat(data.tags()).containsExactly("액션");
@@ -143,7 +147,7 @@ class TmdbMovieMapperTest {
 
     // when
     Optional<ExternalContentData> data =
-        longGenreMapper.map(new TmdbMovieDto(550, "제목", "줄거리", null, List.of(1, 2)));
+        longGenreMapper.map(new TmdbMovieDto(550, "제목", "줄거리", null, null, List.of(1, 2)));
 
     // then
     assertThat(data.orElseThrow().tags()).containsExactly("액션");

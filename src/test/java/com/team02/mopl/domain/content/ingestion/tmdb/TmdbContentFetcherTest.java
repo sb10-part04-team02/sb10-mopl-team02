@@ -11,6 +11,7 @@ import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbMovieDto;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbPageResponse;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbTvDto;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +37,7 @@ class TmdbContentFetcherTest {
             "https://image.tmdb.org/t/p/w500",
             "ko-KR",
             2,
+            new TmdbProperties.Backfill(25, LocalDate.of(1950, 1, 1)),
             Duration.ofSeconds(3),
             Duration.ofSeconds(10));
     fetcher = new TmdbContentFetcher(tmdbClient, properties, "");
@@ -60,11 +62,11 @@ class TmdbContentFetcherTest {
     // given
     givenGenres();
     given(tmdbClient.fetchPopularMovies(1))
-        .willReturn(moviePage(new TmdbMovieDto(1, "영화1", "줄거리", "/p1.jpg", List.of(28))));
+        .willReturn(moviePage(new TmdbMovieDto(1, "영화1", "줄거리", "/p1.jpg", null, List.of(28))));
     given(tmdbClient.fetchPopularMovies(2))
-        .willReturn(moviePage(new TmdbMovieDto(2, "영화2", "줄거리", "/p2.jpg", List.of())));
+        .willReturn(moviePage(new TmdbMovieDto(2, "영화2", "줄거리", "/p2.jpg", null, List.of())));
     given(tmdbClient.fetchPopularTv(1))
-        .willReturn(tvPage(new TmdbTvDto(3, "드라마1", "줄거리", "/p3.jpg", List.of(10765))));
+        .willReturn(tvPage(new TmdbTvDto(3, "드라마1", "줄거리", "/p3.jpg", null, List.of(10765))));
     given(tmdbClient.fetchPopularTv(2)).willReturn(tvPage());
 
     // when
@@ -89,8 +91,8 @@ class TmdbContentFetcherTest {
     given(tmdbClient.fetchPopularMovies(1))
         .willReturn(
             moviePage(
-                new TmdbMovieDto(1, "정상 영화", "줄거리", "/p1.jpg", List.of()),
-                new TmdbMovieDto(2, " ", "제목 없는 영화", "/p2.jpg", List.of())));
+                new TmdbMovieDto(1, "정상 영화", "줄거리", "/p1.jpg", null, List.of()),
+                new TmdbMovieDto(2, " ", "제목 없는 영화", "/p2.jpg", null, List.of())));
     given(tmdbClient.fetchPopularMovies(2)).willReturn(moviePage());
     given(tmdbClient.fetchPopularTv(1)).willReturn(tvPage());
     given(tmdbClient.fetchPopularTv(2)).willReturn(tvPage());
@@ -110,9 +112,9 @@ class TmdbContentFetcherTest {
     given(tmdbClient.fetchPopularMovies(1))
         .willThrow(new TmdbApiException(new RuntimeException("일시 오류")));
     given(tmdbClient.fetchPopularMovies(2))
-        .willReturn(moviePage(new TmdbMovieDto(2, "영화2", "줄거리", "/p2.jpg", List.of())));
+        .willReturn(moviePage(new TmdbMovieDto(2, "영화2", "줄거리", "/p2.jpg", null, List.of())));
     given(tmdbClient.fetchPopularTv(1))
-        .willReturn(tvPage(new TmdbTvDto(3, "드라마1", "줄거리", "/p3.jpg", List.of())));
+        .willReturn(tvPage(new TmdbTvDto(3, "드라마1", "줄거리", "/p3.jpg", null, List.of())));
     given(tmdbClient.fetchPopularTv(2)).willReturn(tvPage());
 
     // when
@@ -132,10 +134,10 @@ class TmdbContentFetcherTest {
         .willThrow(new TmdbApiException(new RuntimeException("일시 오류")));
     given(tmdbClient.fetchTvGenres()).willReturn(Map.of(10765, "SF"));
     given(tmdbClient.fetchPopularMovies(1))
-        .willReturn(moviePage(new TmdbMovieDto(1, "영화1", "줄거리", "/p1.jpg", List.of(28))));
+        .willReturn(moviePage(new TmdbMovieDto(1, "영화1", "줄거리", "/p1.jpg", null, List.of(28))));
     given(tmdbClient.fetchPopularMovies(2)).willReturn(moviePage());
     given(tmdbClient.fetchPopularTv(1))
-        .willReturn(tvPage(new TmdbTvDto(3, "드라마1", "줄거리", "/p3.jpg", List.of(10765))));
+        .willReturn(tvPage(new TmdbTvDto(3, "드라마1", "줄거리", "/p3.jpg", null, List.of(10765))));
     given(tmdbClient.fetchPopularTv(2)).willReturn(tvPage());
 
     // when

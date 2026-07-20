@@ -37,7 +37,8 @@ class ContentIngestionSchedulerTest {
   @BeforeEach
   void setUp() {
     IngestionSchedulerProperties properties =
-        new IngestionSchedulerProperties(true, "0 0 4 * * *", Duration.ofMinutes(30));
+        new IngestionSchedulerProperties(
+            true, "0 0 4 * * *", "0 0 * * * *", Duration.ofMinutes(30));
     scheduler =
         new ContentIngestionScheduler(jobLauncher, contentIngestionJob, runLock, properties);
   }
@@ -51,7 +52,7 @@ class ContentIngestionSchedulerTest {
         .willReturn(completedExecution());
 
     // when
-    scheduler.collectAll();
+    scheduler.collectDaily();
 
     // then - 매 실행이 새 JobInstance가 되도록 timestamp 식별 파라미터가 전달되어야 한다
     ArgumentCaptor<JobParameters> captor = ArgumentCaptor.forClass(JobParameters.class);
@@ -67,7 +68,7 @@ class ContentIngestionSchedulerTest {
     given(runLock.tryAcquire(any())).willReturn(null);
 
     // when
-    scheduler.collectAll();
+    scheduler.collectDaily();
 
     // then
     then(jobLauncher).shouldHaveNoInteractions();
@@ -82,7 +83,7 @@ class ContentIngestionSchedulerTest {
         .willThrow(new RuntimeException("실행 실패"));
 
     // when & then
-    assertThatCode(() -> scheduler.collectAll()).doesNotThrowAnyException();
+    assertThatCode(() -> scheduler.collectDaily()).doesNotThrowAnyException();
     then(runLock).should().release(TOKEN);
   }
 
@@ -96,7 +97,7 @@ class ContentIngestionSchedulerTest {
     willThrow(new RuntimeException("Redis 오류")).given(runLock).release(TOKEN);
 
     // when & then - 해제 실패가 성공한 수집을 예외로 뒤바꾸지 않아야 한다
-    assertThatCode(() -> scheduler.collectAll()).doesNotThrowAnyException();
+    assertThatCode(() -> scheduler.collectDaily()).doesNotThrowAnyException();
     then(jobLauncher).should().run(eq(contentIngestionJob), any(JobParameters.class));
   }
 
@@ -107,7 +108,7 @@ class ContentIngestionSchedulerTest {
     given(runLock.tryAcquire(any())).willThrow(new RuntimeException("Redis 오류"));
 
     // when & then
-    assertThatCode(() -> scheduler.collectAll()).doesNotThrowAnyException();
+    assertThatCode(() -> scheduler.collectDaily()).doesNotThrowAnyException();
     then(jobLauncher).shouldHaveNoInteractions();
   }
 

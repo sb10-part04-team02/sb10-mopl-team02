@@ -1,5 +1,7 @@
 package com.team02.mopl.domain.content.ingestion;
 
+import com.team02.mopl.domain.content.ingestion.batch.ContentIngestionJobConfig;
+import com.team02.mopl.domain.content.ingestion.batch.IngestionMode;
 import com.team02.mopl.domain.content.ingestion.scheduler.IngestionRunLock;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -60,9 +62,11 @@ public class ContentIngestionRunner implements ApplicationRunner {
     try {
       // 매 실행이 새 JobInstance가 되도록 timestamp를 식별 파라미터로 전달
       // (기본 JobLauncher는 동기 실행이므로 락이 배치 실행 내내 유지된다)
+      // 기동 수집은 DAILY(popular + SportsDB 시즌)로 시딩한다. 백필은 스케줄러(HOURLY)가 이어받는다.
       JobParameters parameters =
           new JobParametersBuilder()
               .addLocalDateTime("runDateTime", LocalDateTime.now())
+              .addString(ContentIngestionJobConfig.JOB_PARAM_MODE, IngestionMode.DAILY.name())
               .toJobParameters();
       jobLauncher.run(contentIngestionJob, parameters);
     } catch (Exception e) {
