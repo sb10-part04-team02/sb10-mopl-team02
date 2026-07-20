@@ -69,7 +69,7 @@
       <Bug pattern="EI_EXPOSE_REP2" />
     </Match>
     <Match>
-      <Class name="com.team02.mopl.domain.auth.provider.MoplAuthenticationProvider" />
+      <Class name="com.team02.mopl.domain.auth.login.provider.MoplAuthenticationProvider" />
       <Bug pattern="EI_EXPOSE_REP2" />
     </Match>
 

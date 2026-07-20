@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -20,8 +21,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   private final JwtUtils jwtUtils;
-  private final AuthenticationManager authenticationManager;
   private final AuthenticationEntryPoint authenticationEntryPoint;
+  private AuthenticationManager authenticationManager;
 
   @Override
   protected void doFilterInternal(
@@ -46,5 +47,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     filterChain.doFilter(request, response);
+  }
+
+  public void setAuthenticationManager(AuthenticationManager authenticationManager) {
+    Assert.notNull(authenticationManager, "authenticationManager는 null이면 안됩니다");
+    if (this.authenticationManager != null) {
+      return;
+    }
+    this.authenticationManager = authenticationManager;
   }
 }

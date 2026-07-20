@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.auth.jwt;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.stereotype.Component;
 
@@ -33,6 +36,10 @@ public class JwtRegistry {
 
   private final JwtProperties properties;
   private final StringRedisTemplate redisTemplate;
+  private static final RedisScript<Long> RELEASE_SCRIPT =
+      new DefaultRedisScript<>(
+          "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+          Long.class);
 
   // TODO: 기본구현 후 LuaScript를 통한 원자적 처리 구현
   public void registerRefreshToken(UUID userId, String refreshToken) {
@@ -185,6 +192,17 @@ public class JwtRegistry {
     } catch (Exception e) {
       log.error("[Redis] 임시 비밀번호 반환 실패: userId={}", userId, e);
       return null;
+    }
+  }
+
+  public boolean verifyAndUseTempPassword(UUID userId, String inputPassword) {
+    try {
+      String tempKey = tempPwKey(userId);
+      Long result = redisTemplate.execute(RELEASE_SCRIPT, List.of(tempKey), inputPassword);
+      return Objects.equals(result, 1L);
+    } catch (Exception e) {
+      log.error("[Redis] 임시 비밀번호 검증 실패: userId={}", userId);
+      return false;
     }
   }
 

@@ -117,6 +117,11 @@ services:
       ADMIN_NAME: ${ADMIN_NAME:?ADMIN_NAME is required}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
 
+      # 메일 발송 설정
+      # 부하테스트에서는 비밀번호 초기화 메일을 사용하지 않더라도 MailService bean 생성에 필요하다.
+      EMAIL_ACCOUNT: ${EMAIL_ACCOUNT:?EMAIL_ACCOUNT is required}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:?EMAIL_PASSWORD is required}
+
       # Nginx 경유 접근 기준 public URL
       STORAGE_PUBLIC_BASE_URL: http://localhost:8080
     ports:
@@ -158,6 +163,11 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
       ADMIN_NAME: ${ADMIN_NAME:?ADMIN_NAME is required}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+
+      # 메일 발송 설정
+      # 부하테스트에서는 비밀번호 초기화 메일을 사용하지 않더라도 MailService bean 생성에 필요하다.
+      EMAIL_ACCOUNT: ${EMAIL_ACCOUNT:?EMAIL_ACCOUNT is required}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:?EMAIL_PASSWORD is required}
 
       STORAGE_PUBLIC_BASE_URL: http://localhost:8080
     ports:
