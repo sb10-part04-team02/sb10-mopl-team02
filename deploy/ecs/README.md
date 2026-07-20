@@ -17,7 +17,7 @@ Client → CloudFlare(HTTPS) → ALB(HTTPS:443)
 - nginx와 app은 별도 ECS 서비스로 분리되어 있고, nginx가 Service Connect 별칭(`app.mopl.local`)으로 app 인스턴스 2대에 요청을 분산한다.
 - 모든 태스크는 ARM64(Graviton) Fargate에서 실행된다.
 - nginx 서비스는 desired 1이라 교체·장애 시 순단 가능성이 있는 단일 지점이다. 무중단이 필요해지면 nginx도 2대 이상으로 확장한다.
-- 엣지 구간은 CloudFlare가 Full (Strict) 모드로 ALB의 ACM 인증서를 검증하며 종단 간 암호화된다. ALB가 TLS를 종료하고 뒤쪽 nginx로는 VPC 내부에서 HTTP로 전달한다.
+- 엣지 구간은 CloudFlare가 Full (Strict) 모드로 ALB의 ACM 인증서를 검증하므로 CloudFlare와 ALB 사이 퍼블릭 구간이 암호화된다. ALB가 TLS를 종료하고 뒤쪽 nginx로는 VPC 내부에서 HTTP로 전달한다.
 
 ## 이 디렉터리의 파일
 
