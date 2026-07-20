@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-// discover 백필의 매체별 진행 커서. PK는 매체(MOVIE/TV) 자체
+// discover backfill의 매체별 진행 커서. PK는 매체(MOVIE/TV) 자체
 // - cursorDate: 다음 실행의 개봉일 상한(lte). null이면 아직 시작 전(오늘부터)
 // - backfillComplete: floor-date까지 내려가 더 수집할 과거가 없는 상태
 @Entity

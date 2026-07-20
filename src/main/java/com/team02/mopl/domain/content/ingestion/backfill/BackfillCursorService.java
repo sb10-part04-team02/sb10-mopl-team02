@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// discover 백필 커서의 조회/전진을 담당한다.
+// discover backfill 커서의 조회/전진을 담당한다.
 // - 배치 스텝은 no-op(ResourcelessTransactionManager)이라 이 서비스의 @Transactional이 커밋 경계를 만든다
 //   (ContentUpsertService와 동일한 패턴)
 @Service

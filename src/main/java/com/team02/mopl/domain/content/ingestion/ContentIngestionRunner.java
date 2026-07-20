@@ -62,7 +62,7 @@ public class ContentIngestionRunner implements ApplicationRunner {
     try {
       // 매 실행이 새 JobInstance가 되도록 timestamp를 식별 파라미터로 전달
       // (기본 JobLauncher는 동기 실행이므로 락이 배치 실행 내내 유지된다)
-      // 기동 수집은 DAILY(popular + SportsDB 시즌)로 시딩한다. 백필은 스케줄러(HOURLY)가 이어받는다.
+      // 기동 수집은 DAILY(popular + SportsDB 시즌)로 시딩한다. backfill은 스케줄러(HOURLY)가 이어받는다.
       JobParameters parameters =
           new JobParametersBuilder()
               .addLocalDateTime("runDateTime", LocalDateTime.now())

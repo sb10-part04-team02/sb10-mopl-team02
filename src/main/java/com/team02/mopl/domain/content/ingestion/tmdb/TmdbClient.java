@@ -48,7 +48,7 @@ public class TmdbClient {
     return getPage("/tv/popular", page, TV_PAGE_TYPE);
   }
 
-  // discover 백필: 개봉일 내림차순 정렬 + 상한(lte) 이하만 조회. lte가 null이면 상한 없이 최신부터.
+  // discover backfill: 개봉일 내림차순 정렬 + 상한(lte) 이하만 조회. lte가 null이면 상한 없이 최신부터.
   // sort_by/lte의 날짜 필드명은 매체마다 다르다(movie=primary_release_date, tv=first_air_date).
   public TmdbPageResponse<TmdbMovieDto> discoverMovies(int page, LocalDate releaseDateLte) {
     return discover(TmdbMediaType.MOVIE, page, releaseDateLte, MOVIE_PAGE_TYPE);

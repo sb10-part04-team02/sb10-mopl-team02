@@ -42,9 +42,9 @@ public record TmdbProperties(
     }
   }
 
-  // discover 백필 설정
+  // discover backfill 설정
   // - pagesPerRun: 시간별 1회 실행에서 매체(movie/tv)별로 훑는 페이지 수 (페이지당 20건)
-  // - floorDate: 개봉일이 이 값까지 내려가면 백필 완료(backfillComplete)로 표시하고 이후 실행은 skip
+  // - floorDate: 개봉일이 이 값까지 내려가면 backfill 완료(backfillComplete)로 표시하고 이후 실행은 skip
   public record Backfill(int pagesPerRun, LocalDate floorDate) {
 
     public Backfill {

@@ -6,7 +6,7 @@ import org.springframework.scheduling.support.CronExpression;
 
 // 콘텐츠 수집 스케줄러 설정
 // - cron: 일간 popular 수집 주기
-// - backfillCron: 시간별 discover 백필 주기
+// - backfillCron: 시간별 discover backfill 주기
 @ConfigurationProperties(prefix = "app.ingestion.scheduler")
 public record IngestionSchedulerProperties(
     boolean enabled, String cron, String backfillCron, Duration lockTtl) {

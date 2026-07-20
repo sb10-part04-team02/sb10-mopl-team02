@@ -18,7 +18,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 // 콘텐츠 수집 배치 Job 구성:
 //   contentIngestionJob = popularTmdbStep -> sportsDbStep -> backfillTmdbStep (스텝당 Tasklet 1개)
 // - 모드 게이팅: 스텝마다 IngestionMode를 부여하고, JOB_PARAM_MODE와 일치하는 스텝만 실제 수집한다.
-//   DAILY 실행은 popular+sports만, HOURLY 실행은 discover 백필만 돈다 (나머지는 fetch 없이 FINISHED).
+//   DAILY 실행은 popular+sports만, HOURLY 실행은 discover backfill만 돈다 (나머지는 fetch 없이 FINISHED).
 // - 소스/모드 간 실패 격리: 한 스텝이 실패해도 on("*") 전이로 다음 스텝은 실행된다
 //   (이 flow가 스텝 실패를 COMPLETED로 가릴 수 있어 최종 상태는 IngestionJobListener가 판정)
 // - 항목 단위 실패 격리 + 집계는 ContentIngestionTasklet이 담당 (chunk의 reader/writer/skip 리스너 불필요)

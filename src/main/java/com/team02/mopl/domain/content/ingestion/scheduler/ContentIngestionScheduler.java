@@ -15,7 +15,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 // 콘텐츠 수집 배치를 주기 실행하는 스케줄러 (app.ingestion.scheduler.enabled=true일 때만 등록)
-// - 두 주기: 일간 popular(DAILY) + 시간별 discover 백필(HOURLY)
+// - 두 주기: 일간 popular(DAILY) + 시간별 discover backfill(HOURLY)
 // - IngestionRunLock으로 인스턴스 간 + 두 주기 간 중복 실행을 방지 (획득 실패 시 이번 주기 skip)
 //   Spring Batch는 동일 JobInstance의 동시 실행만 막으므로 timestamp 파라미터 + 멀티 인스턴스 환경에서는 이 락이 필요
 // - 수집 실패가 다음 주기 실행을 막지 않도록 예외는 로그만 남김 (결과 요약/알림은 IngestionJobListener 담당)
@@ -36,10 +36,10 @@ public class ContentIngestionScheduler {
     run(IngestionMode.DAILY, "일간 popular");
   }
 
-  // 시간별 discover 백필 (최신 -> 과거)
+  // 시간별 discover backfill (최신 -> 과거)
   @Scheduled(cron = "${app.ingestion.scheduler.backfill-cron}", zone = "Asia/Seoul")
   public void collectBackfill() {
-    run(IngestionMode.HOURLY, "시간별 백필");
+    run(IngestionMode.HOURLY, "시간별 backfill");
   }
 
   private void run(IngestionMode mode, String label) {
