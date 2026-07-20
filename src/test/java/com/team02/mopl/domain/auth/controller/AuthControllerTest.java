@@ -34,6 +34,7 @@ import com.team02.mopl.domain.auth.login.provider.MoplAuthenticationProvider;
 import com.team02.mopl.domain.auth.login.token.MoplAuthenticationToken;
 import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginFailureHandler;
 import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginSuccessHandler;
+import com.team02.mopl.domain.auth.oauth.repository.MoplCookieOAuth2AuthorizationRequestRepository;
 import com.team02.mopl.domain.auth.oauth.service.MoplOidcUserService;
 import com.team02.mopl.domain.auth.service.AuthService;
 import com.team02.mopl.domain.auth.service.AuthService.TokenResult;
@@ -76,6 +77,10 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 // 테스트 실행마다 스프링 컨테이너, 시큐리티 환경 다시 빌드
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class AuthControllerTest {
+
+  @MockitoBean
+  private MoplCookieOAuth2AuthorizationRequestRepository
+      moplCookieOAuth2AuthorizationRequestRepository;
 
   @MockitoBean private MoplAuthenticationProvider moplAuthenticationProvider;
   @MockitoBean private JwtAuthenticationProvider jwtAuthenticationProvider;
