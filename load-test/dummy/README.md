@@ -115,10 +115,15 @@ docker exec sb10-mopl-team02-db-1 psql -U mopl_user -d mopl_db -f /tmp/dummy/01_
 
 ## 적재 기록
 
-2026-07-20 리얼리즘 개편(시간 분포/평점 J-curve/실서비스 문구/셀럽 팔로우/타입별 태그) 후
-일회용 postgres:16 컨테이너에서 SCALE=0.01, SCALE=1.0 모두 재검증: 행 수 14/14 일치, 집계/규칙 위반 0건.
+2026-07-20, 리얼리즘 개편판(시간 분포/평점 J-curve/실서비스 문구/셀럽 팔로우/타입별 태그)
+SCALE=1.0 (약 535만 행), dev DB(postgres:16) 적재 기준:
 
-2026-07-15, SCALE=1.0 (약 560만 행), 로컬 Docker postgres:16 기준:
+- 90_verify.sql 행 수 14/14 일치, 집계/규칙 위반 0건 (일회용 컨테이너에서 SCALE=0.01/1.0 사전 재검증 포함)
+- 분포 확인: rating 4~5 편중(4가 최빈), 콘텐츠 평균 약 2.1~4.4로 분산, 셀럽(상위 1%)이 전체 팔로우의 약 27% 수신,
+  활성 시청 세션 전부 최근 4시간 내, 최근 7일 신규 유저 약 4.7천 / 리뷰 약 40만
+- 공통 비밀번호 해시는 Spring Security BCryptPasswordEncoder.matches("password1!", 해시) = true 확인됨
+
+소요 시간 참고 (2026-07-15, 개편 전 세트 약 560만 행 기준 - 규모가 비슷해 참고용으로 유지):
 
 | 구간 | 소요 |
 |---|---|
@@ -129,6 +134,3 @@ docker exec sb10-mopl-team02-db-1 psql -U mopl_user -d mopl_db -f /tmp/dummy/01_
 | 50 direct_messages 100만 | 34초 |
 | 60 notifications 50만 / watching_sessions 20만 | 13초 / 6초 |
 | ANALYZE | 41초 |
-
-검증 결과: 90_verify.sql 행 수 14/14 일치, 집계/규칙 위반 0건.
-공통 비밀번호 해시는 Spring Security BCryptPasswordEncoder.matches("password1!", 해시) = true 확인됨.
