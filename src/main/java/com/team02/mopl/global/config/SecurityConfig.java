@@ -2,26 +2,24 @@ package com.team02.mopl.global.config;
 
 import com.team02.mopl.domain.auth.jwt.JwtAuthenticationProvider;
 import com.team02.mopl.domain.auth.jwt.filter.JwtAuthenticationFilter;
+import com.team02.mopl.domain.auth.jwt.handler.JwtLoginFailureHandler;
+import com.team02.mopl.domain.auth.jwt.handler.JwtLoginSuccessHandler;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
-import com.team02.mopl.domain.auth.provider.MoplAuthenticationProvider;
+import com.team02.mopl.domain.auth.login.filter.MoplAuthenticationFilter;
+import com.team02.mopl.domain.auth.login.provider.MoplAuthenticationProvider;
 import com.team02.mopl.global.config.auth.handler.SpaCsrfTokenRequestHandler;
-import java.util.Arrays;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.AuthenticationFailureHandler;
-import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
@@ -35,37 +33,25 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-  private final AuthenticationSuccessHandler jwtLoginSuccessHandler;
-  private final AuthenticationFailureHandler jwtLoginFailureHandler;
+  private final MoplAuthenticationProvider moplAuthenticationProvider;
+  private final JwtAuthenticationProvider jwtAuthenticationProvider;
+  private final JwtLoginSuccessHandler jwtLoginSuccessHandler;
+  private final JwtLoginFailureHandler jwtLoginFailureHandler;
   private final LogoutHandler jwtLogoutHandler;
   private final AuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
   @Bean
-  public SecurityFilterChain filterChain(
-      HttpSecurity http, AuthenticationManager authenticationManager, JwtUtils jwtUtils)
+  public SecurityFilterChain filterChain(HttpSecurity http, JwtUtils jwtUtils, Validator validator)
       throws Exception {
     RequestMatcher apiMatcher = PathPatternRequestMatcher.withDefaults().matcher("/api/**");
     RequestMatcher nonApiMatcher = new NegatedRequestMatcher(apiMatcher);
 
-    http
-        // 수동으로 만든걸 추가해야 formLogin에서 Provider가 제대로 인식됨
-        .authenticationManager(authenticationManager)
-        .addFilterBefore(
-            new JwtAuthenticationFilter(
-                jwtUtils, authenticationManager, jwtAuthenticationEntryPoint),
-            UsernamePasswordAuthenticationFilter.class)
-        .csrf(
+    http.csrf(
             csrf ->
                 csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                     .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .formLogin(
-            login ->
-                login
-                    .loginProcessingUrl("/api/auth/sign-in")
-                    .successHandler(jwtLoginSuccessHandler)
-                    .failureHandler(jwtLoginFailureHandler))
         .logout(
             logout ->
                 logout
@@ -112,23 +98,33 @@ public class SecurityConfig {
                 except
                     // 토큰이 없거나(익명), 인증에 실패한 채로 보호된 리소스에 접근할 때
                     .authenticationEntryPoint(jwtAuthenticationEntryPoint));
-    return http.build();
+
+    // jwt 토큰 검증 및 provider
+    JwtAuthenticationFilter jwtAuthenticationFilter =
+        new JwtAuthenticationFilter(jwtUtils, jwtAuthenticationEntryPoint);
+    http.authenticationProvider(jwtAuthenticationProvider)
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+    // 일반/임시 패스워드 로그인 필터 및 provider
+    MoplAuthenticationFilter moplAuthenticationFilter = getMoplAuthenticationFilter(validator);
+    http.authenticationProvider(moplAuthenticationProvider)
+        .addFilterAt(moplAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+    // filterChain 빌드
+    SecurityFilterChain securityFilterChain = http.build();
+
+    // securityFilterChian이 build가 된 이후에야 authenticationManager를 불러올 수 있음
+    AuthenticationManager authenticationManager = http.getSharedObject(AuthenticationManager.class);
+    jwtAuthenticationFilter.setAuthenticationManager(authenticationManager);
+    moplAuthenticationFilter.setAuthenticationManager(authenticationManager);
+
+    return securityFilterChain;
   }
 
-  @Bean
-  public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
-  }
-
-  @Bean
-  public AuthenticationManager authenticationManager(
-      MoplAuthenticationProvider moplAuthenticationProvider,
-      JwtAuthenticationProvider jwtAuthenticationProvider) {
-
-    return new ProviderManager(
-        Arrays.asList(
-            moplAuthenticationProvider, // 일반 로그인 + 임시비밀번호 포함
-            jwtAuthenticationProvider // 토큰용
-            ));
+  private MoplAuthenticationFilter getMoplAuthenticationFilter(Validator validator) {
+    MoplAuthenticationFilter filter = new MoplAuthenticationFilter(validator);
+    filter.setAuthenticationSuccessHandler(jwtLoginSuccessHandler);
+    filter.setAuthenticationFailureHandler(jwtLoginFailureHandler);
+    return filter;
   }
 }

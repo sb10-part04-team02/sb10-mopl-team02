@@ -27,12 +27,42 @@ jobs:
     permissions:
       id-token: write   # OIDC 토큰 발급
       contents: read
+      actions: read     # nginx 변경 감지가 마지막 성공 런을 조회(gh run list)할 때 필요
 
     steps:
       - name: 코드 체크아웃
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          # nginx 변경 감지의 git diff가 마지막 성공 런의 커밋을 참조하므로 전체 이력을 받는다
+          # (기준 커밋은 event.before보다 오래될 수 있다).
+          fetch-depth: 0
+
+      - name: nginx 변경 감지
+        id: nginx-changes
+        # nginx 관련 파일이 바뀐 커밋에서만 nginx를 빌드·배포한다(평상시 app-only 커밋에서 nginx 롤아웃 제거).
+        # 비교 기준은 마지막 성공 CD 런의 head SHA다. event.before는 concurrency로 취소된 중간 런·실패 런
+        # 탓에 "실제 배포된 상태"라는 보장이 없지만, 성공 런의 커밋은 nginx 배포 상태와 일치함이 보장된다.
+        # 기준을 얻지 못하면(수동 실행, 조회 실패, 기준 커밋 유실 등) 안전하게 배포하는 쪽(fail-open)으로 간다.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          deploy=true
+          if [ "$GITHUB_EVENT_NAME" != "push" ]; then
+            echo "수동 실행이라 nginx를 배포합니다."
+          else
+            BASELINE=$(gh run list -R "$GITHUB_REPOSITORY" --workflow cd.yml --branch "$GITHUB_REF_NAME" \
+              --status success --limit 1 --json headSha --jq '.[0].headSha // empty' || true)
+            if [ -z "$BASELINE" ] || ! git cat-file -e "$BASELINE" 2>/dev/null; then
+              echo "비교 기준을 얻지 못해 nginx를 배포합니다."
+            elif git diff --name-only "$BASELINE" "$GITHUB_SHA" -- deploy/ecs/nginx deploy/ecs/task-definition-nginx.json | grep -q .; then
+              echo "nginx 관련 변경이 있어 배포합니다. (기준: $BASELINE)"
+            else
+              deploy=false
+              echo "마지막 성공 배포($BASELINE) 이후 nginx 관련 변경이 없어 배포를 건너뜁니다."
+            fi
+          fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
 
       - name: JDK 17 설정
         uses: actions/setup-java@v4
@@ -48,6 +78,7 @@ jobs:
         run: ./gradlew clean bootJar --no-daemon
 
       - name: AWS 자격 증명 (OIDC)
+        id: aws-creds
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.CD_ROLE_ARN }}
@@ -76,6 +107,7 @@ jobs:
 
       - name: nginx 이미지 빌드 · 푸시 (ARM64)
         # 2차 구성은 nginx가 별도 서비스라 app과 함께 빌드·푸시한다. 컨텍스트는 deploy/ecs/nginx.
+        if: steps.nginx-changes.outputs.deploy == 'true'
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
@@ -138,6 +170,7 @@ jobs:
 
       - name: nginx task-definition 렌더링
         # nginx 정의는 민감값이 없어 이미지 태그·레지스트리·역할·리전만 치환한다.
+        if: steps.nginx-changes.outputs.deploy == 'true'
         env:
           AWS_REGION: ${{ env.AWS_REGION }}
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
@@ -151,26 +184,72 @@ jobs:
           fi
 
       - name: app task-def 등록 · 배포
-        # app이 nginx 뒤에 있으므로 먼저 등록·안정화한 뒤 nginx를 배포한다.
+        # app이 nginx 뒤에 있으므로 업데이트는 app을 먼저 내보낸다. 안정화는 아래에서 두 서비스를 한 번에 기다린다.
+        id: deploy-app
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: /tmp/task-def-app.json
           cluster: ${{ env.ECS_CLUSTER }}
           service: ${{ env.APP_SERVICE }}
           force-new-deployment: true
-          wait-for-service-stability: true
+          wait-for-service-stability: false
 
       - name: nginx task-def 등록 · 배포
+        if: steps.nginx-changes.outputs.deploy == 'true'
+        id: deploy-nginx
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: /tmp/task-def-nginx.json
           cluster: ${{ env.ECS_CLUSTER }}
           service: ${{ env.NGINX_SERVICE }}
           force-new-deployment: true
-          wait-for-service-stability: true
+          wait-for-service-stability: false
+
+      - name: 서비스 안정화 대기
+        # 두 배포를 순차로 기다리지 않고 병렬로 한 번에 기다린다(순차 합산 대비 대기 시간 절반 수준).
+        # waiter 1회는 10분(15초×40회) 고정이라 2회 루프로 최대 20분까지 허용한다
+        # (실측 안정화 6~7분의 여유분. 실패 배포는 circuit breaker가 서버 측에서 자동 롤백).
+        env:
+          NGINX_DEPLOYED: ${{ steps.nginx-changes.outputs.deploy }}
+        run: |
+          SERVICES="$APP_SERVICE"
+          if [ "$NGINX_DEPLOYED" = "true" ]; then
+            SERVICES="$SERVICES $NGINX_SERVICE"
+          fi
+          echo "안정화 대기: $SERVICES"
+          for attempt in 1 2; do
+            if aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services $SERVICES; then
+              echo "안정화 완료 (시도 $attempt)"; exit 0
+            fi
+            echo "10분 초과, 계속 대기 (시도 $attempt/2)"
+          done
+          echo "20분 내 안정화 실패"; exit 1
 
       - name: ECS 배포 상태 확인
+        # 앞 스텝이 실패해도 실패 시점의 배포 상태를 남기기 위해 자격 증명만 있으면 항상 실행한다.
+        if: always() && steps.aws-creds.outcome == 'success'
+        env:
+          APP_TASKDEF_ARN: ${{ steps.deploy-app.outputs.task-definition-arn }}
+          NGINX_TASKDEF_ARN: ${{ steps.deploy-nginx.outputs.task-definition-arn }}
         run: |
           aws ecs describe-services \
             --cluster "$ECS_CLUSTER" --services "$APP_SERVICE" "$NGINX_SERVICE" \
             --query "services[].{name:serviceName,deployments:deployments}" --output table
+
+          # 이번 런이 등록한 task-def가 실제 PRIMARY로 남았는지 검증.
+          # circuit breaker가 waiter 도중 롤백을 끝내면 waiter는 성공하므로, 여기서 잡아 런을 실패시킨다.
+          verify() {
+            local svc="$1" expected="$2"
+            [ -z "$expected" ] && return 0
+            local actual
+            actual=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$svc" \
+              --query 'services[0].deployments[?status==`PRIMARY`]|[0].taskDefinition' --output text)
+            if [ "$actual" != "$expected" ]; then
+              echo "$svc: PRIMARY($actual)가 이번 런이 등록한 task-def($expected)와 다릅니다(롤백 의심)"; return 1
+            fi
+            echo "$svc: PRIMARY task-def 일치 확인"
+          }
+          status=0
+          verify "$APP_SERVICE" "$APP_TASKDEF_ARN" || status=1
+          verify "$NGINX_SERVICE" "$NGINX_TASKDEF_ARN" || status=1
+          exit "$status"

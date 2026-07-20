@@ -411,4 +411,49 @@ class JwtRegistryTest {
       assertThat(actual).isNull();
     }
   }
+
+  @Nested
+  class VerifyAndUserTempPassword {
+
+    @Test
+    @DisplayName("임시 비밀번호가 일치하면 Redis에서 삭제하고 true를 반환한다")
+    void success_shouldDeleteTempPasswordAndReturnTrue_whenPasswordMatches() {
+      // given
+      given(redisTemplate.execute(any(), any(), any())).willReturn(1L);
+
+      // when
+      boolean result = jwtRegistry.verifyAndUseTempPassword(UUID.randomUUID(), "inputPassword");
+
+      // then
+      assertThat(result).isTrue();
+    }
+
+    @Test
+    @DisplayName("임시 비밀번호가 일치하지 않으면 false를 반환한다")
+    void success_shouldReturnFalse_whenPasswordDoesNotMatch() {
+      // given
+      given(redisTemplate.execute(any(), any(), any())).willReturn(0L);
+
+      // when
+      boolean result = jwtRegistry.verifyAndUseTempPassword(UUID.randomUUID(), "inputPassword");
+
+      // then
+      assertThat(result).isFalse();
+    }
+
+    @Test
+    @DisplayName("Redis 장애로 null을 반환하면 예외를 터트리지 않고 false를 반환한다")
+    void success_ShouldReturnFalse_whenRedisIsDown() {
+      // given
+      willThrow(RedisConnectionFailureException.class)
+          .given(redisTemplate)
+          .execute(any(), any(), any());
+
+      // when
+      boolean result = jwtRegistry.verifyAndUseTempPassword(UUID.randomUUID(), "inputPassword");
+
+      // then
+      assertThat(result).isFalse();
+    }
+  }
 }

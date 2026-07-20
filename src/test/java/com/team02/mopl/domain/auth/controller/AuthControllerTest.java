@@ -23,9 +23,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team02.mopl.domain.auth.dto.JwtDto;
 import com.team02.mopl.domain.auth.dto.ResetPasswordRequest;
 import com.team02.mopl.domain.auth.dto.SignInRequest;
+import com.team02.mopl.domain.auth.entity.MoplUserDetails;
 import com.team02.mopl.domain.auth.exception.AuthException;
+import com.team02.mopl.domain.auth.jwt.JwtAuthenticationProvider;
+import com.team02.mopl.domain.auth.jwt.handler.JwtLoginFailureHandler;
+import com.team02.mopl.domain.auth.jwt.handler.JwtLoginSuccessHandler;
 import com.team02.mopl.domain.auth.jwt.handler.JwtLogoutHandler;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
+import com.team02.mopl.domain.auth.login.provider.MoplAuthenticationProvider;
+import com.team02.mopl.domain.auth.login.token.MoplAuthenticationToken;
 import com.team02.mopl.domain.auth.service.AuthService;
 import com.team02.mopl.domain.auth.service.AuthService.TokenResult;
 import com.team02.mopl.domain.auth.service.MailService;
@@ -53,12 +59,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.security.web.AuthenticationEntryPoint;
-import org.springframework.security.web.authentication.AuthenticationFailureHandler;
-import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -71,10 +74,11 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class AuthControllerTest {
 
+  @MockitoBean private MoplAuthenticationProvider moplAuthenticationProvider;
+  @MockitoBean private JwtAuthenticationProvider jwtAuthenticationProvider;
   @MockitoBean private AuthenticationEntryPoint jwtAuthenticationEntryPoint;
-  @MockitoBean private AuthenticationSuccessHandler jwtLoginSuccessHandler;
-  @MockitoBean private AuthenticationFailureHandler jwtLoginFailureHandler;
-  @MockitoBean private AuthenticationManager authenticationManager;
+  @MockitoBean private JwtLoginSuccessHandler jwtLoginSuccessHandler;
+  @MockitoBean private JwtLoginFailureHandler jwtLoginFailureHandler;
   @MockitoBean private JwtLogoutHandler jwtLogoutHandler;
   @MockitoBean private AuthService authService;
   @MockitoBean private JwtUtils jwtUtils;
@@ -137,6 +141,7 @@ class AuthControllerTest {
     @DisplayName("이메일을 가진 계정이 없어 로그인에 실패한다")
     void fail_shouldReturnUnauthorized_whenEmailIsAbsent() throws Exception {
       // given
+      AuthenticationManager authenticationManager = mock(AuthenticationManager.class);
       given(authenticationManager.authenticate(any())).willThrow(new BadCredentialsException(""));
       willAnswer(
               invocation -> {
@@ -172,8 +177,12 @@ class AuthControllerTest {
       String accessToken = "accessToken";
       Object object = new JwtDto(userDto, accessToken);
 
-      Authentication mockAuthentication = mock(Authentication.class);
-      given(authenticationManager.authenticate(any())).willReturn(mockAuthentication);
+      MoplUserDetails moplUserDetails = new MoplUserDetails(userDto, "password");
+      MoplAuthenticationToken moplToken =
+          new MoplAuthenticationToken(moplUserDetails, moplUserDetails.getAuthorities());
+
+      given(moplAuthenticationProvider.supports(any())).willReturn(true);
+      given(moplAuthenticationProvider.authenticate(any())).willReturn(moplToken);
 
       willAnswer(
               invocation -> {

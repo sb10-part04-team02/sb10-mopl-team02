@@ -17,6 +17,7 @@ import jakarta.servlet.ServletException;
 import java.io.IOException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,108 +31,140 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
 
   @Mock private JwtUtils jwtUtils;
-  @Mock private AuthenticationManager authenticationManager;
   @Mock private AuthenticationEntryPoint authenticationEntryPoint;
-
   @InjectMocks private JwtAuthenticationFilter jwtAuthenticationFilter;
 
-  @BeforeEach
-  void setUp() {
-    // 테스트간 격리를 위해 비워둠
-    SecurityContextHolder.clearContext();
+  private AuthenticationManager authenticationManager;
+
+  @Nested
+  class DoFilterInternal {
+
+    @BeforeEach
+    void setUp() {
+      // 테스트간 격리를 위해 비워둠
+      SecurityContextHolder.clearContext();
+
+      authenticationManager = mock(AuthenticationManager.class);
+      jwtAuthenticationFilter.setAuthenticationManager(authenticationManager);
+    }
+
+    @Test
+    @DisplayName("Authorization 헤더가 없으면 인증을 수행하지 않고 다음 필터로 통과한다")
+    void fail_shouldNotAuthenticate_whenAuthorizationHeaderIsAbsent()
+        throws ServletException, IOException {
+      // given
+      MockHttpServletRequest request = new MockHttpServletRequest();
+      MockHttpServletResponse response = new MockHttpServletResponse();
+      FilterChain filterChain = new MockFilterChain();
+      given(jwtUtils.resolveAccessToken(isNull())).willReturn(null);
+
+      // when
+      jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+      // then
+      Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+      assertThat(authentication).isNull();
+    }
+
+    @Test
+    @DisplayName("다른 타입의 인증토큰이 있으면 인증을 수행하지 않고 다음 필터로 통과한다")
+    void fail_shouldNotAuthenticate_whenAuthorizationHeaderIsInvalid()
+        throws ServletException, IOException {
+      // given
+      MockHttpServletRequest request = new MockHttpServletRequest();
+      MockHttpServletResponse response = new MockHttpServletResponse();
+      FilterChain filterChain = new MockFilterChain();
+
+      String accessToken = "accessToken";
+      request.addHeader("Authorization", "Basic " + accessToken);
+      given(jwtUtils.resolveAccessToken(anyString())).willReturn(null);
+
+      // when
+      jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+      // then
+      Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+      assertThat(authentication).isNull();
+    }
+
+    @Test
+    @DisplayName("authenticate 함수가 실패해서 예외를 던지면 시큐리티 컨텍스트를 초기화하고 인증 에러 핸들러를 실행한다")
+    void fail_shouldHandleExceptionAndCommence_whenAuthenticateFails()
+        throws ServletException, IOException {
+      // given
+      MockHttpServletRequest request = new MockHttpServletRequest();
+      MockHttpServletResponse response = new MockHttpServletResponse();
+      FilterChain filterChain = mock(FilterChain.class);
+
+      String accessToken = "invalidToken";
+      request.addHeader("Authorization", "Bearer " + accessToken);
+      given(jwtUtils.resolveAccessToken(anyString())).willReturn(accessToken);
+
+      BadCredentialsException exception = new BadCredentialsException("Invalid token");
+      given(authenticationManager.authenticate(any(Authentication.class))).willThrow(exception);
+
+      // when & then
+      assertDoesNotThrow(
+          () -> jwtAuthenticationFilter.doFilterInternal(request, response, filterChain));
+
+      Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+      assertThat(authentication).isNull();
+
+      then(authenticationEntryPoint).should(times(1)).commence(request, response, exception);
+      then(filterChain).should(never()).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("올바른 Bearer 토큰이 있으면 인증객체를 SecurityContextHolder에 저장한다")
+    void success_shouldSaveAuthentication_whenTokenIsValid() throws ServletException, IOException {
+      // given
+      MockHttpServletRequest request = new MockHttpServletRequest();
+      MockHttpServletResponse response = new MockHttpServletResponse();
+      FilterChain filterChain = new MockFilterChain();
+
+      String accessToken = "accessToken";
+      request.addHeader("Authorization", "Bearer " + accessToken);
+      given(jwtUtils.resolveAccessToken(anyString())).willReturn(accessToken);
+
+      Authentication expectAuthentication = mock(Authentication.class);
+      given(authenticationManager.authenticate(any())).willReturn(expectAuthentication);
+
+      // when
+      jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+      // then
+      Authentication actual = SecurityContextHolder.getContext().getAuthentication();
+      assertThat(actual).isEqualTo(expectAuthentication);
+    }
   }
 
-  @Test
-  @DisplayName("Authorization 헤더가 없으면 인증을 수행하지 않고 다음 필터로 통과한다")
-  void fail_shouldNotAuthenticate_whenAuthorizationHeaderIsAbsent()
-      throws ServletException, IOException {
-    // given
-    MockHttpServletRequest request = new MockHttpServletRequest();
-    MockHttpServletResponse response = new MockHttpServletResponse();
-    FilterChain filterChain = new MockFilterChain();
-    given(jwtUtils.resolveAccessToken(isNull())).willReturn(null);
+  @Nested
+  class SetAuthenticationManager {
+    @Test
+    @DisplayName("한번 manager가 정해지면 바꾸지 못한다")
+    void success_shouldDontChangeManager_whenOnceRegister() {
+      // given
+      AuthenticationManager first = mock(AuthenticationManager.class);
+      AuthenticationManager second = mock(AuthenticationManager.class);
 
-    // when
-    jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+      jwtAuthenticationFilter.setAuthenticationManager(first);
 
-    // then
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    assertThat(authentication).isNull();
-  }
+      // when
+      jwtAuthenticationFilter.setAuthenticationManager(second);
 
-  @Test
-  @DisplayName("다른 타입의 인증토큰이 있으면 인증을 수행하지 않고 다음 필터로 통과한다")
-  void fail_shouldNotAuthenticate_whenAuthorizationHeaderIsInvalid()
-      throws ServletException, IOException {
-    // given
-    MockHttpServletRequest request = new MockHttpServletRequest();
-    MockHttpServletResponse response = new MockHttpServletResponse();
-    FilterChain filterChain = new MockFilterChain();
+      // then
+      AuthenticationManager currentManager =
+          (AuthenticationManager)
+              ReflectionTestUtils.getField(jwtAuthenticationFilter, "authenticationManager");
 
-    String accessToken = "accessToken";
-    request.addHeader("Authorization", "Basic " + accessToken);
-    given(jwtUtils.resolveAccessToken(anyString())).willReturn(null);
-
-    // when
-    jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
-
-    // then
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    assertThat(authentication).isNull();
-  }
-
-  @Test
-  @DisplayName("authenticate 함수가 실패해서 예외를 던지면 시큐리티 컨텍스트를 초기화하고 인증 에러 핸들러를 실행한다")
-  void fail_shouldHandleExceptionAndCommence_whenAuthenticateFails()
-      throws ServletException, IOException {
-    // given
-    MockHttpServletRequest request = new MockHttpServletRequest();
-    MockHttpServletResponse response = new MockHttpServletResponse();
-    FilterChain filterChain = mock(FilterChain.class);
-
-    String accessToken = "invalidToken";
-    request.addHeader("Authorization", "Bearer " + accessToken);
-    given(jwtUtils.resolveAccessToken(anyString())).willReturn(accessToken);
-
-    BadCredentialsException exception = new BadCredentialsException("Invalid token");
-    given(authenticationManager.authenticate(any(Authentication.class))).willThrow(exception);
-
-    // when & then
-    assertDoesNotThrow(
-        () -> jwtAuthenticationFilter.doFilterInternal(request, response, filterChain));
-
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    assertThat(authentication).isNull();
-
-    then(authenticationEntryPoint).should(times(1)).commence(request, response, exception);
-    then(filterChain).should(never()).doFilter(request, response);
-  }
-
-  @Test
-  @DisplayName("올바른 Bearer 토큰이 있으면 인증객체를 SecurityContextHolder에 저장한다")
-  void success_shouldSaveAuthentication_whenTokenIsValid() throws ServletException, IOException {
-    // given
-    MockHttpServletRequest request = new MockHttpServletRequest();
-    MockHttpServletResponse response = new MockHttpServletResponse();
-    FilterChain filterChain = new MockFilterChain();
-
-    String accessToken = "accessToken";
-    request.addHeader("Authorization", "Bearer " + accessToken);
-    given(jwtUtils.resolveAccessToken(anyString())).willReturn(accessToken);
-
-    Authentication expectAuthentication = mock(Authentication.class);
-    given(authenticationManager.authenticate(any())).willReturn(expectAuthentication);
-
-    // when
-    jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
-
-    // then
-    Authentication actual = SecurityContextHolder.getContext().getAuthentication();
-    assertThat(actual).isEqualTo(expectAuthentication);
+      assertThat(currentManager).isEqualTo(first);
+      assertThat(currentManager).isNotEqualTo(second);
+    }
   }
 }
