@@ -4,10 +4,12 @@ import com.team02.mopl.domain.content.exception.ContentNotFoundException;
 import com.team02.mopl.domain.content.repository.ContentRepository;
 import com.team02.mopl.domain.contentchat.dto.ContentChatDto;
 import com.team02.mopl.domain.contentchat.dto.ContentChatSendRequest;
+import com.team02.mopl.domain.contentchat.exception.NotWatchingContentException;
 import com.team02.mopl.domain.user.dto.UserSummary;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.domain.watching.repository.WatchingSessionRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ public class ContentChatService {
 
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
+  private final WatchingSessionRepository watchingSessionRepository;
 
   // 콘텐츠 채팅 메시지는 영속하지 않고(WebSocket 전용), 발신자 정보를 채워 전파용 DTO만 조립한다.
   @Transactional(readOnly = true)
@@ -31,6 +34,12 @@ public class ContentChatService {
 
     User sender =
         userRepository.findByIdAndDeletedAtIsNull(senderId).orElseThrow(UserNotFoundException::new);
+
+    // 명세상 콘텐츠 채팅은 같은 콘텐츠를 시청 중인 사용자 간의 채팅이므로 활성 시청 세션 참여자만 발신할 수 있다.
+    if (!watchingSessionRepository.existsByContent_IdAndUser_IdAndExitedAtIsNullAndDeletedAtIsNull(
+        contentId, senderId)) {
+      throw new NotWatchingContentException();
+    }
 
     UserSummary summary =
         new UserSummary(sender.getId(), sender.getName(), sender.getProfileImageUrl());
