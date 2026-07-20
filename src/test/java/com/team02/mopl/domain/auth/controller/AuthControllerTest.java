@@ -25,6 +25,7 @@ import com.team02.mopl.domain.auth.dto.ResetPasswordRequest;
 import com.team02.mopl.domain.auth.dto.SignInRequest;
 import com.team02.mopl.domain.auth.entity.MoplUserDetails;
 import com.team02.mopl.domain.auth.exception.AuthException;
+import com.team02.mopl.domain.auth.exception.JwtAccessDeniedHandler;
 import com.team02.mopl.domain.auth.jwt.JwtAuthenticationProvider;
 import com.team02.mopl.domain.auth.jwt.handler.JwtLoginFailureHandler;
 import com.team02.mopl.domain.auth.jwt.handler.JwtLoginSuccessHandler;
@@ -69,7 +70,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 @WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class})
+@Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAccessDeniedHandler.class})
 // 테스트 실행마다 스프링 컨테이너, 시큐리티 환경 다시 빌드
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class AuthControllerTest {

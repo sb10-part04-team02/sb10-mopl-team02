@@ -20,6 +20,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
@@ -39,6 +40,7 @@ public class SecurityConfig {
   private final JwtLoginFailureHandler jwtLoginFailureHandler;
   private final LogoutHandler jwtLogoutHandler;
   private final AuthenticationEntryPoint jwtAuthenticationEntryPoint;
+  private final AccessDeniedHandler jwtAccessDeniedHandler;
 
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http, JwtUtils jwtUtils, Validator validator)
@@ -90,14 +92,25 @@ public class SecurityConfig {
                     .requestMatchers(nonApiMatcher)
                     .permitAll() // swagger, api-docs 대응
 
+                    // 콘텐츠 쓰기(CRUD)는 ADMIN 전용. 메서드 레벨 @PreAuthorize보다 앞선 필터 단계에서 차단해,
+                    // 인증된 USER가 파라미터 바인딩(멀티파트) 이전에 403으로 거부되도록 한다.
+                    .requestMatchers(HttpMethod.POST, "/api/contents")
+                    .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.PATCH, "/api/contents/**")
+                    .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.DELETE, "/api/contents/**")
+                    .hasRole("ADMIN")
+
                     // 외의 것들은 인증 필요
                     .anyRequest()
                     .authenticated())
         .exceptionHandling(
             except ->
                 except
-                    // 토큰이 없거나(익명), 인증에 실패한 채로 보호된 리소스에 접근할 때
-                    .authenticationEntryPoint(jwtAuthenticationEntryPoint));
+                    // 토큰이 없거나(익명), 인증에 실패한 채로 보호된 리소스에 접근할 때 -> 401
+                    .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                    // 인증은 됐으나 권한이 부족할 때 -> 403
+                    .accessDeniedHandler(jwtAccessDeniedHandler));
 
     // jwt 토큰 검증 및 provider
     JwtAuthenticationFilter jwtAuthenticationFilter =

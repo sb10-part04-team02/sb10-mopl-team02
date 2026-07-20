@@ -14,6 +14,7 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.BindException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestCookieException;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @Slf4j
 @RestControllerAdvice
@@ -83,6 +86,30 @@ public class GlobalExceptionHandler {
             e.getClass().getSimpleName(), "잘못된 요청입니다.", Map.of("file", "파일 크기가 허용 한도를 초과했습니다."));
 
     return ResponseEntity.badRequest().body(response);
+  }
+
+  // @RequestPart 필수 파트 누락 / 멀티파트 파싱 실패 시 발생하는 예외 처리
+  @ExceptionHandler({MissingServletRequestPartException.class, MultipartException.class})
+  public ResponseEntity<ErrorResponse> handleMultipart(Exception e) {
+    ErrorResponse response =
+        new ErrorResponse(
+            e.getClass().getSimpleName(),
+            "잘못된 요청입니다.",
+            Map.of("reason", "요청 파트(multipart) 형식이 올바르지 않거나 필수 파트가 누락되었습니다."));
+
+    return ResponseEntity.badRequest().body(response);
+  }
+
+  // consumes 불일치(멀티파트가 아닌 Content-Type 등) 시 발생하는 예외 처리 -> 415
+  @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+  public ResponseEntity<ErrorResponse> handleMediaType(HttpMediaTypeNotSupportedException e) {
+    ErrorResponse response =
+        new ErrorResponse(
+            e.getClass().getSimpleName(),
+            "지원하지 않는 미디어 타입입니다.",
+            Map.of("contentType", String.valueOf(e.getContentType())));
+
+    return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(response);
   }
 
   // @Valid 검증 실패 시 발생하는 예외 처리(BindException이 MethodArgumentNotValidException을 상속)
