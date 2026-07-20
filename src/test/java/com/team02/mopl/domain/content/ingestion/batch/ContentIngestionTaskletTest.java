@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 import com.team02.mopl.domain.content.enums.ContentSource;
 import com.team02.mopl.domain.content.enums.ContentType;
@@ -17,11 +19,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.batch.core.JobExecution;
+import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.scope.context.StepContext;
 import org.springframework.batch.item.ExecutionContext;
+import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.batch.test.MetaDataInstanceFactory;
 
 @ExtendWith(MockitoExtension.class)
@@ -106,5 +112,64 @@ class ContentIngestionTaskletTest {
         .isInstanceOf(ContentFetchException.class)
         .hasMessageContaining("source=TMDB")
         .hasCause(cause);
+  }
+
+  // 어드민 수동 수집은 sources 파라미터로 대상 소스를 한정한다
+  private static StepExecution stepExecutionWithSources(String sources) {
+    JobParameters parameters =
+        new JobParametersBuilder()
+            .addString(ContentIngestionJobConfig.JOB_PARAM_SOURCES, sources)
+            .toJobParameters();
+    JobExecution jobExecution =
+        MetaDataInstanceFactory.createJobExecution(
+            ContentIngestionJobConfig.JOB_NAME, 1L, 1L, parameters);
+    return MetaDataInstanceFactory.createStepExecution(jobExecution, "tmdbStep", 1L);
+  }
+
+  @Test
+  @DisplayName("sources에 자기 소스가 없으면 fetch도 하지 않고 스텝을 건너뛴다")
+  void execute_whenSourceNotSelected_skipsWithoutFetching() {
+    // given - SPORTS_DB만 수집하도록 지정된 Job에서 TMDB 스텝이 도는 상황
+    given(fetcher.source()).willReturn(ContentSource.TMDB);
+    ContentIngestionTasklet tasklet =
+        new ContentIngestionTasklet(fetcher, contentUpsertService, 100);
+
+    StepExecution stepExecution = stepExecutionWithSources("SPORTS_DB");
+    StepContribution contribution = stepExecution.createStepContribution();
+    ChunkContext chunkContext = new ChunkContext(new StepContext(stepExecution));
+
+    // when
+    RepeatStatus status = tasklet.execute(contribution, chunkContext);
+
+    // then - 외부 API 호출 없이 정상 종료된다 (스텝 실패로 오인되면 Job이 FAILED로 강등되므로 FINISHED여야 한다)
+    assertThat(status).isEqualTo(RepeatStatus.FINISHED);
+    then(fetcher).should(never()).fetch();
+    then(contentUpsertService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("sources에 자기 소스가 포함되면 평소대로 수집한다")
+  void execute_whenSourceSelected_collects() {
+    // given - TMDB와 SPORTS_DB를 함께 지정한 Job에서 TMDB 스텝이 도는 상황
+    given(fetcher.source()).willReturn(ContentSource.TMDB);
+    given(fetcher.fetch()).willReturn(List.of(tmdbData("1")));
+    given(contentUpsertService.upsert(any())).willReturn(UpsertResult.INSERTED);
+    ContentIngestionTasklet tasklet =
+        new ContentIngestionTasklet(fetcher, contentUpsertService, 100);
+
+    StepExecution stepExecution = stepExecutionWithSources("TMDB,SPORTS_DB");
+    StepContribution contribution = stepExecution.createStepContribution();
+    ChunkContext chunkContext = new ChunkContext(new StepContext(stepExecution));
+
+    // when
+    RepeatStatus status = tasklet.execute(contribution, chunkContext);
+
+    // then
+    assertThat(status).isEqualTo(RepeatStatus.FINISHED);
+    assertThat(
+            stepExecution
+                .getExecutionContext()
+                .getInt(ContentIngestionTasklet.CONTEXT_KEY_INSERTED))
+        .isEqualTo(1);
   }
 }
