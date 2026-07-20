@@ -6,7 +6,7 @@
 ## 아키텍처
 
 ```text
-Client → CloudFlare(HTTPS) → ALB(HTTP:80)
+Client → CloudFlare(HTTPS) → ALB(HTTPS:443)
           → nginx 서비스 (mopl-nginx-service, desired 1, :8080)
              → Service Connect (app.mopl.local:8080)
                 → app 서비스 (mopl-app-service, desired 2)
@@ -17,6 +17,7 @@ Client → CloudFlare(HTTPS) → ALB(HTTP:80)
 - nginx와 app은 별도 ECS 서비스로 분리되어 있고, nginx가 Service Connect 별칭(`app.mopl.local`)으로 app 인스턴스 2대에 요청을 분산한다.
 - 모든 태스크는 ARM64(Graviton) Fargate에서 실행된다.
 - nginx 서비스는 desired 1이라 교체·장애 시 순단 가능성이 있는 단일 지점이다. 무중단이 필요해지면 nginx도 2대 이상으로 확장한다.
+- 엣지 구간은 CloudFlare가 Full (Strict) 모드로 ALB의 ACM 인증서를 검증하며 종단 간 암호화된다. ALB가 TLS를 종료하고 뒤쪽 nginx로는 VPC 내부에서 HTTP로 전달한다.
 
 ## 이 디렉터리의 파일
 
@@ -69,7 +70,8 @@ CD가 GitHub Secrets/Variables에서 `envsubst`로 주입해 등록한다.
 | ECS 서비스 | `mopl-app-service` | desired 2, Service Connect `app.mopl.local:8080` |
 | ECS 서비스 | `mopl-nginx-service` | desired 1, ALB 타겟 등록 |
 | 태스크 정의 | `mopl-app-task` / `mopl-nginx-task` | ARM64 |
-| ALB | `mopl-alb` | HTTP:80 리스너 → `mopl-nginx-tg`(8080, 헬스체크 `/actuator/health`) |
+| ALB | `mopl-alb` | HTTPS:443 리스너 → `mopl-nginx-tg`(8080, 헬스체크 `/actuator/health`), HTTP:80은 HTTPS로 301 리다이렉트 |
+| 인증서 | ACM (`ap-northeast-2`) | `api.<도메인>` + 와일드카드, DNS 검증·자동 갱신 |
 | RDS | PostgreSQL 16 | `db.t4g.micro`, 스키마는 Flyway가 관리 |
 | ElastiCache | Redis OSS 7.1 | `cache.t4g.micro`, 세션·실시간 Pub/Sub |
 | Kafka | Confluent Cloud | 알림 fan-out (SASL_SSL) |
@@ -80,7 +82,7 @@ CD가 GitHub Secrets/Variables에서 `envsubst`로 주입해 등록한다.
 
 | 이름 | 역할 | 인바운드 |
 |---|---|---|
-| `mopl-alb-sg` | ALB | 인터넷 80/443 |
+| `mopl-alb-sg` | ALB | CloudFlare IPv4 대역 80/443 (관리형 접두사 목록 `cloudflare-ipv4` 참조) |
 | `mopl-ecs-sg` | ECS 태스크 | `mopl-alb-sg` → 8080, self → 8080 (nginx → app) |
 | `mopl-rds-sg` | RDS | `mopl-ecs-sg` → 5432 |
 | `mopl-redis-sg` | Redis | `mopl-ecs-sg` → 6379 |
