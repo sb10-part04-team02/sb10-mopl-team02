@@ -103,6 +103,7 @@ docker exec sb10-mopl-team02-db-1 psql -U mopl_user -d mopl_db -f /tmp/dummy/01_
 - **결정적 UUID**: `duuid(접두사, n)` = `d00000XX-0000-4000-8000-<n의 hex>`. FK를 조인 없이 산술식으로 재계산하고, cleanup이 PK range scan 1회로 끝난다.
 - **유니크 페어**: (작성자 x 콘텐츠) 등은 서로소 stride(99991, 소수)로 뽑아 중복이 수학적으로 불가능. ON CONFLICT 불필요, 행 수 결정적.
 - **direct_messages의 sender/receiver는 users가 아니라 conversation_members.id를 참조**한다. 멤버 id를 대화 번호의 함수(2n-1, 2n)로 고정해 해결.
+- **SPORT 콘텐츠 제목**은 영화/드라마와 달리 "리그 N라운드 홈팀 vs 원정팀" 형식으로 생성한다(K리그1/KBO/KBL/LCK, 종목별 8팀 풀). 스포츠 순번 `s=c/10`을 인덱스로 써 4개 리그/8팀이 균등 분포하고 홈 != 원정을 보장한다.
 - 소요 시간(풀 규모): 아래 "적재 기록" 참고.
 
 ## 적재 기록
