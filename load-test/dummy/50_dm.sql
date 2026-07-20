@@ -27,7 +27,7 @@ SELECT pg_temp.duuid('d0000009', 2 * n - 1 + side),
             ELSE pg_temp.duuid('d0000001', 1 + ((n - 1 + 1 + (n % (:n_users / 2))) % :n_users))
        END,
        CASE WHEN (n + side) % 2 = 0
-            THEN now() - random() * interval '1 day'
+            THEN GREATEST(cv.created_at, now() - random() * interval '1 day')
             ELSE cv.created_at + random() * 0.3 * (now() - cv.created_at)
        END
 FROM generate_series(1, :n_conversations) AS n
