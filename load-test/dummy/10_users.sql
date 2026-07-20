@@ -25,28 +25,45 @@ VALUES (pg_temp.duuid('d0000001', 0),
         '더미관리자', 'dummy_admin@mopl.test', :'DUMMY_PW_HASH',
         NULL, 'ADMIN', false);
 
--- 일반 유저 (티어 0: now()-24개월 ~ now()-12개월)
+-- 일반 유저: 가입 시각은 24개월 전 ~ 현재, 최근일수록 밀도가 높은 성장 곡선(random^1.5).
+-- 이름은 실명형(성+이름, 약 86%)과 닉네임형(약 14%)을 섞는다. name 은 유니크 제약이 없어 중복 허용.
 INSERT INTO users (id, created_at, updated_at, deleted_at, name, email, password, profile_image_url, role, is_locked)
 SELECT pg_temp.duuid('d0000001', n),
        ts.t, ts.t, NULL,
-       (ARRAY['김','이','박','최','정','강','조','윤','장','임'])[1 + (n % 10)]
-         || (ARRAY['민준','서연','도윤','지우','하준','서준','하은','지호','수아','예준','시우','지아'])[1 + ((n / 10) % 12)]
-         || lpad(n::text, 6, '0'),
+       CASE WHEN n % 7 <> 0
+            THEN (ARRAY['김','이','박','최','정','강','조','윤','장','임','한','오','서','신','권','황','안','송','전','홍'])[1 + (n % 20)]
+                   || (ARRAY['민준','서연','도윤','지우','하준','서준','하은','지호','수아','예준','시우','지아',
+                             '은우','채원','유준','다은','건우','소율','현우','지민','우진','서현','준서','예은',
+                             '도현','시은','지환','하린','승우','유나','정우','가은','민재','윤서','태윤','서윤',
+                             '지훈','나윤','준혁','예린'])[1 + ((n / 20 * 11) % 40)]
+            ELSE (ARRAY['무비홀릭','정주행장인','팝콘성애자','밤샘시청러','시네필','드라마덕후','스포츠광','하이라이트봇',
+                        '리뷰요정','별점자판기','소파감자','주말집돌이','극장죽돌이','OST수집가','스포주의보','결말맛집',
+                        '자막없이본다','몰아보기달인','채널고정','본방사수','눈물버튼','킬링타임러','명대사수집가','N차관람러',
+                        '쿠키영상지킴이','롤드컵직관러','야구장단골','축덕후','이불속관객','새벽두시감성','플리장인','알고리즘노예',
+                        '취향존중','숨은명작발굴단','정속재생거부','엔딩크레딧까지'])[1 + ((n / 7 * 5) % 36)]
+       END,
        'dummy_bulk_' || lpad(n::text, 7, '0') || '@mopl.test',
        :'DUMMY_PW_HASH',
        'https://picsum.photos/seed/u' || n || '/200/200',
        'USER', false
 FROM generate_series(1, :n_users) AS n
-CROSS JOIN LATERAL (SELECT now() - interval '24 months' + random() * interval '365 days' AS t) ts;
+-- seed 컬럼: n 을 참조해 LATERAL 을 상관 서브쿼리로 만든다.
+-- (비상관 LATERAL 의 random() 은 PG가 1회만 평가해 전 행이 같은 값을 갖게 된다)
+CROSS JOIN LATERAL (
+  SELECT n AS seed,
+         LEAST(now() - interval '1 hour',
+               pg_temp.dhour(now() - interval '24 months' * power(random(), 1.5))) AS t
+) ts;
 
--- 소셜 계정 (유저 1~n_social_accounts, GOOGLE/KAKAO 교대. 티어 1)
+-- 소셜 계정 (유저 1~n_social_accounts, GOOGLE/KAKAO 교대. 해당 유저 가입 이후 시각)
 INSERT INTO social_accounts (id, created_at, deleted_at, user_id, provider, provider_user_id)
 SELECT pg_temp.duuid('d000000e', n),
-       now() - interval '12 months' + random() * interval '6 months',
+       pg_temp.dchild(u.created_at, now()),
        NULL,
-       pg_temp.duuid('d0000001', n),
+       u.id,
        CASE WHEN n % 2 = 0 THEN 'GOOGLE' ELSE 'KAKAO' END,
        'dummy-' || (CASE WHEN n % 2 = 0 THEN 'google' ELSE 'kakao' END) || '-' || n
-FROM generate_series(1, :n_social_accounts) AS n;
+FROM generate_series(1, :n_social_accounts) AS n
+JOIN users u ON u.id = pg_temp.duuid('d0000001', n);
 
 COMMIT;

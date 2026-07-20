@@ -14,7 +14,8 @@ SELECT tbl, actual, expected, (actual = expected) AS ok FROM (
          :n_contents
   UNION ALL SELECT 'tags',
          (SELECT count(*) FROM tags WHERE id BETWEEN pg_temp.duuid('d000000d', 0) AND 'd000000d-ffff-ffff-ffff-ffffffffffff'),
-         :n_contents * 5
+         (SELECT sum(CASE WHEN c % 10 = 9 THEN 2 ELSE 2 + (c % 3) END)
+          FROM generate_series(1, :n_contents) AS c)
   UNION ALL SELECT 'social_accounts',
          (SELECT count(*) FROM social_accounts WHERE id BETWEEN pg_temp.duuid('d000000e', 0) AND 'd000000e-ffff-ffff-ffff-ffffffffffff'),
          :n_social_accounts
@@ -26,8 +27,13 @@ SELECT tbl, actual, expected, (actual = expected) AS ok FROM (
   UNION ALL SELECT 'follows',
          (SELECT count(*) FROM follows WHERE id BETWEEN pg_temp.duuid('d0000004', 0) AND 'd0000004-ffff-ffff-ffff-ffffffffffff'),
          (WITH w AS (SELECT f, power(f::float, -0.5) AS wt FROM generate_series(1, :n_users) AS f),
-               tot AS (SELECT sum(wt) AS s FROM w)
-          SELECT sum(LEAST(:n_users - 1, GREATEST(1, round(:n_follows_target * w.wt / tot.s)))::int) FROM w, tot)
+               tot AS (SELECT sum(wt) AS s FROM w),
+               per_f AS (SELECT w.f, LEAST(:n_users - 1, GREATEST(1, round(:n_follows_target * w.wt / tot.s)))::int AS cnt FROM w, tot)
+          SELECT count(*) FROM per_f pf
+          CROSS JOIN LATERAL generate_series(1, pf.cnt) AS k
+          WHERE (CASE WHEN k = 1 OR k * 10 <= pf.cnt * 3
+                      THEN 1 + ((pf.f + k::bigint * 99991) % :n_celebs)
+                      ELSE :n_celebs + 1 + ((pf.f + k::bigint * 99991) % (:n_users - :n_celebs)) END) <> pf.f)
   UNION ALL SELECT 'playlists',
          (SELECT count(*) FROM playlists WHERE id BETWEEN pg_temp.duuid('d0000005', 0) AND 'd0000005-ffff-ffff-ffff-ffffffffffff'),
          :n_playlists
@@ -128,7 +134,7 @@ WHERE r.id BETWEEN pg_temp.duuid('d0000003', 0) AND 'd0000003-ffff-ffff-ffff-fff
 
 \echo ''
 \echo '=== 4) 분포 확인 (육안) ==='
-\echo '--- rating 히스토그램 (3.5 중심 삼각분포) ---'
+\echo '--- rating 히스토그램 (정수 1~5, 4~5 편중 J-curve) ---'
 SELECT rating, count(*) AS cnt
 FROM reviews
 WHERE id BETWEEN pg_temp.duuid('d0000003', 0) AND 'd0000003-ffff-ffff-ffff-ffffffffffff'
@@ -146,9 +152,24 @@ FROM playlists
 WHERE id BETWEEN pg_temp.duuid('d0000005', 0) AND 'd0000005-ffff-ffff-ffff-ffffffffffff'
 ORDER BY subscriber_count DESC LIMIT 5;
 
-\echo '--- 활성 시청 세션 비율 (약 10% 기대) ---'
+\echo '--- 활성 시청 세션 비율 (약 10% 기대) / 활성 세션은 전부 최근 4시간 내 참여여야 함 ---'
 SELECT count(*) FILTER (WHERE exited_at IS NULL) AS active,
        count(*) AS total,
-       round(100.0 * count(*) FILTER (WHERE exited_at IS NULL) / count(*), 1) AS active_pct
+       round(100.0 * count(*) FILTER (WHERE exited_at IS NULL) / count(*), 1) AS active_pct,
+       count(*) FILTER (WHERE exited_at IS NULL AND joined_at < now() - interval '5 hours') AS stale_active
 FROM watching_sessions
 WHERE id BETWEEN pg_temp.duuid('d000000c', 0) AND 'd000000c-ffff-ffff-ffff-ffffffffffff';
+
+\echo '--- 최근 7일 활동량 (시간 분포가 현재까지 이어지는지: 모두 0보다 커야 자연스러움) ---'
+SELECT (SELECT count(*) FROM users
+        WHERE id BETWEEN pg_temp.duuid('d0000001', 0) AND 'd0000001-ffff-ffff-ffff-ffffffffffff'
+          AND created_at > now() - interval '7 days') AS new_users_7d,
+       (SELECT count(*) FROM reviews
+        WHERE id BETWEEN pg_temp.duuid('d0000003', 0) AND 'd0000003-ffff-ffff-ffff-ffffffffffff'
+          AND created_at > now() - interval '7 days') AS reviews_7d,
+       (SELECT count(*) FROM direct_messages
+        WHERE id BETWEEN pg_temp.duuid('d000000a', 0) AND 'd000000a-ffff-ffff-ffff-ffffffffffff'
+          AND created_at > now() - interval '7 days') AS dms_7d,
+       (SELECT count(*) FROM notifications
+        WHERE id BETWEEN pg_temp.duuid('d000000b', 0) AND 'd000000b-ffff-ffff-ffff-ffffffffffff'
+          AND created_at > now() - interval '7 days') AS notifications_7d;
