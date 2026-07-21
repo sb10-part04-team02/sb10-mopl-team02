@@ -14,6 +14,7 @@ import com.team02.mopl.domain.content.enums.ContentSource;
 import com.team02.mopl.domain.content.ingestion.ExternalContentData;
 import com.team02.mopl.domain.content.ingestion.backfill.BackfillCursorService;
 import com.team02.mopl.domain.content.ingestion.backfill.BackfillCursorService.CursorState;
+import com.team02.mopl.domain.content.ingestion.exception.TmdbApiException;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbMovieDto;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbPageResponse;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbTvDto;
@@ -175,6 +176,39 @@ class TmdbBackfillContentFetcherTest {
 
     then(tmdbClient).should().discoverMovies(eq(1), any());
     then(tmdbClient).should(never()).discoverMovies(eq(2), any());
+  }
+
+  @Test
+  @DisplayName("첫 페이지 조회가 실패해 아무 데이터도 못 얻으면 커서를 전진시키지 않는다")
+  void backfill_whenFirstPageFails_keepsCursor() {
+    LocalDate cursor = LocalDate.of(2020, 6, 1);
+    given(cursorService.read(TmdbMediaType.MOVIE)).willReturn(new CursorState(cursor, false));
+    given(cursorService.read(TmdbMediaType.TV)).willReturn(new CursorState(null, false));
+    // 첫 페이지부터 API 실패 -> 확보한 개봉일이 없으므로 강제 전진 시 실패 구간이 영구 누락된다
+    given(tmdbClient.discoverMovies(eq(1), any()))
+        .willThrow(new TmdbApiException(new RuntimeException("일시 오류")));
+    noTv();
+
+    fetcher.fetch();
+
+    then(cursorService).should(never()).advance(eq(TmdbMediaType.MOVIE), any(), anyBoolean());
+  }
+
+  @Test
+  @DisplayName("후속 페이지에서 실패해도 앞 페이지에서 데이터를 얻었으면 최소 개봉일로 전진한다")
+  void backfill_whenLaterPageFailsButDataSeen_advances() {
+    given(cursorService.read(TmdbMediaType.MOVIE)).willReturn(new CursorState(null, false));
+    given(cursorService.read(TmdbMediaType.TV)).willReturn(new CursorState(null, false));
+    given(tmdbClient.discoverMovies(eq(1), any()))
+        .willReturn(moviePage(9, movie(1, "2026-05-10"), movie(2, "2026-03-01")));
+    given(tmdbClient.discoverMovies(eq(2), any()))
+        .willThrow(new TmdbApiException(new RuntimeException("일시 오류")));
+    noTv();
+
+    fetcher.fetch();
+
+    // 1페이지에서 본 최소 개봉일 2026-03-01로 정상 전진 (실패해도 확보한 데이터는 반영)
+    then(cursorService).should().advance(TmdbMediaType.MOVIE, LocalDate.of(2026, 3, 1), false);
   }
 
   @Test

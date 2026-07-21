@@ -27,6 +27,7 @@ import org.springframework.stereotype.Component;
 //   응답의 최소 개봉일을 다음 커서로 저장해 매 실행 과거로 한 칸씩 내려간다
 // - 경계 날짜는 inclusive로 다시 요청한다
 // - 한 날짜에 데이터가 몰려(특정 날짜 데이터로 꽉 참) 커서가 안 내려가면 하루를 빼서 강제 전진한다
+// - 단, 첫 페이지부터 fetch가 실패해 아무 데이터도 못 얻으면 커서를 유지해 다음 실행에서 같은 지점을 재시도한다
 // - floor-date까지 내려가면 backfillComplete로 표시해 이후 실행은 건너뛴다
 @Slf4j
 @Component
@@ -108,6 +109,7 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
     LocalDate base = (lte != null) ? lte : LocalDate.now(); // 전진/정체 판정 기준
     LocalDate minSeen = null;
     int pagesPerRun = properties.backfill().pagesPerRun();
+    boolean fetchFailed = false;
 
     for (int page = 1; page <= pagesPerRun; page++) {
       TmdbPageResponse<T> response;
@@ -116,6 +118,7 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
       } catch (ExternalApiException e) {
         log.warn(
             "discover backfill 페이지 수집 실패로 이번 매체를 중단합니다. mediaType={}, page={}", mediaType, page, e);
+        fetchFailed = true;
         break;
       }
       if (response.results().isEmpty()) {
@@ -131,6 +134,13 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
       if (page >= response.totalPages()) {
         break; // 마지막 페이지 도달
       }
+    }
+
+    // fetch 실패로 아무 날짜도 확보하지 못했으면 커서를 유지해 다음 실행에서 같은 지점부터 재시도한다.
+    // (강제 전진하면 실패 구간의 콘텐츠가 영구 누락된다. 데이터 소진과 달리 재조회 대상이 남아 있다)
+    if (fetchFailed && minSeen == null) {
+      log.warn("discover backfill 수집 실패로 커서를 유지합니다. mediaType={}", mediaType);
+      return;
     }
 
     advanceCursor(mediaType, base, minSeen);
