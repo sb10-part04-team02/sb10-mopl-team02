@@ -67,12 +67,14 @@ abstract class AbstractTmdbMapper<T> implements ExternalContentMapper<T> {
       return Optional.empty();
     }
     // discover backfill: 썸네일/줄거리가 실제로 있는 항목만 수집 (폴백으로 채우지 않음)
+    // 오래되거나 덜 알려진 작품일수록 흔한 정상 필터링이라 debug로 남긴다.
+    // 매체별 제외 건수는 TmdbBackfillContentFetcher가 실행마다 한 줄로 요약한다
     if (requireCompleteMedia && !StringUtils.hasText(posterPath)) {
-      log.warn("discover backfill: 포스터가 없어 건너뜁니다. type={}, id={}", contentType, id);
+      log.debug("discover backfill: 포스터가 없어 건너뜁니다. type={}, id={}", contentType, id);
       return Optional.empty();
     }
     if (requireCompleteMedia && !StringUtils.hasText(overview)) {
-      log.warn("discover backfill: 줄거리가 없어 건너뜁니다. type={}, id={}", contentType, id);
+      log.debug("discover backfill: 줄거리가 없어 건너뜁니다. type={}, id={}", contentType, id);
       return Optional.empty();
     }
 
