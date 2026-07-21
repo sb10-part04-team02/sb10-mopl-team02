@@ -132,6 +132,77 @@ class TmdbClientTest {
   }
 
   @Test
+  @DisplayName("discoverMovies는 개봉일 내림차순 정렬과 상한(primary_release_date.lte) 파라미터로 호출한다")
+  void discoverMovies_buildsDiscoverQueryWithUpperBound() {
+    // given
+    server
+        .expect(
+            requestTo(
+                Matchers.allOf(
+                    Matchers.startsWith(BASE_URL + "/discover/movie"),
+                    Matchers.containsString("sort_by=primary_release_date.desc"),
+                    Matchers.containsString("primary_release_date.lte=2020-01-15"))))
+        .andExpect(method(HttpMethod.GET))
+        .andExpect(header("Authorization", "Bearer test-token"))
+        .andExpect(queryParam("language", "ko-KR"))
+        .andExpect(queryParam("page", "1"))
+        .andExpect(queryParam("include_adult", "false"))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "page": 1,
+                  "results": [
+                    {"id": 550, "title": "파이트 클럽", "release_date": "2020-01-15", "genre_ids": [18]}
+                  ],
+                  "total_pages": 10
+                }
+                """,
+                MediaType.APPLICATION_JSON));
+
+    // when
+    TmdbPageResponse<TmdbMovieDto> response =
+        tmdbClient.discoverMovies(1, LocalDate.of(2020, 1, 15));
+
+    // then
+    assertThat(response.results().get(0).releaseDate()).isEqualTo("2020-01-15");
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("discoverTv는 first_air_date 필드로 정렬하고, lte가 null이면 상한 파라미터 없이 최신부터 조회한다")
+  void discoverTv_whenLteNull_omitsUpperBound() {
+    // given
+    server
+        .expect(
+            requestTo(
+                Matchers.allOf(
+                    Matchers.startsWith(BASE_URL + "/discover/tv"),
+                    Matchers.containsString("sort_by=first_air_date.desc"),
+                    Matchers.not(Matchers.containsString("first_air_date.lte")))))
+        .andExpect(queryParam("page", "1"))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "page": 1,
+                  "results": [
+                    {"id": 1399, "name": "왕좌의 게임", "first_air_date": "2011-04-17", "genre_ids": [10765]}
+                  ],
+                  "total_pages": 5
+                }
+                """,
+                MediaType.APPLICATION_JSON));
+
+    // when
+    TmdbPageResponse<TmdbTvDto> response = tmdbClient.discoverTv(1, null);
+
+    // then
+    assertThat(response.results().get(0).firstAirDate()).isEqualTo("2011-04-17");
+    server.verify();
+  }
+
+  @Test
   @DisplayName("fetchMovieGenres는 장르 목록을 id-이름 Map으로 변환한다")
   void fetchMovieGenres_returnsIdToNameMap() {
     // given
