@@ -27,7 +27,7 @@
         { "name": "REDIS_PORT", "value": "6379" },
         { "name": "ADMIN_EMAIL", "value": "${ADMIN_EMAIL}" },
         { "name": "ADMIN_NAME", "value": "${ADMIN_NAME}" },
-        { "name": "INGESTION_SCHEDULER_ENABLED", "value": "false" },
+        { "name": "INGESTION_SCHEDULER_ENABLED", "value": "true" },
         { "name": "AWS_S3_BUCKET", "value": "${AWS_S3_BUCKET}" },
         { "name": "AWS_S3_REGION", "value": "${AWS_S3_REGION}" },
         { "name": "AWS_S3_BASE_URL", "value": "${AWS_S3_BASE_URL}" },
@@ -45,7 +45,8 @@
         { "name": "GOOGLE_CLIENT_ID", "valueFrom": "${GOOGLE_CLIENT_ID_SECRET_ARN}" },
         { "name": "GOOGLE_CLIENT_SECRET", "valueFrom": "${GOOGLE_CLIENT_SECRET_SECRET_ARN}" },
         { "name": "KAKAO_CLIENT_ID", "valueFrom": "${KAKAO_CLIENT_ID_SECRET_ARN}" },
-        { "name": "KAKAO_CLIENT_SECRET", "valueFrom": "${KAKAO_CLIENT_SECRET_SECRET_ARN}" }
+        { "name": "KAKAO_CLIENT_SECRET", "valueFrom": "${KAKAO_CLIENT_SECRET_SECRET_ARN}" },
+        { "name": "TMDB_ACCESS_TOKEN", "valueFrom": "${TMDB_ACCESS_TOKEN_SECRET_ARN}" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"],

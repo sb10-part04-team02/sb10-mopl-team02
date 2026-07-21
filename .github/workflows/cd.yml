@@ -148,6 +148,7 @@ jobs:
           GOOGLE_CLIENT_SECRET_SECRET_ARN: ${{ secrets.GOOGLE_CLIENT_SECRET_SECRET_ARN }}
           KAKAO_CLIENT_ID_SECRET_ARN: ${{ secrets.KAKAO_CLIENT_ID_SECRET_ARN }}
           KAKAO_CLIENT_SECRET_SECRET_ARN: ${{ secrets.KAKAO_CLIENT_SECRET_SECRET_ARN }}
+          TMDB_ACCESS_TOKEN_SECRET_ARN: ${{ secrets.TMDB_ACCESS_TOKEN_SECRET_ARN }}
         run: |
           DEFINED_VARS=$(env | cut -d= -f1 | awk '{printf "${%s} ", $1}')
           envsubst "$DEFINED_VARS" < deploy/ecs/task-definition-app.json > /tmp/task-def-app.json
