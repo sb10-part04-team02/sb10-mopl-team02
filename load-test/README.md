@@ -66,6 +66,23 @@ docker compose --env-file .env exec -T db \
   < load-test/seed/seed-content-read.sql
 ```
 
+### 6. 대용량 더미 데이터 시나리오 (리뷰/플리/구독 편중 부하)
+
+`review-read.js`·`playlist-read.js`·`review-write.js`·`subscribe-write.js` 는 위 소량 시드가 아니라 **`load-test/dummy/` 의 대용량 세트**(약 535만 행, 멱법칙/Zipf 편중)를 전제로 한다. read 는 편중 조회 성능을, write 두 시나리오는 비정규화 카운트 UPDATE 락 경합(리뷰=`average_rating` 재집계, 구독=`subscriber_count`)을 `hotspot`/`spread` 대조로 잰다. 이 시나리오들만의 추가 준비:
+
+```bash
+# a) 더미 데이터 적재 (load-test/dummy/README.md 참고). 쓰기 시나리오가 데이터를 변형하므로 전용 DB 권장.
+#    적재 전 SCALE=0.01 로 스모크 후 SCALE=1.0 본 적재.
+docker cp load-test/dummy sb10-mopl-team02-db-1:/tmp/dummy
+docker exec sb10-mopl-team02-db-1 psql -U mopl_user -d mopl_db -f /tmp/dummy/00_load_all.sql
+
+# b) 더미 로그인 계정 목록 생성 (이미 DB에 있는 계정을 pickDummyUser 가 읽을 형태로).
+#    seed-users.js 와 달리 API 로 만들지 않고 목록화만 한다. 인자 = 계정 수(적재 SCALE 이하).
+node load-test/gen-dummy-users.mjs 100000     # → data/dummy-users.json (gitignore 대상)
+```
+
+더미 계정은 `dummy_bulk_NNNNNNN@mopl.test` / `password1!`(더미 세트가 넣은 공통 비번). 위 준비 후 실행법은 "실행" 절과 각 시나리오 파일 상단 주석 참고. write 시나리오는 부하 후 `dummy/90_verify.sql` 2번 섹션(비정규화 집계 정합)으로 검증한다 — 구독은 `subscriber_count_mismatch=0`, 리뷰는 create/delete 짝이 맞으면 `review_agg_mismatch=0`.
+
 ## 실행
 
 시나리오 파일만 바꿔 끼우면 된다. 프로파일은 `-e CONFIG` 로 고른다.
