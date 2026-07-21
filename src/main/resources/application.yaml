@@ -157,7 +157,7 @@ app:
     run-on-startup: false  # true면 기동 시 1회 전체 소스 수집 실행 (검증/수동 실행용)
     scheduler:
       enabled: ${INGESTION_SCHEDULER_ENABLED:false}  # 기본 off. 테스트/로컬에서 실행 방지
-      cron: ${INGESTION_SCHEDULER_CRON:0 0 4 * * *}  # 일간 popular 수집 주기
+      cron: ${INGESTION_SCHEDULER_CRON:0 10 4 * * *}  # 일간 popular 수집 주기 (매시 정각 백필과 겹치지 않도록 04:10)
       backfill-cron: ${INGESTION_SCHEDULER_BACKFILL_CRON:0 0 * * * *}  # 시간별 discover backfill 주기 (매시 정각)
       lock-ttl: 30m  # 중복 실행 방지 락 TTL (최대 수집 소요보다 넉넉히)
   jwt:
