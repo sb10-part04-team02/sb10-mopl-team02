@@ -11,6 +11,7 @@ import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbMovieDto;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbPageResponse;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbTvDto;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +33,9 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 public class TmdbBackfillContentFetcher implements ContentFetcher {
+
+  // 첫 실행의 시작 상한(오늘) 기준 타임존. 스케줄러(@Scheduled zone)와 같은 값으로 맞춘다
+  private static final ZoneId INGESTION_ZONE = ZoneId.of("Asia/Seoul");
 
   private final TmdbClient tmdbClient;
   private final TmdbProperties properties;
@@ -105,11 +109,16 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
       return;
     }
 
-    LocalDate lte = state.cursorDate(); // null이면 상한 없이 최신부터 (첫 실행)
-    LocalDate base = (lte != null) ? lte : LocalDate.now(); // 전진/정체 판정 기준
+    // 커서가 없는 첫 실행도 오늘을 상한으로 둔다. 상한을 비우면 개봉 예정작(미래 날짜)부터 내려오는데,
+    // 그 날짜는 판정 기준인 오늘보다 뒤라 advanceCursor가 진전 없음으로 보고 커서를 어제로 내린다.
+    // 커서는 과거로만 가므로 그 사이 구간(오늘 ~ 미래 개봉작)은 이후 어느 실행에서도 조회되지 않는다.
+    LocalDate lte =
+        (state.cursorDate() != null) ? state.cursorDate() : LocalDate.now(INGESTION_ZONE);
     LocalDate minSeen = null;
     int pagesPerRun = properties.backfill().pagesPerRun();
     boolean fetchFailed = false;
+    int seen = 0; // 응답으로 받은 항목 수 (수집 제외분 포함)
+    int collectedBefore = results.size(); // results는 매체 간 누적이라 이번 매체 몫만 세려면 기준점이 필요
 
     for (int page = 1; page <= pagesPerRun; page++) {
       TmdbPageResponse<T> response;
@@ -125,6 +134,7 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
         break; // 더 내려갈 데이터 없음
       }
       for (T item : response.results()) {
+        seen++;
         mapper.map(item).ifPresent(results::add);
         LocalDate date = parseDate(rawDateExtractor.apply(item));
         if (date != null && (minSeen == null || date.isBefore(minSeen))) {
@@ -136,6 +146,17 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
       }
     }
 
+    // 항목별 제외 사유는 debug라, 매체별 결과는 이 한 줄로 요약한다.
+    // excluded가 seen에 육박하면 strict 필터(포스터/줄거리 필수)가 과한지 의심해볼 지점이다
+    int collected = results.size() - collectedBefore;
+    log.info(
+        "discover backfill 매체 조회 완료. mediaType={}, lte={}, seen={}, collected={}, excluded={}",
+        mediaType,
+        lte,
+        seen,
+        collected,
+        seen - collected);
+
     // fetch 실패로 아무 날짜도 확보하지 못했으면 커서를 유지해 다음 실행에서 같은 지점부터 재시도한다.
     // (강제 전진하면 실패 구간의 콘텐츠가 영구 누락된다. 데이터 소진과 달리 재조회 대상이 남아 있다)
     if (fetchFailed && minSeen == null) {
@@ -143,7 +164,7 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
       return;
     }
 
-    advanceCursor(mediaType, base, minSeen);
+    advanceCursor(mediaType, lte, minSeen);
   }
 
   // 커서를 이번 실행이 도달한 지점으로 전진시킨다.

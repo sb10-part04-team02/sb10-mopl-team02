@@ -20,6 +20,7 @@ import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbPageResponse;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbTvDto;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,7 +81,24 @@ class TmdbBackfillContentFetcherTest {
   }
 
   @Test
-  @DisplayName("커서가 없으면 상한 없이 최신부터 조회하고, 응답의 최소 개봉일로 커서를 전진시킨다")
+  @DisplayName("커서가 없는 첫 실행은 오늘을 상한으로 조회한다")
+  void backfill_firstRun_startsFromToday() {
+    LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+    given(cursorService.read(TmdbMediaType.MOVIE)).willReturn(new CursorState(null, false));
+    given(cursorService.read(TmdbMediaType.TV)).willReturn(new CursorState(null, false));
+    given(tmdbClient.discoverMovies(anyInt(), any()))
+        .willReturn(moviePage(1, movie(1, today.toString())));
+    noTv();
+
+    fetcher.fetch();
+
+    // 상한이 null이면 미래 개봉일부터 내려와 커서가 어제로 밀리고, 그 사이 구간이 누락된다
+    then(tmdbClient).should().discoverMovies(1, today);
+    then(cursorService).should().advance(TmdbMediaType.MOVIE, today.minusDays(1), false);
+  }
+
+  @Test
+  @DisplayName("커서가 없으면 오늘부터 조회하고, 응답의 최소 개봉일로 커서를 전진시킨다")
   void backfill_firstRun_advancesCursorToMinDate() {
     given(cursorService.read(TmdbMediaType.MOVIE)).willReturn(new CursorState(null, false));
     given(cursorService.read(TmdbMediaType.TV)).willReturn(new CursorState(null, false));
