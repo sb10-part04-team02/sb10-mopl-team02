@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
+import com.team02.mopl.domain.content.ingestion.batch.IngestionMode;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -69,5 +70,37 @@ class IngestionRunLockTest {
     then(redisTemplate)
         .should()
         .execute(any(RedisScript.class), eq(List.of("ingestion:collect:lock")), eq("token"));
+  }
+
+  @Test
+  @DisplayName("모드 오버로드는 모드별 접미 키로 획득한다 (DAILY/HOURLY가 서로 다른 키)")
+  void tryAcquire_withMode_usesModeSpecificKey() {
+    // given
+    given(redisTemplate.opsForValue()).willReturn(valueOperations);
+    given(
+            valueOperations.setIfAbsent(
+                eq("ingestion:collect:lock:" + IngestionMode.HOURLY.name()), anyString(), eq(TTL)))
+        .willReturn(true);
+
+    // when
+    String token = runLock.tryAcquire(IngestionMode.HOURLY, TTL);
+
+    // then
+    assertThat(token).isNotNull();
+  }
+
+  @Test
+  @DisplayName("모드 오버로드 해제는 모드별 접미 키로 스크립트를 실행한다")
+  void release_withMode_usesModeSpecificKey() {
+    // when
+    runLock.release(IngestionMode.DAILY, "token");
+
+    // then
+    then(redisTemplate)
+        .should()
+        .execute(
+            any(RedisScript.class),
+            eq(List.of("ingestion:collect:lock:" + IngestionMode.DAILY.name())),
+            eq("token"));
   }
 }
