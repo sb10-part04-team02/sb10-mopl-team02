@@ -42,4 +42,3 @@ app:
   ingestion:
     scheduler:
       enabled: ${INGESTION_SCHEDULER_ENABLED:true}
-      cron: ${INGESTION_SCHEDULER_CRON:0 0 4 * * *}

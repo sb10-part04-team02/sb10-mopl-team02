@@ -29,12 +29,23 @@ abstract class AbstractTmdbMapper<T> implements ExternalContentMapper<T> {
   private final Map<Integer, String> genreNames;
   private final String imageBaseUrl;
   private final String defaultThumbnailUrl;
+  // true면 포스터/줄거리가 없는 응답을 폴백으로 채우지 않고 건너뛴다 (discover backfill 전용)
+  private final boolean requireCompleteMedia;
 
   protected AbstractTmdbMapper(
       Map<Integer, String> genreNames, String imageBaseUrl, String defaultThumbnailUrl) {
+    this(genreNames, imageBaseUrl, defaultThumbnailUrl, false);
+  }
+
+  protected AbstractTmdbMapper(
+      Map<Integer, String> genreNames,
+      String imageBaseUrl,
+      String defaultThumbnailUrl,
+      boolean requireCompleteMedia) {
     this.genreNames = Map.copyOf(genreNames);
     this.imageBaseUrl = imageBaseUrl;
     this.defaultThumbnailUrl = defaultThumbnailUrl;
+    this.requireCompleteMedia = requireCompleteMedia;
   }
 
   // externalIdPrefix: TMDB의 movie id와 tv id는 서로 독립된 시퀀스라 같은 숫자가 다른 작품을 가리킬 수 있음
@@ -53,6 +64,17 @@ abstract class AbstractTmdbMapper<T> implements ExternalContentMapper<T> {
     }
     if (!StringUtils.hasText(title)) {
       log.warn("TMDB 응답에 제목이 없어 건너뜁니다. type={}, id={}", contentType, id);
+      return Optional.empty();
+    }
+    // discover backfill: 썸네일/줄거리가 실제로 있는 항목만 수집 (폴백으로 채우지 않음)
+    // 오래되거나 덜 알려진 작품일수록 흔한 정상 필터링이라 debug로 남긴다.
+    // 매체별 제외 건수는 TmdbBackfillContentFetcher가 실행마다 한 줄로 요약한다
+    if (requireCompleteMedia && !StringUtils.hasText(posterPath)) {
+      log.debug("discover backfill: 포스터가 없어 건너뜁니다. type={}, id={}", contentType, id);
+      return Optional.empty();
+    }
+    if (requireCompleteMedia && !StringUtils.hasText(overview)) {
+      log.debug("discover backfill: 줄거리가 없어 건너뜁니다. type={}, id={}", contentType, id);
       return Optional.empty();
     }
 

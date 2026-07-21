@@ -140,6 +140,9 @@ app:
     image-base-url: https://image.tmdb.org/t/p/w500
     language: ko-KR
     pages: 3  # popular 수집 페이지 수 (페이지당 20건)
+    backfill:
+      pages-per-run: 25       # 시간별 discover backfill 1회당 매체(movie/tv)별 페이지 수 (25p x 20 x 2 = 1000건/시간)
+      floor-date: 1950-01-01  # 개봉일이 여기까지 내려가면 backfill 완료(backfillComplete)
     connect-timeout: 3s
     read-timeout: 10s
   sportsdb:
@@ -154,7 +157,8 @@ app:
     run-on-startup: false  # true면 기동 시 1회 전체 소스 수집 실행 (검증/수동 실행용)
     scheduler:
       enabled: ${INGESTION_SCHEDULER_ENABLED:false}  # 기본 off. 테스트/로컬에서 실행 방지
-      cron: ${INGESTION_SCHEDULER_CRON:0 0 4 * * *}  # 로컬 테스트 시 주기 바꿔서 실행할 것
+      cron: ${INGESTION_SCHEDULER_CRON:0 10 4 * * *}  # 일간 popular 수집 주기 (매시 정각 백필과 겹치지 않도록 04:10)
+      backfill-cron: ${INGESTION_SCHEDULER_BACKFILL_CRON:0 0 * * * *}  # 시간별 discover backfill 주기 (매시 정각)
       lock-ttl: 30m  # 중복 실행 방지 락 TTL (최대 수집 소요보다 넉넉히)
   jwt:
     secret-key: ${JWT_SECRET_KEY}

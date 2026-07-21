@@ -49,7 +49,7 @@ class ContentIngestionTaskletTest {
     given(fetcher.fetch()).willReturn(List.of(tmdbData("1"), tmdbData("2"), tmdbData("3")));
     given(contentUpsertService.upsert(any())).willThrow(new RuntimeException("저장 실패"));
     ContentIngestionTasklet tasklet =
-        new ContentIngestionTasklet(fetcher, contentUpsertService, 100);
+        new ContentIngestionTasklet(fetcher, contentUpsertService, 100, IngestionMode.DAILY);
 
     StepExecution stepExecution = MetaDataInstanceFactory.createStepExecution();
     StepContribution contribution = stepExecution.createStepContribution();
@@ -77,7 +77,8 @@ class ContentIngestionTaskletTest {
     given(contentUpsertService.upsert(any()))
         .willReturn(UpsertResult.INSERTED)
         .willThrow(new RuntimeException("저장 실패"));
-    ContentIngestionTasklet tasklet = new ContentIngestionTasklet(fetcher, contentUpsertService, 1);
+    ContentIngestionTasklet tasklet =
+        new ContentIngestionTasklet(fetcher, contentUpsertService, 1, IngestionMode.DAILY);
 
     StepExecution stepExecution = MetaDataInstanceFactory.createStepExecution();
     StepContribution contribution = stepExecution.createStepContribution();
@@ -101,7 +102,7 @@ class ContentIngestionTaskletTest {
     given(fetcher.source()).willReturn(ContentSource.TMDB);
     given(fetcher.fetch()).willThrow(cause);
     ContentIngestionTasklet tasklet =
-        new ContentIngestionTasklet(fetcher, contentUpsertService, 100);
+        new ContentIngestionTasklet(fetcher, contentUpsertService, 100, IngestionMode.DAILY);
 
     StepExecution stepExecution = MetaDataInstanceFactory.createStepExecution();
     StepContribution contribution = stepExecution.createStepContribution();
@@ -132,7 +133,7 @@ class ContentIngestionTaskletTest {
     // given - SPORTS_DB만 수집하도록 지정된 Job에서 TMDB 스텝이 도는 상황
     given(fetcher.source()).willReturn(ContentSource.TMDB);
     ContentIngestionTasklet tasklet =
-        new ContentIngestionTasklet(fetcher, contentUpsertService, 100);
+        new ContentIngestionTasklet(fetcher, contentUpsertService, 100, IngestionMode.DAILY);
 
     StepExecution stepExecution = stepExecutionWithSources("SPORTS_DB");
     StepContribution contribution = stepExecution.createStepContribution();
@@ -155,7 +156,7 @@ class ContentIngestionTaskletTest {
     given(fetcher.fetch()).willReturn(List.of(tmdbData("1")));
     given(contentUpsertService.upsert(any())).willReturn(UpsertResult.INSERTED);
     ContentIngestionTasklet tasklet =
-        new ContentIngestionTasklet(fetcher, contentUpsertService, 100);
+        new ContentIngestionTasklet(fetcher, contentUpsertService, 100, IngestionMode.DAILY);
 
     StepExecution stepExecution = stepExecutionWithSources("TMDB,SPORTS_DB");
     StepContribution contribution = stepExecution.createStepContribution();

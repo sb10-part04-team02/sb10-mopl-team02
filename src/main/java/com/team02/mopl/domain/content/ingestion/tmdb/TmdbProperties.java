@@ -1,6 +1,7 @@
 package com.team02.mopl.domain.content.ingestion.tmdb;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 // TMDB API 연동 설정
@@ -13,6 +14,7 @@ public record TmdbProperties(
     String imageBaseUrl,
     String language,
     int pages,
+    Backfill backfill,
     Duration connectTimeout,
     Duration readTimeout) {
 
@@ -29,11 +31,29 @@ public record TmdbProperties(
     if (pages < 1) {
       throw new IllegalStateException("TMDB pages는 1 이상이어야 합니다.");
     }
+    if (backfill == null) {
+      throw new IllegalStateException("TMDB backfill 설정은 필수입니다.");
+    }
     if (connectTimeout == null || connectTimeout.isNegative() || connectTimeout.isZero()) {
       throw new IllegalStateException("TMDB connect-timeout은 필수고 0보다 커야 합니다.");
     }
     if (readTimeout == null || readTimeout.isNegative() || readTimeout.isZero()) {
       throw new IllegalStateException("TMDB read-timeout은 필수고 0보다 커야 합니다.");
+    }
+  }
+
+  // discover backfill 설정
+  // - pagesPerRun: 시간별 1회 실행에서 매체(movie/tv)별로 훑는 페이지 수 (페이지당 20건)
+  // - floorDate: 개봉일이 이 값까지 내려가면 backfill 완료(backfillComplete)로 표시하고 이후 실행은 skip
+  public record Backfill(int pagesPerRun, LocalDate floorDate) {
+
+    public Backfill {
+      if (pagesPerRun < 1) {
+        throw new IllegalStateException("TMDB backfill pages-per-run은 1 이상이어야 합니다.");
+      }
+      if (floorDate == null) {
+        throw new IllegalStateException("TMDB backfill floor-date는 필수입니다.");
+      }
     }
   }
 }

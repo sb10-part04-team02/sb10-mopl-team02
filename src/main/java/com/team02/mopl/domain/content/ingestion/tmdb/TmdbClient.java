@@ -6,6 +6,7 @@ import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbGenreListResponse;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbMovieDto;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbPageResponse;
 import com.team02.mopl.domain.content.ingestion.tmdb.dto.TmdbTvDto;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -45,6 +46,43 @@ public class TmdbClient {
 
   public TmdbPageResponse<TmdbTvDto> fetchPopularTv(int page) {
     return getPage("/tv/popular", page, TV_PAGE_TYPE);
+  }
+
+  // discover backfill: 개봉일 내림차순 정렬 + 상한(lte) 이하만 조회. lte가 null이면 상한 없이 최신부터.
+  // sort_by/lte의 날짜 필드명은 매체마다 다르다(movie=primary_release_date, tv=first_air_date).
+  public TmdbPageResponse<TmdbMovieDto> discoverMovies(int page, LocalDate releaseDateLte) {
+    return discover(TmdbMediaType.MOVIE, page, releaseDateLte, MOVIE_PAGE_TYPE);
+  }
+
+  public TmdbPageResponse<TmdbTvDto> discoverTv(int page, LocalDate firstAirDateLte) {
+    return discover(TmdbMediaType.TV, page, firstAirDateLte, TV_PAGE_TYPE);
+  }
+
+  private <T> TmdbPageResponse<T> discover(
+      TmdbMediaType type,
+      int page,
+      LocalDate lte,
+      ParameterizedTypeReference<TmdbPageResponse<T>> responseType) {
+    return fetch(
+        () ->
+            requireBody(
+                restClient
+                    .get()
+                    .uri(
+                        uriBuilder -> {
+                          uriBuilder
+                              .path(type.discoverPath())
+                              .queryParam("language", language)
+                              .queryParam("page", page)
+                              .queryParam("sort_by", type.dateField() + ".desc")
+                              .queryParam("include_adult", false);
+                          if (lte != null) { // null이면 상한 없이 최신부터 (첫 실행)
+                            uriBuilder.queryParam(type.dateField() + ".lte", lte.toString());
+                          }
+                          return uriBuilder.build();
+                        })
+                    .retrieve()
+                    .body(responseType)));
   }
 
   public Map<Integer, String> fetchMovieGenres() {

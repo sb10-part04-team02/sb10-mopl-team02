@@ -24,7 +24,7 @@ class TmdbTvMapperTest {
   @DisplayName("정상 응답은 name을 제목으로 하는 TV_SERIES 타입의 수집 데이터로 매핑된다")
   void map_success() {
     // given
-    TmdbTvDto raw = new TmdbTvDto(1399, "왕좌의 게임", "줄거리", "/poster.jpg", List.of(10765));
+    TmdbTvDto raw = new TmdbTvDto(1399, "왕좌의 게임", "줄거리", "/poster.jpg", null, List.of(10765));
 
     // when
     ExternalContentData data = mapper.map(raw).orElseThrow();
@@ -41,7 +41,25 @@ class TmdbTvMapperTest {
   @Test
   @DisplayName("name이 없으면 건너뛴다")
   void map_whenBlankName_returnsEmpty() {
-    assertThat(mapper.map(new TmdbTvDto(1399, null, "줄거리", null, List.of()))).isEmpty();
+    assertThat(mapper.map(new TmdbTvDto(1399, null, "줄거리", null, null, List.of()))).isEmpty();
+  }
+
+  @Test
+  @DisplayName("requireCompleteMedia면 poster_path나 overview가 없을 때 폴백 대신 건너뛴다")
+  void map_whenStrictAndIncomplete_returnsEmpty() {
+    // given
+    TmdbTvMapper strictMapper =
+        new TmdbTvMapper(
+            Map.of(10765, "SF"), IMAGE_BASE_URL, "https://cdn.example.com/default.png", true);
+
+    // when & then
+    assertThat(strictMapper.map(new TmdbTvDto(1399, "제목", "줄거리", null, null, List.of())))
+        .isEmpty(); // poster 없음
+    assertThat(strictMapper.map(new TmdbTvDto(1399, "제목", null, "/poster.jpg", null, List.of())))
+        .isEmpty(); // overview 없음
+    // 둘 다 있으면 정상 매핑
+    assertThat(strictMapper.map(new TmdbTvDto(1399, "제목", "줄거리", "/poster.jpg", null, List.of())))
+        .isPresent();
   }
 
   @Test
@@ -54,11 +72,14 @@ class TmdbTvMapperTest {
     // when
     String movieExternalId =
         movieMapper
-            .map(new TmdbMovieDto(1396, "영화", "줄거리", null, List.of()))
+            .map(new TmdbMovieDto(1396, "영화", "줄거리", null, null, List.of()))
             .orElseThrow()
             .externalId();
     String tvExternalId =
-        mapper.map(new TmdbTvDto(1396, "드라마", "줄거리", null, List.of())).orElseThrow().externalId();
+        mapper
+            .map(new TmdbTvDto(1396, "드라마", "줄거리", null, null, List.of()))
+            .orElseThrow()
+            .externalId();
 
     // then
     assertThat(movieExternalId).isEqualTo("movie:1396");
