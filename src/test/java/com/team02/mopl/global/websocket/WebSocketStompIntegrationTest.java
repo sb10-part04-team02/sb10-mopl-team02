@@ -263,7 +263,8 @@ class WebSocketStompIntegrationTest {
         .get(10, TimeUnit.SECONDS);
   }
 
-  // SUBSCRIBE 프레임이 심플 브로커에 등록되는 시점을 클라이언트가 알 수 없어 짧게 대기한다.
+  // 심플 브로커(enableSimpleBroker)는 SUBSCRIBE에 RECEIPT를 보내지 않아(DISCONNECT만 지원)
+  // 등록 시점을 클라이언트가 알 수 없으므로 짧게 대기한다.
   private void awaitSubscriptionRegistered() throws InterruptedException {
     Thread.sleep(500);
   }
