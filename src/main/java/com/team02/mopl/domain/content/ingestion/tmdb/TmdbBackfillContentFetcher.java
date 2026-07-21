@@ -27,7 +27,8 @@ import org.springframework.stereotype.Component;
 // - 매체(movie/tv)별로 개봉일 내림차순 상한(lte=커서)부터 pages-per-run 페이지를 훑고,
 //   응답의 최소 개봉일을 다음 커서로 저장해 매 실행 과거로 한 칸씩 내려간다
 // - 경계 날짜는 inclusive로 다시 요청한다
-// - 한 날짜에 데이터가 몰려(특정 날짜 데이터로 꽉 참) 커서가 안 내려가면 하루를 빼서 강제 전진한다
+// - 한 날짜에 데이터가 몰려(특정 날짜 데이터로 꽉 참) 커서가 안 내려가면, 그 날짜에 아직 안 읽은 페이지가 남았는지에 따라 갈린다.
+//   남았으면 날짜를 유지한 채 다음 시작 페이지만 올려 이어 읽고, 다 읽었으면(마지막 페이지 도달) 하루를 빼서 강제 전진한다.
 // - 단, 첫 페이지부터 fetch가 실패해 아무 데이터도 못 얻으면 커서를 유지해 다음 실행에서 같은 지점을 재시도한다
 // - floor-date까지 내려가면 backfillComplete로 표시해 이후 실행은 건너뛴다
 @Slf4j
@@ -36,6 +37,9 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
 
   // 첫 실행의 시작 상한(오늘) 기준 타임존. 스케줄러(@Scheduled zone)와 같은 값으로 맞춘다
   private static final ZoneId INGESTION_ZONE = ZoneId.of("Asia/Seoul");
+
+  // TMDB discover의 page 상한. 초과 요청은 400을 받으므로 이어 읽기도 여기서 멈춘다
+  private static final int MAX_DISCOVER_PAGE = 500;
 
   private final TmdbClient tmdbClient;
   private final TmdbProperties properties;
@@ -115,12 +119,15 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
     LocalDate lte =
         (state.cursorDate() != null) ? state.cursorDate() : LocalDate.now(INGESTION_ZONE);
     LocalDate minSeen = null;
-    int pagesPerRun = properties.backfill().pagesPerRun();
+    int startPage = state.nextPage(); // 직전 실행이 같은 날짜에서 끊겼으면 그 다음 페이지부터
+    int endPage = Math.min(startPage + properties.backfill().pagesPerRun() - 1, MAX_DISCOVER_PAGE);
     boolean fetchFailed = false;
+    boolean exhaustedBound = false; // 이 lte 조건의 결과를 끝까지 다 읽었는지 (페이지 예산 소진과 구분)
+    int lastReadPage = startPage - 1; // 실제로 읽어낸 마지막 페이지
     int seen = 0; // 응답으로 받은 항목 수 (수집 제외분 포함)
     int collectedBefore = results.size(); // results는 매체 간 누적이라 이번 매체 몫만 세려면 기준점이 필요
 
-    for (int page = 1; page <= pagesPerRun; page++) {
+    for (int page = startPage; page <= endPage; page++) {
       TmdbPageResponse<T> response;
       try {
         response = pageFetcher.apply(page, lte);
@@ -131,8 +138,10 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
         break;
       }
       if (response.results().isEmpty()) {
-        break; // 더 내려갈 데이터 없음
+        exhaustedBound = true; // 더 내려갈 데이터 없음
+        break;
       }
+      lastReadPage = page;
       for (T item : response.results()) {
         seen++;
         mapper.map(item).ifPresent(results::add);
@@ -142,7 +151,8 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
         }
       }
       if (page >= response.totalPages()) {
-        break; // 마지막 페이지 도달
+        exhaustedBound = true; // 마지막 페이지 도달
+        break;
       }
     }
 
@@ -150,9 +160,12 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
     // excluded가 seen에 육박하면 strict 필터(포스터/줄거리 필수)가 과한지 의심해볼 지점이다
     int collected = results.size() - collectedBefore;
     log.info(
-        "discover backfill 매체 조회 완료. mediaType={}, lte={}, seen={}, collected={}, excluded={}",
+        "discover backfill 매체 조회 완료. mediaType={}, lte={}, pages={}~{}, seen={}, collected={},"
+            + " excluded={}",
         mediaType,
         lte,
+        startPage,
+        lastReadPage,
         seen,
         collected,
         seen - collected);
@@ -164,21 +177,56 @@ public class TmdbBackfillContentFetcher implements ContentFetcher {
       return;
     }
 
-    advanceCursor(mediaType, lte, minSeen);
+    advanceCursor(mediaType, lte, minSeen, exhaustedBound, lastReadPage);
   }
 
   // 커서를 이번 실행이 도달한 지점으로 전진시킨다.
-  // - 유효 날짜가 없거나 진전이 없으면(minSeen >= base) 하루 빼서 강제 전진 (한 날짜 물량 정체 방어)
-  // - 그 외에는 최소 개봉일로 이동 (inclusive)
-  private void advanceCursor(TmdbMediaType mediaType, LocalDate base, LocalDate minSeen) {
+  // - 최소 개봉일이 상한보다 과거면(정상 진행) 그 날짜로 이동하고 페이지는 1로 리셋한다.
+  //   내림차순이라 아직 안 읽은 항목은 모두 minSeen 이하이므로 inclusive 재조회로 커버된다
+  // - 진전이 없는데(minSeen >= base) 아직 안 읽은 페이지가 남았으면 날짜를 유지하고 다음 페이지부터 이어 읽는다
+  // - 진전이 없고 그 상한의 결과를 다 읽었으면(또는 페이지 상한에 걸리면) 하루 빼서 강제 전진한다
+  private void advanceCursor(
+      TmdbMediaType mediaType,
+      LocalDate base,
+      LocalDate minSeen,
+      boolean exhaustedBound,
+      int lastReadPage) {
+
+    LocalDate next;
+    int nextPage;
+    if (minSeen != null && minSeen.isBefore(base)) {
+      next = minSeen;
+      nextPage = 1;
+    } else if (!exhaustedBound && lastReadPage < MAX_DISCOVER_PAGE) {
+      // 한 날짜에 물량이 몰려 커서가 못 내려간 상태. 남은 페이지를 다음 실행이 이어 읽는다
+      next = base;
+      nextPage = lastReadPage + 1;
+      log.info(
+          "discover backfill 커서 날짜 유지, 다음 실행이 이어 읽습니다. mediaType={}, cursorDate={}, nextPage={}",
+          mediaType,
+          next,
+          nextPage);
+    } else {
+      if (!exhaustedBound) {
+        // deep paging 상한까지 읽고도 같은 날짜라 더 못 판다. 남은 항목은 포기하고 전진
+        log.warn(
+            "discover backfill이 페이지 상한에 걸려 남은 항목을 건너뜁니다. mediaType={}, cursorDate={}, page={}",
+            mediaType,
+            base,
+            MAX_DISCOVER_PAGE);
+      }
+      next = base.minusDays(1);
+      nextPage = 1;
+    }
+
     LocalDate floor = properties.backfill().floorDate();
-    LocalDate next = (minSeen == null || !minSeen.isBefore(base)) ? base.minusDays(1) : minSeen;
     boolean backfillComplete = !next.isAfter(floor); // next <= floorDate
-    cursorService.advance(mediaType, next, backfillComplete);
+    cursorService.advance(mediaType, next, nextPage, backfillComplete);
     log.info(
-        "discover backfill 커서 전진. mediaType={}, nextCursorDate={}, backfillComplete={}",
+        "discover backfill 커서 전진. mediaType={}, nextCursorDate={}, nextPage={}, backfillComplete={}",
         mediaType,
         next,
+        nextPage,
         backfillComplete);
   }
 

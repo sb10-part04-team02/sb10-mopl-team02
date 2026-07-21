@@ -20,19 +20,20 @@ public class BackfillCursorService {
   public CursorState read(TmdbMediaType mediaType) {
     return repository
         .findById(mediaType)
-        .map(c -> new CursorState(c.getCursorDate(), c.isBackfillComplete()))
-        .orElse(new CursorState(null, false));
+        .map(c -> new CursorState(c.getCursorDate(), c.getNextPage(), c.isBackfillComplete()))
+        .orElse(new CursorState(null, 1, false));
   }
 
   // 이번 실행이 내려간 지점으로 커서를 전진시킨다. 행이 없으면 생성한다.
   @Transactional
-  public void advance(TmdbMediaType mediaType, LocalDate nextCursorDate, boolean backfillComplete) {
+  public void advance(
+      TmdbMediaType mediaType, LocalDate nextCursorDate, int nextPage, boolean backfillComplete) {
     BackfillCursor cursor =
         repository.findById(mediaType).orElseGet(() -> new BackfillCursor(mediaType));
-    cursor.advance(nextCursorDate, backfillComplete);
+    cursor.advance(nextCursorDate, nextPage, backfillComplete);
     repository.save(cursor);
   }
 
-  // 커서 조회 스냅샷. cursorDate가 null이면 아직 시작 전(오늘부터).
-  public record CursorState(LocalDate cursorDate, boolean backfillComplete) {}
+  // 커서 조회 스냅샷. cursorDate가 null이면 아직 시작 전(오늘부터), nextPage는 다음 실행의 시작 페이지.
+  public record CursorState(LocalDate cursorDate, int nextPage, boolean backfillComplete) {}
 }
