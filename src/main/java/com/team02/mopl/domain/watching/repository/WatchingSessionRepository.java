@@ -15,6 +15,10 @@ public interface WatchingSessionRepository
   Optional<WatchingSession> findByContent_IdAndUser_IdAndDeletedAtIsNull(
       UUID contentId, UUID userId);
 
+  // 유저가 해당 콘텐츠의 활성 시청 세션에 참여 중인지 여부 (콘텐츠 채팅 발신 자격 검증용)
+  boolean existsByContent_IdAndUser_IdAndExitedAtIsNullAndDeletedAtIsNull(
+      UUID contentId, UUID userId);
+
   // 단건 콘텐츠의 활성 시청자 수
   @Query(
       "select count(ws) from WatchingSession ws "

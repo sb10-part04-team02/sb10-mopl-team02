@@ -124,6 +124,13 @@ services:
 
       # Nginx 경유 접근 기준 public URL
       STORAGE_PUBLIC_BASE_URL: http://localhost:8080
+
+      # OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID is required}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET is required}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:?KAKAO_CLIENT_ID is required}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:?KAKAO_CLIENT_SECRET is required}
+
     ports:
       # app-1 직접 접근 확인용 포트
       # 일반 사용자는 nginx(localhost:8080)를 통해 접근한다.
@@ -170,6 +177,12 @@ services:
       EMAIL_PASSWORD: ${EMAIL_PASSWORD:?EMAIL_PASSWORD is required}
 
       STORAGE_PUBLIC_BASE_URL: http://localhost:8080
+
+      # OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID is required}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET is required}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:?KAKAO_CLIENT_ID is required}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:?KAKAO_CLIENT_SECRET is required}
     ports:
       # app-2 직접 접근 확인용 포트
       - "8082:8080"

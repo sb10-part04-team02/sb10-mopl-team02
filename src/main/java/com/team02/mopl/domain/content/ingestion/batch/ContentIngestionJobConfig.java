@@ -34,6 +34,10 @@ public class ContentIngestionJobConfig {
   // 실행 모드를 지정하는 Job 파라미터 (IngestionMode 이름). 없으면 DAILY로 간주 (ContentIngestionTasklet 참고).
   public static final String JOB_PARAM_MODE = "mode";
 
+  // 수집할 소스를 한정하는 Job 파라미터 (콤마로 구분한 ContentSource 이름).
+  // 파라미터가 없으면 전체 소스를 수집한다 -> 스케줄러/기동 러너는 이 값을 주지 않아 기존 동작을 그대로 유지한다
+  public static final String JOB_PARAM_SOURCES = "sources";
+
   // 항목 단위 실패는 격리하되, 시스템 장애(DB 다운 등)로 전부 실패하는 상황은 스텝 실패로 드러나도록 상한을 둔다
   private static final int SKIP_LIMIT = 100;
 

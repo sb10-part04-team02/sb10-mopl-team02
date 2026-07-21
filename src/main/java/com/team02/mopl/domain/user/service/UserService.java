@@ -1,5 +1,6 @@
 package com.team02.mopl.domain.user.service;
 
+import com.team02.mopl.domain.auth.oauth.provider.OAuth2UserInfo;
 import com.team02.mopl.domain.user.dto.ChangePasswordRequest;
 import com.team02.mopl.domain.user.dto.UserCreateRequest;
 import com.team02.mopl.domain.user.dto.UserDto;
@@ -7,6 +8,7 @@ import com.team02.mopl.domain.user.dto.UserLockUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserRoleUpdateRequest;
 import com.team02.mopl.domain.user.dto.UserSearchRequest;
 import com.team02.mopl.domain.user.dto.UserUpdateRequest;
+import com.team02.mopl.domain.user.entity.SocialAccount;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import com.team02.mopl.domain.user.enums.UserSortBy;
@@ -18,6 +20,7 @@ import com.team02.mopl.domain.user.exception.UserForbiddenException;
 import com.team02.mopl.domain.user.exception.UserInvalidProfileImageException;
 import com.team02.mopl.domain.user.exception.UserNotFoundException;
 import com.team02.mopl.domain.user.mapper.UserMapper;
+import com.team02.mopl.domain.user.repository.SocialAccountRepository;
 import com.team02.mopl.domain.user.repository.UserRepository;
 import com.team02.mopl.domain.user.util.UserCursorConverter;
 import com.team02.mopl.global.dto.CursorPageRequest;
@@ -44,6 +47,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Transactional(readOnly = true)
 public class UserService {
 
+  private final SocialAccountRepository socialAccountRepository;
   private final UserRepository userRepository;
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
@@ -203,6 +207,43 @@ public class UserService {
     eventPublisher.publishEvent(new PasswordUpdatedEvent(findUser.getId()));
 
     log.info("유저 비밀번호변경 로직 완료: userId={}", userId);
+  }
+
+  @Transactional
+  public void registerSocialUser(OAuth2UserInfo userInfo) {
+    // 소셜계정이 이미 있는 경우
+    if (socialAccountRepository.existsByProviderAndProviderUserIdAndDeletedAtIsNull(
+        userInfo.authType(), userInfo.socialUserId())) {
+      return;
+    }
+
+    User user =
+        userRepository
+            // 소셜계정이메일과 동일한 일반이메일계정이 있는경우
+            .findByEmailAndDeletedAtIsNull(userInfo.email())
+            .orElseGet(
+                () -> {
+                  // 처음가입하는 경우
+                  User newUser =
+                      new User(
+                          userInfo.name(),
+                          userInfo.email(),
+                          null,
+                          userInfo.profileImageUrl(),
+                          Role.USER,
+                          false);
+
+                  User savedUser = userRepository.save(newUser);
+                  log.info(
+                      "소셜계정이 만들어졌습니다. userId={}, provider={}",
+                      savedUser.getId(),
+                      userInfo.authType());
+                  return savedUser;
+                });
+
+    SocialAccount socialAccount =
+        new SocialAccount(user.getId(), userInfo.authType(), userInfo.socialUserId());
+    socialAccountRepository.save(socialAccount);
   }
 
   private void validateOwner(UUID requesterId, UUID userId) {

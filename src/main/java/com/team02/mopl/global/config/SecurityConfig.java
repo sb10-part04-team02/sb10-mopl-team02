@@ -7,6 +7,10 @@ import com.team02.mopl.domain.auth.jwt.handler.JwtLoginSuccessHandler;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import com.team02.mopl.domain.auth.login.filter.MoplAuthenticationFilter;
 import com.team02.mopl.domain.auth.login.provider.MoplAuthenticationProvider;
+import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginFailureHandler;
+import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginSuccessHandler;
+import com.team02.mopl.domain.auth.oauth.repository.MoplCookieOAuth2AuthorizationRequestRepository;
+import com.team02.mopl.domain.auth.oauth.service.MoplOidcUserService;
 import com.team02.mopl.global.config.auth.handler.SpaCsrfTokenRequestHandler;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
@@ -33,12 +37,17 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+  private final MoplCookieOAuth2AuthorizationRequestRepository
+      moplCookieOAuth2AuthorizationRequestRepository;
   private final MoplAuthenticationProvider moplAuthenticationProvider;
   private final JwtAuthenticationProvider jwtAuthenticationProvider;
   private final JwtLoginSuccessHandler jwtLoginSuccessHandler;
   private final JwtLoginFailureHandler jwtLoginFailureHandler;
   private final LogoutHandler jwtLogoutHandler;
   private final AuthenticationEntryPoint jwtAuthenticationEntryPoint;
+  private final MoplOidcUserService moplOidcUserService;
+  private final OAuthLoginSuccessHandler oAuthLoginSuccessHandler;
+  private final OAuthLoginFailureHandler oAuthLoginFailureHandler;
 
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http, JwtUtils jwtUtils, Validator validator)
@@ -52,6 +61,16 @@ public class SecurityConfig {
                     .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .oauth2Login(
+            oauth ->
+                oauth
+                    .authorizationEndpoint(
+                        auth ->
+                            auth.authorizationRequestRepository(
+                                moplCookieOAuth2AuthorizationRequestRepository))
+                    .userInfoEndpoint(info -> info.oidcUserService(moplOidcUserService))
+                    .successHandler(oAuthLoginSuccessHandler)
+                    .failureHandler(oAuthLoginFailureHandler))
         .logout(
             logout ->
                 logout

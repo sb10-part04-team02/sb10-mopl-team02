@@ -32,6 +32,10 @@ import com.team02.mopl.domain.auth.jwt.handler.JwtLogoutHandler;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import com.team02.mopl.domain.auth.login.provider.MoplAuthenticationProvider;
 import com.team02.mopl.domain.auth.login.token.MoplAuthenticationToken;
+import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginFailureHandler;
+import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginSuccessHandler;
+import com.team02.mopl.domain.auth.oauth.repository.MoplCookieOAuth2AuthorizationRequestRepository;
+import com.team02.mopl.domain.auth.oauth.service.MoplOidcUserService;
 import com.team02.mopl.domain.auth.service.AuthService;
 import com.team02.mopl.domain.auth.service.AuthService.TokenResult;
 import com.team02.mopl.domain.auth.service.MailService;
@@ -74,11 +78,19 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class AuthControllerTest {
 
+  @MockitoBean
+  private MoplCookieOAuth2AuthorizationRequestRepository
+      moplCookieOAuth2AuthorizationRequestRepository;
+
   @MockitoBean private MoplAuthenticationProvider moplAuthenticationProvider;
   @MockitoBean private JwtAuthenticationProvider jwtAuthenticationProvider;
+  @MockitoBean private MoplOidcUserService oidcUserService;
+  @MockitoBean private OAuthLoginSuccessHandler oAuthLoginSuccessHandler;
+  @MockitoBean private OAuthLoginFailureHandler oAuthLoginFailureHandler;
   @MockitoBean private AuthenticationEntryPoint jwtAuthenticationEntryPoint;
   @MockitoBean private JwtLoginSuccessHandler jwtLoginSuccessHandler;
   @MockitoBean private JwtLoginFailureHandler jwtLoginFailureHandler;
+  @MockitoBean private AuthenticationManager authenticationManager;
   @MockitoBean private JwtLogoutHandler jwtLogoutHandler;
   @MockitoBean private AuthService authService;
   @MockitoBean private JwtUtils jwtUtils;
@@ -141,7 +153,6 @@ class AuthControllerTest {
     @DisplayName("이메일을 가진 계정이 없어 로그인에 실패한다")
     void fail_shouldReturnUnauthorized_whenEmailIsAbsent() throws Exception {
       // given
-      AuthenticationManager authenticationManager = mock(AuthenticationManager.class);
       given(authenticationManager.authenticate(any())).willThrow(new BadCredentialsException(""));
       willAnswer(
               invocation -> {

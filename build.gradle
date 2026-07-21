@@ -38,6 +38,7 @@ dependencies {
     // === 보안 / 인증 ===
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'com.nimbusds:nimbus-jose-jwt:10.9.1'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 
     // === 실시간 통신 ===
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
