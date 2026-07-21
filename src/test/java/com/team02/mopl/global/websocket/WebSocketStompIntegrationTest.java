@@ -208,7 +208,7 @@ class WebSocketStompIntegrationTest {
         new QueueingFrameHandler<>(String.class, new LinkedBlockingQueue<>()));
 
     String errorFrame = handler.errorFrames.poll(10, TimeUnit.SECONDS);
-    assertThat(errorFrame).isNotNull();
+    assertThat(errorFrame).isNotNull().contains("해당 대화방에 접근할 권한이 없습니다");
   }
 
   private User saveUser(String name) {
