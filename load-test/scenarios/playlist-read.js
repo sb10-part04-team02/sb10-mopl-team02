@@ -106,10 +106,11 @@ export default function () {
 
   // 상세 조회(목록 첫 항목)
   if (firstId) {
-    http.get(
+    const detailRes = http.get(
       `${BASE_URL}/api/playlists/${firstId}`,
       authParams(accessToken, { tags: { name: 'playlists-detail' } })
     );
+    check(detailRes, { 'playlists-detail: status 200': (r) => r.status === 200 });
   }
 
   sleep(1);

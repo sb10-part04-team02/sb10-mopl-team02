@@ -11,7 +11,7 @@
 //   두 모드의 p95 차이가 곧 락 경합 비용이다. 대조 없이는 hotspot 숫자를 해석할 수 없다.
 //
 // 동시성 충돌 회피
-//   같은 (user, playlist) 재구독은 409(SubscriptionAlreadyExistsException)다. 그래서
+//   같은 (user, playlist) 재구독은 400(SubscriptionAlreadyExistsException)다. 그래서
 //     - VU 마다 서로 다른 더미 유저로 로그인(__VU 로 분할).
 //     - 각 iteration 은 subscribe → (짧게) → unsubscribe 로 상태를 되돌려, 같은 유저가
 //       다음 iteration 에 같은 플리를 다시 구독해도 409 가 안 나게 한다.
