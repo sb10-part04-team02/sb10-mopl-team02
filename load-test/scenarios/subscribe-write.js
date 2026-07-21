@@ -94,31 +94,32 @@ export function setup() {
 
 export default function () {
   const { accessToken } = ensureSession();
-  const csrf = fetchCsrfToken();
   const playlistId = PLAYLIST(targetPlaylistNo());
   const subTags = { name: 'subscribe', mode: MODE };
 
+  // CSRF 토큰은 매 mutation 마다 로테이트된다(SpaCsrfTokenRequestHandler). 요청 직전에
+  // 쿠키 jar 에서 최신값을 읽는다. (subscribe 가 갱신한 토큰을 unsubscribe 가 그대로 쓰면 403)
   // 구독 생성 — 여기가 락 경합 측정 지점.
   const subRes = http.post(
     `${BASE_URL}/api/playlists/${playlistId}/subscription`,
     null,
     authParams(accessToken, {
-      headers: { 'X-XSRF-TOKEN': csrf },
+      headers: { 'X-XSRF-TOKEN': fetchCsrfToken() },
       tags: subTags,
-      // 204 신규. 409 는 이미 구독(직전 unsubscribe 실패 등) — 정상 흐름은 아니지만 실패로 세지 않고
-      // 아래에서 취소를 시도해 상태를 회복시킨다.
-      responseCallback: http.expectedStatuses(204, 409),
+      // 204 신규. 400(SUBSCRIPTION_ALREADY_EXISTS)은 이미 구독(직전 unsubscribe 실패 등) —
+      // 정상 흐름은 아니지만 실패로 세지 않고 아래에서 취소를 시도해 상태를 회복시킨다.
+      responseCallback: http.expectedStatuses(204, 400),
     })
   );
 
-  // 구독이 성립했거나 이미 있으면 되돌린다(다음 iteration 의 409 방지 + 카운트 짝 맞춤).
-  if (subRes.status === 204 || subRes.status === 409) {
+  // 구독이 성립했거나 이미 있으면 되돌린다(다음 iteration 의 400 방지 + 카운트 짝 맞춤).
+  if (subRes.status === 204 || subRes.status === 400) {
     sleep(0.1);
     http.del(
       `${BASE_URL}/api/playlists/${playlistId}/subscription`,
       null,
       authParams(accessToken, {
-        headers: { 'X-XSRF-TOKEN': csrf },
+        headers: { 'X-XSRF-TOKEN': fetchCsrfToken() },
         tags: { name: 'unsubscribe' },
         // 204 취소. 404 는 이미 취소됨 — 정상.
         responseCallback: http.expectedStatuses(204, 404),

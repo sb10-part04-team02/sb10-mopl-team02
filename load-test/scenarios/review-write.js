@@ -56,6 +56,10 @@ const DURATION = __ENV.DURATION || '2m';
 // 리뷰를 집중시킬 콘텐츠 개수. 기본은 모드에 따름(hotspot=1, spread=100). 명시하면 그 값을 쓴다.
 const FOCUS = Number(__ENV.FOCUS || (MODE === 'spread' ? 100 : 1));
 const USER_BASE = Number(__ENV.USER_BASE || 90000); // 계정 시작 오프셋(기존 더미 리뷰 회피)
+// 콘텐츠 시작 오프셋. 앞쪽(1~) 콘텐츠는 기존 더미 리뷰가 최대 3.2만 건이라 90000+ 유저 상당수가
+// 이미 리뷰를 갖고 있어 create 가 409 로 튕긴다. tail 쪽(리뷰 수십 건)을 hotspot 으로 잡아
+// 기존 리뷰와의 (author,content) 충돌을 피하되, 소수 콘텐츠에 부하를 몰아 재집계 락은 유지한다.
+const CONTENT_BASE = Number(__ENV.CONTENT_BASE || 19000);
 
 export const options = {
   scenarios: {
@@ -68,25 +72,22 @@ export const options = {
   thresholds: writeThresholds,
 };
 
-// VU 별 1회 로그인 + CSRF(쿠키 jar 기준 유효). USER_BASE + __VU 로 계정 분할.
+// VU 별 1회 로그인. USER_BASE + __VU 로 계정 분할. CSRF 는 로테이트되므로 여기 캐시하지 않고
+// 각 mutation 직전에 fetchCsrfToken() 으로 최신값을 읽는다.
 let session = null;
 
 function getSession() {
   if (session == null) {
     const user = pickDummyUser(USER_BASE + __VU);
     const { accessToken } = login(user.email, user.password);
-    const csrf = fetchCsrfToken();
-    if (!csrf) {
-      fail('CSRF 토큰을 얻지 못했습니다.');
-    }
-    session = { accessToken, csrf };
+    session = { accessToken };
   }
   return session;
 }
 
-// 이 iteration 이 리뷰를 걸 콘텐츠 번호. FOCUS 개 중 하나(1..FOCUS)를 무작위로.
+// 이 iteration 이 리뷰를 걸 콘텐츠 번호. CONTENT_BASE 부터 FOCUS 개 중 하나를 무작위로.
 function targetContentNo() {
-  return 1 + Math.floor(Math.random() * FOCUS);
+  return CONTENT_BASE + Math.floor(Math.random() * FOCUS);
 }
 
 export function setup() {
@@ -97,9 +98,14 @@ export function setup() {
 }
 
 export default function () {
-  const { accessToken, csrf } = getSession();
+  const { accessToken } = getSession();
   const contentId = CONTENT(targetContentNo());
   const createTags = { name: 'review-create', mode: MODE };
+
+  // CSRF 토큰은 이 프로젝트에서 매 mutation 마다 로테이트된다(SpaCsrfTokenRequestHandler +
+  // CookieCsrfTokenRepository). 따라서 요청 직전에 쿠키 jar 에서 최신값을 다시 읽어야 한다.
+  // (세션 시작 시 1회 받은 값을 재사용하면 두 번째 mutation 부터 403 이 난다)
+  const createCsrf = fetchCsrfToken();
 
   // 1) 리뷰 생성 → 평점 재집계 UPDATE 발생(경합 관찰 지점).
   const createRes = http.post(
@@ -110,7 +116,7 @@ export default function () {
       rating: Math.round(Math.random() * 50) / 10, // 0.0 ~ 5.0
     }),
     authParams(accessToken, {
-      headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': csrf },
+      headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': createCsrf },
       tags: createTags,
       // 409(REVIEW_ALREADY_EXISTS)는 제약이 정상 동작한 것. 실패로 세지 않고 재시도한다.
       responseCallback: http.expectedStatuses(201, 409),
@@ -135,11 +141,12 @@ export default function () {
   }
 
   // 2) 즉시 삭제 → 제약을 풀고(다음 iteration 재생성 가능) 재집계를 한 번 더 돌린다(경합 대상).
+  //    create 가 CSRF 를 로테이트했으므로 delete 직전에 최신 토큰을 다시 읽는다.
   const deleteRes = http.del(
     `${BASE_URL}/api/reviews/${reviewId}`,
     null,
     authParams(accessToken, {
-      headers: { 'X-XSRF-TOKEN': csrf },
+      headers: { 'X-XSRF-TOKEN': fetchCsrfToken() },
       tags: { name: 'review-delete' },
     })
   );
