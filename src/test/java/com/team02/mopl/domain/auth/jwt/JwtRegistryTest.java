@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -20,6 +19,7 @@ import com.team02.mopl.domain.auth.jwt.JwtRegistry.RotationResult;
 import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
 import com.team02.mopl.global.exception.BusinessException;
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +37,6 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.ZSetOperations;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -51,37 +50,26 @@ class JwtRegistryTest {
   @Mock private ValueOperations<String, String> valueOperations;
   @InjectMocks private JwtRegistry jwtRegistry;
 
-  private final String accessToken = "accessToken";
-  private final String refreshToken = "refreshToken";
+  private String accessToken;
+  private String refreshToken;
 
   @BeforeEach
   void setUp() {
     ReflectionTestUtils.setField(jwtRegistry, "refreshPrefix", "jwt:refresh:");
     ReflectionTestUtils.setField(jwtRegistry, "maxAccountCount", 1L);
+
+    accessToken = "accessToken";
+    refreshToken = "refreshToken";
   }
 
   @Nested
   class RegisterToken {
 
     @Test
-    @DisplayName("토큰에 식별자가 없으면 예외를 던진다")
-    void fail_shouldThrowException_whenTokenIsInvalid() {
-      // given
-      UUID userId = UUID.randomUUID();
-      given(jwtUtils.getTokenId(anyString())).willReturn(null);
-
-      // when & then
-      assertThrows(
-          BadCredentialsException.class,
-          () -> jwtRegistry.registerToken(userId, refreshToken, accessToken));
-    }
-
-    @Test
     @DisplayName("네트워크 오류가 생기면 예외를 던진다")
     void fail_shouldNotRemoveToken_whenCurrentCountIsNull() {
       // given
       UUID userId = UUID.randomUUID();
-      given(jwtUtils.getTokenId(any())).willReturn("tokenId");
       given(properties.refreshTokenExpiration()).willReturn(Duration.ZERO);
       given(jwtUtils.getRemainingTimeToExpiration(anyString())).willReturn(Duration.ZERO);
       given(
@@ -100,7 +88,6 @@ class JwtRegistryTest {
     void success_shouldSaveRefreshAndAccessToken_whenUserIdAndRefreshTokenAndAccessTokenHas() {
       // given
       UUID userId = UUID.randomUUID();
-      given(jwtUtils.getTokenId(any())).willReturn("tokenId");
       given(properties.refreshTokenExpiration()).willReturn(Duration.ZERO);
       given(jwtUtils.getRemainingTimeToExpiration(anyString())).willReturn(Duration.ZERO);
       given(
@@ -180,44 +167,80 @@ class JwtRegistryTest {
     private UUID userId;
     private String refreshToken;
     private String newRefreshToken;
+    private String newAccessToken;
 
     @BeforeEach
     void SetUp() {
       userId = UUID.randomUUID();
-      refreshToken = "refresh token";
-      newRefreshToken = "new refresh token";
-      given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
+      refreshToken = "refresh-token";
+      newRefreshToken = "new-refresh-token";
+      newAccessToken = "new-access-token";
     }
 
     @Test
-    @DisplayName("refresh토큰이 없다면 키를 전체삭제하고 COMPROMISED 결과값을 반환한다")
-    void fail_shouldDeleteAllAndReturnCompromisedResult_whenRefreshTokenDoesNotExist() {
+    @DisplayName("네트워크 오류가 생기면 예외를 던진다")
+    void fail_shouldNotRemoveToken_whenCurrentCountIsNull() {
       // given
-      given(zSetOperations.score(anyString(), anyString())).willReturn(null);
+      given(properties.refreshTokenExpiration()).willReturn(Duration.ZERO);
+      given(jwtUtils.getRemainingTimeToExpiration(anyString()))
+          .willReturn(Duration.ofMinutes(1).negated());
+      given(
+              redisTemplate.execute(
+                  any(), anyList(), any(), any(), any(), any(), any(), any(), any()))
+          .willThrow(RedisConnectionFailureException.class);
 
-      // when
-      RotationResult actual = jwtRegistry.rotateRefreshToken(userId, refreshToken, newRefreshToken);
-
-      // then
-      then(redisTemplate).should(times(1)).delete(anyString());
-      assertThat(actual).isEqualTo(RotationResult.COMPROMISED);
+      // when & then
+      assertThrows(
+          BusinessException.class,
+          () ->
+              jwtRegistry.rotateRefreshToken(
+                  userId, refreshToken, newRefreshToken, newAccessToken));
     }
 
     @Test
-    @DisplayName("refresh토큰이 있다면 rotate과정을 진행한다")
-    void success_shouldProcessRotate_whenRefreshTokenExists() {
+    @DisplayName("스크립트 실행이 오류가 난다면 Invalid를 반환한다")
+    void fail_shouldReturnInvalidResult_whenScriptErrors() {
       // given
-      given(zSetOperations.score(anyString(), eq(refreshToken))).willReturn(3.0);
-      given(properties.refreshTokenExpiration()).willReturn(Duration.ofMinutes(10));
+      given(properties.refreshTokenExpiration()).willReturn(Duration.ZERO);
+      given(jwtUtils.getRemainingTimeToExpiration(anyString())).willReturn(Duration.ZERO);
+      given(
+              redisTemplate.execute(
+                  any(), anyList(), any(), any(), any(), any(), any(), any(), any()))
+          .willReturn(null);
 
       // when
-      RotationResult actual = jwtRegistry.rotateRefreshToken(userId, refreshToken, newRefreshToken);
+      RotationResult result =
+          jwtRegistry.rotateRefreshToken(userId, refreshToken, newRefreshToken, newAccessToken);
 
       // then
-      then(zSetOperations).should(times(1)).remove(anyString(), eq(refreshToken));
-      then(zSetOperations).should(times(1)).add(anyString(), eq(newRefreshToken), anyDouble());
-      then(redisTemplate).should(times(1)).expire(anyString(), any(Duration.class));
-      assertThat(actual).isEqualTo(RotationResult.OK);
+      assertThat(result).isEqualTo(RotationResult.INVALID);
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {0, 1, 2})
+    @DisplayName("redis의 결과값에 따라 그에 맞는 RotationResult 타입을 반환한다")
+    void success_shouldReturnCorrespondingRotationResult_whenRedisReturnsResultCode(
+        long redisResult) {
+      // given
+      given(properties.refreshTokenExpiration()).willReturn(Duration.ZERO);
+      given(jwtUtils.getRemainingTimeToExpiration(anyString())).willReturn(Duration.ZERO);
+      given(
+              redisTemplate.execute(
+                  any(), anyList(), any(), any(), any(), any(), any(), any(), any()))
+          .willReturn(redisResult);
+      RotationResult expected =
+          switch ((int) redisResult) {
+            case 0 -> RotationResult.OK;
+            case 1 -> RotationResult.INVALID;
+            default -> RotationResult.COMPROMISED;
+          };
+
+      // when
+      RotationResult result =
+          jwtRegistry.rotateRefreshToken(userId, refreshToken, newRefreshToken, newAccessToken);
+
+      // then
+      assertThat(result).isEqualTo(expected);
     }
   }
 
@@ -274,36 +297,61 @@ class JwtRegistryTest {
 
   @Nested
   class CheckAuthStatus {
+
+    private UUID userId;
+    private String accessTokenId;
+    private String accessToken;
+
+    @BeforeEach
+    void setUp() {
+      userId = UUID.randomUUID();
+      accessTokenId = UUID.randomUUID().toString();
+      accessToken = "access-token";
+    }
+
     @Test
-    @DisplayName("액세스토큰ID와 유저ID가 주어지면 블랙리스트와 유저잠금상태를 반환한다")
+    @DisplayName("액세스토큰ID, 유저ID와 액세스토큰이 주어지면 블랙리스트, 유저잠금상태와 액세스토큰 활성화 상태를 반환한다")
     void success_shouldReturnAuthCheckResult_whenAccessTokenIdAndUserIdAreProvided() {
       // given
       String accessTokenId = UUID.randomUUID().toString();
       UUID userId = UUID.randomUUID();
 
-      given(redisTemplate.hasKey(anyString())).willReturn(true);
+      List<Long> executeResult = List.of(0L, 0L, 1L);
+      given(redisTemplate.execute(any(), anyList(), eq(accessToken))).willReturn(executeResult);
 
       // when
-      AuthCheckResult result = jwtRegistry.checkAuthStatus(accessTokenId, userId);
+      AuthCheckResult result = jwtRegistry.checkAuthStatus(accessTokenId, userId, accessToken);
 
       // then
-      assertThat(result.isBlacklisted()).isTrue();
-      assertThat(result.isUserLocked()).isTrue();
+      assertThat(result.isBlacklisted()).isFalse();
+      assertThat(result.isUserLocked()).isFalse();
+      assertThat(result.isAccessTokenActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("스크립트 실행이 오류가 난다면 Invalid를 반환한다")
+    void fail_shouldReturnInvalidResult_whenScriptErrors() {
+      // given
+      given(redisTemplate.execute(any(), anyList(), any())).willReturn(null);
+
+      // when & then
+      assertThrows(
+          BusinessException.class,
+          () -> jwtRegistry.checkAuthStatus(accessTokenId, userId, accessToken));
     }
 
     @Test
     @DisplayName("redis의 문제가 생기면 예외를 던진다")
     void fail_shouldThrowException_whenRedisIsDownDuringCheckAuthStatus() {
       // given
-      String accessTokenId = UUID.randomUUID().toString();
-      UUID userId = UUID.randomUUID();
-
-      willThrow(RedisConnectionFailureException.class).given(redisTemplate).hasKey(anyString());
+      willThrow(RedisConnectionFailureException.class)
+          .given(redisTemplate)
+          .execute(any(), anyList(), any());
 
       // when & then
       assertThrows(
           InternalAuthenticationServiceException.class,
-          () -> jwtRegistry.checkAuthStatus(accessTokenId, userId));
+          () -> jwtRegistry.checkAuthStatus(accessTokenId, userId, accessToken));
     }
   }
 

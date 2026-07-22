@@ -14,7 +14,6 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +24,9 @@ public class JwtRegistry {
 
   @Value("${app.jwt.redis.refresh-prefix}")
   private String refreshPrefix;
+
+  @Value("${app.jwt.redis.used-refresh-prefix}")
+  private String usedRefreshPrefix;
 
   @Value("${app.jwt.redis.active-access-prefix}")
   private String activeAccessPrefix;
@@ -87,10 +89,74 @@ public class JwtRegistry {
           return "OK"
           """,
           String.class);
+  private static final RedisScript<Long> ROTATE_SCRIPT =
+      new DefaultRedisScript<>(
+          """
+          local refreshKey = KEYS[1]
+          local usedKey = KEYS[2]
+          local accessKey = KEYS[3]
+
+          local oldRefreshToken = ARGV[1]
+          local newRefreshToken = ARGV[2]
+          local newAccessToken = ARGV[3]
+
+          local now = tonumber(ARGV[4])
+          local refreshExpirationMillis = tonumber(ARGV[5])
+          local tokenExpirationTime = tonumber(ARGV[6])
+          local remainingAccessMillis = tonumber(ARGV[7])
+
+          -- 탈취된 경우 refreshKey, accessKey, usedKey 삭제
+          if redis.call('SISMEMBER', usedKey, oldRefreshToken) == 1 then
+              redis.call('DEL', refreshKey, usedKey, accessKey)
+              return 2
+          end
+
+          -- 만료되거나 로그아웃해서 사라진 경우
+          if not redis.call('ZSCORE', refreshKey, oldRefreshToken) then
+              return 1
+          end
+
+          -- 기존토큰 제거 및 usedToken에 기록
+          redis.call('ZREMRANGEBYSCORE', refreshKey, 0, now)
+          redis.call('ZREM', refreshKey, oldRefreshToken)
+          redis.call('SADD', usedKey, oldRefreshToken)
+
+          if remainingAccessMillis > 0 then
+              redis.call('PEXPIRE', usedKey, remainingAccessMillis)
+          end
+
+          -- 순서있는 Set(만료시간을 기준으로 정렬됨)
+          redis.call('ZADD', refreshKey, tokenExpirationTime, newRefreshToken)
+          redis.call('PEXPIRE', refreshKey, refreshExpirationMillis)
+
+          -- access 토큰 저장
+          if remainingAccessMillis > 0 then
+              redis.call('PSETEX', accessKey, remainingAccessMillis, newAccessToken)
+          end
+
+          return 0
+          """,
+          Long.class);
+  private static final RedisScript<List> AUTH_STATUS_SCRIPT =
+      new DefaultRedisScript<>(
+          """
+          local isBlacklisted = redis.call('EXISTS', KEYS[1])
+          local isUserLocked = redis.call('EXISTS', KEYS[2])
+          local storedAccessToken = redis.call('GET', KEYS[3])
+
+          -- 저장된 토큰이 존재하고, 요청으로 들어온 토큰과 정확히 일치하는지 확인
+          local isAccessTokenActive = 0
+          if storedAccessToken and storedAccessToken == ARGV[1] then
+              isAccessTokenActive = 1
+          end
+
+          return { isBlacklisted, isUserLocked, isAccessTokenActive }
+          """,
+          List.class);
 
   public void registerToken(UUID userId, String refreshToken, String accessToken) {
     String refreshKey = getRefreshKey(userId);
-    String accessKey = getActiveAccessKey(userId, accessToken);
+    String accessKey = getActiveAccessKey(userId);
 
     long now = System.currentTimeMillis();
     long refreshExpirationMillis = properties.refreshTokenExpiration().toMillis();
@@ -118,12 +184,8 @@ public class JwtRegistry {
     return refreshPrefix + userId.toString();
   }
 
-  private String getActiveAccessKey(UUID userId, String accessToken) {
-    String accessTokenId = jwtUtils.getTokenId(accessToken);
-    if (accessTokenId == null) {
-      throw new BadCredentialsException("토큰 식별자가 없는 유효하지 않은 토큰입니다.");
-    }
-    return activeAccessPrefix + userId.toString() + ":" + accessTokenId;
+  private String getActiveAccessKey(UUID userId) {
+    return activeAccessPrefix + userId.toString();
   }
 
   public void deleteRefreshToken(UUID userId, String refreshToken) {
@@ -146,33 +208,56 @@ public class JwtRegistry {
     return blacklistPrefix + accessTokenId;
   }
 
-  // TODO: 기본구현 후 LuaScript를 통한 원자적 처리 구현
   public RotationResult rotateRefreshToken(
-      UUID userId, String refreshToken, String newRefreshToken) {
-    String key = getRefreshKey(userId);
+      UUID userId, String refreshToken, String newRefreshToken, String newAccessToken) {
+    String refreshKey = getRefreshKey(userId);
+    String usedKey = getUsedRefreshPrefix(userId);
+    String accessKey = getActiveAccessKey(userId);
 
-    // 값이 있으면 double값, 없으면 null. O(1)
-    if (redisTemplate.opsForZSet().score(key, refreshToken) == null) {
-      // 키값 전체삭제
-      redisTemplate.delete(key);
-      return RotationResult.COMPROMISED;
+    long now = System.currentTimeMillis();
+    long refreshExpirationMillis = properties.refreshTokenExpiration().toMillis();
+    long tokenExpirationTime = now + refreshExpirationMillis;
+
+    // Access Token 남은 만료 시간
+    Duration remaining = jwtUtils.getRemainingTimeToExpiration(newAccessToken);
+    long remainingAccessMillis = remaining.isNegative() ? 0 : remaining.toMillis();
+
+    try {
+      Long resultCode =
+          redisTemplate.execute(
+              ROTATE_SCRIPT,
+              List.of(refreshKey, usedKey, accessKey),
+              refreshToken,
+              newRefreshToken,
+              newAccessToken,
+              String.valueOf(now),
+              String.valueOf(refreshExpirationMillis),
+              String.valueOf(tokenExpirationTime),
+              String.valueOf(remainingAccessMillis));
+
+      if (resultCode == null) {
+        return RotationResult.INVALID;
+      }
+
+      return switch (resultCode.intValue()) {
+        case 0 -> RotationResult.OK;
+        case 1 -> RotationResult.INVALID;
+        default -> RotationResult.COMPROMISED;
+      };
+    } catch (DataAccessException e) {
+      log.error("[Redis] 토큰 rotation 진행 중 네트워크/redis 장애 발생 - userId: {}", userId, e);
+      throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
-
-    long tokenExpirationTime =
-        System.currentTimeMillis() + properties.refreshTokenExpiration().toMillis();
-
-    redisTemplate.opsForZSet().remove(key, refreshToken);
-    // 순서있는 Set(만료시간을 기준으로 정렬됨)
-    redisTemplate.opsForZSet().add(key, newRefreshToken, tokenExpirationTime);
-    // 토큰키 값 TTL 최신화
-    redisTemplate.expire(key, properties.refreshTokenExpiration());
-
-    return RotationResult.OK;
   }
 
   public enum RotationResult {
     OK,
+    INVALID,
     COMPROMISED
+  }
+
+  private String getUsedRefreshPrefix(UUID userId) {
+    return usedRefreshPrefix + userId.toString();
   }
 
   public void deleteAllRefreshToken(UUID userId) {
@@ -203,22 +288,34 @@ public class JwtRegistry {
     return userLockPrefix + userId.toString();
   }
 
-  public AuthCheckResult checkAuthStatus(String accessTokenId, UUID userId) {
+  public AuthCheckResult checkAuthStatus(String accessTokenId, UUID userId, String accessToken) {
     try {
       String blacklistKey = blacklistKey(accessTokenId);
       String lockKey = lockKey(userId);
+      String accessKey = getActiveAccessKey(userId);
 
-      boolean isBlacklisted = Objects.equals(redisTemplate.hasKey(blacklistKey), true);
-      boolean isUserLocked = Objects.equals(redisTemplate.hasKey(lockKey), true);
+      List<Long> result =
+          redisTemplate.execute(
+              AUTH_STATUS_SCRIPT, List.of(blacklistKey, lockKey, accessKey), accessToken);
 
-      return new AuthCheckResult(isBlacklisted, isUserLocked);
+      if (result == null || result.size() < 3) {
+        log.error("[Redis] Redis스크립트 실행결과가 올바르지 않음 - userId: {}", userId);
+        throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+      }
+
+      boolean isBlacklisted = result.get(0) == 1L;
+      boolean isUserLocked = result.get(1) == 1L;
+      boolean isAccessTokenActive = result.get(2) == 1L;
+
+      return new AuthCheckResult(isBlacklisted, isUserLocked, isAccessTokenActive);
     } catch (DataAccessException e) {
       log.error("[Redis] 인증상태 조회 중 네트워크 장애 발생: reason={}", e.getMessage(), e);
       throw new InternalAuthenticationServiceException("redis 장애로 요청을 처리할 수 없습니다.", e);
     }
   }
 
-  public record AuthCheckResult(boolean isBlacklisted, boolean isUserLocked) {}
+  public record AuthCheckResult(
+      boolean isBlacklisted, boolean isUserLocked, boolean isAccessTokenActive) {}
 
   public boolean registerTempPassword(UUID userId, String tempPassword, Duration expireAt) {
     try {

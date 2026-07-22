@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -232,7 +233,12 @@ class JwtUtilsTest {
   @Nested
   class GetRemainingTimeToExpiration {
 
-    private final String token = "valid-token";
+    private String token;
+
+    @BeforeEach
+    void setUp() {
+      token = "valid-token";
+    }
 
     @Test
     @DisplayName("예외가 발생하면 기본값을 반환한다")
@@ -300,7 +306,12 @@ class JwtUtilsTest {
   @Nested
   class GetTokenId {
 
-    private final String token = "valid-token";
+    private String token;
+
+    @BeforeEach
+    void setUp() {
+      token = "valid-token";
+    }
 
     @Test
     @DisplayName("예외가 발생하면 null을 반환한다")

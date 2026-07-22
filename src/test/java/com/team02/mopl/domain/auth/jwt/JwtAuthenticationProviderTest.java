@@ -63,8 +63,8 @@ class JwtAuthenticationProviderTest {
     given(jwtUtils.getUserId(mockClaimSet)).willReturn(UUID.randomUUID());
     given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
 
-    AuthCheckResult authResult = new AuthCheckResult(true, false);
-    given(jwtRegistry.checkAuthStatus(anyString(), any(UUID.class))).willReturn(authResult);
+    AuthCheckResult authResult = new AuthCheckResult(true, false, false);
+    given(jwtRegistry.checkAuthStatus(anyString(), any(UUID.class), any())).willReturn(authResult);
 
     // when & then
     assertThrows(
@@ -84,11 +84,32 @@ class JwtAuthenticationProviderTest {
     given(jwtUtils.getUserId(mockClaimSet)).willReturn(UUID.randomUUID());
     given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
 
-    AuthCheckResult authResult = new AuthCheckResult(false, true);
-    given(jwtRegistry.checkAuthStatus(anyString(), any(UUID.class))).willReturn(authResult);
+    AuthCheckResult authResult = new AuthCheckResult(false, true, false);
+    given(jwtRegistry.checkAuthStatus(anyString(), any(UUID.class), any())).willReturn(authResult);
 
     // when & then
     assertThrows(LockedException.class, () -> jwtAuthenticationProvider.authenticate(mockAuth));
+  }
+
+  @Test
+  @DisplayName("액세스토큰이 만료되었다면 예외를 던진다")
+  void fail_shouldThrowCredentialsExpiredException_whenAccessTokenIsExpired() {
+    // given
+    Authentication mockAuth = mock(Authentication.class);
+    given(mockAuth.getCredentials()).willReturn("ValidToken");
+
+    JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
+    given(jwtTokenProvider.verifyAccessToken(anyString())).willReturn(mockClaimSet);
+
+    given(jwtUtils.getUserId(mockClaimSet)).willReturn(UUID.randomUUID());
+    given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
+
+    AuthCheckResult authResult = new AuthCheckResult(false, false, false);
+    given(jwtRegistry.checkAuthStatus(anyString(), any(UUID.class), any())).willReturn(authResult);
+
+    // when & then
+    assertThrows(
+        CredentialsExpiredException.class, () -> jwtAuthenticationProvider.authenticate(mockAuth));
   }
 
   @Test
@@ -122,8 +143,8 @@ class JwtAuthenticationProviderTest {
     given(jwtUtils.getUserId(mockClaimSet)).willReturn(UUID.randomUUID());
     given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
 
-    AuthCheckResult authResult = new AuthCheckResult(false, false);
-    given(jwtRegistry.checkAuthStatus(anyString(), any(UUID.class))).willReturn(authResult);
+    AuthCheckResult authResult = new AuthCheckResult(false, false, true);
+    given(jwtRegistry.checkAuthStatus(anyString(), any(UUID.class), any())).willReturn(authResult);
 
     // 권한 얻는데 예외 발생
     given(jwtUtils.getAuthorities(mockClaimSet)).willThrow(BadCredentialsException.class);
@@ -147,9 +168,9 @@ class JwtAuthenticationProviderTest {
     UUID userId = UUID.randomUUID();
     given(jwtUtils.getUserId(mockClaimSet)).willReturn(userId);
 
-    AuthCheckResult authResult = new AuthCheckResult(false, false);
+    AuthCheckResult authResult = new AuthCheckResult(false, false, true);
     given(mockClaimSet.getJWTID()).willReturn(UUID.randomUUID().toString());
-    given(jwtRegistry.checkAuthStatus(anyString(), any(UUID.class))).willReturn(authResult);
+    given(jwtRegistry.checkAuthStatus(anyString(), any(UUID.class), any())).willReturn(authResult);
 
     Collection<? extends GrantedAuthority> authorities =
         List.of(new SimpleGrantedAuthority("ROLE_USER"));

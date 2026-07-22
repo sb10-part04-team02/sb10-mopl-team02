@@ -25,13 +25,13 @@ public class JwtAuthenticationProvider implements AuthenticationProvider {
 
   @Override
   public Authentication authenticate(Authentication authentication) throws AuthenticationException {
-    String token = (String) authentication.getCredentials();
+    String accessToken = (String) authentication.getCredentials();
 
     // 값을 반환했다는 것 자체가 검증이 성공됨을 의미
-    JWTClaimsSet claimsSet = jwtTokenProvider.verifyAccessToken(token);
+    JWTClaimsSet claimsSet = jwtTokenProvider.verifyAccessToken(accessToken);
     UUID userId = jwtUtils.getUserId(claimsSet);
 
-    AuthCheckResult result = jwtRegistry.checkAuthStatus(claimsSet.getJWTID(), userId);
+    AuthCheckResult result = jwtRegistry.checkAuthStatus(claimsSet.getJWTID(), userId, accessToken);
     if (result.isBlacklisted()) {
       throw new CredentialsExpiredException("이미 로그아웃된 토큰입니다.");
     }
@@ -40,10 +40,14 @@ public class JwtAuthenticationProvider implements AuthenticationProvider {
       throw new LockedException("잠금처리된 유저입니다. 어드민에게 문의하세요.");
     }
 
+    if (!result.isAccessTokenActive()) {
+      throw new CredentialsExpiredException("만료된 토큰입니다.");
+    }
+
     Collection<? extends GrantedAuthority> authorities = jwtUtils.getAuthorities(claimsSet);
 
     // @AuthenticationPrincipal사용을 UUID타입 userId을 사용하기로 되어있음
-    return new JwtAuthenticationToken(userId, token, authorities);
+    return new JwtAuthenticationToken(userId, accessToken, authorities);
   }
 
   @Override

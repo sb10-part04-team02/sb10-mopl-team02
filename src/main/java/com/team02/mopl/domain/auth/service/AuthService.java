@@ -78,10 +78,14 @@ public class AuthService {
     String newAccessToken = jwtTokenProvider.generateAccessToken(userDetails);
     String newRefreshToken = jwtTokenProvider.generateRefreshToken(userDetails);
 
-    if (jwtRegistry.rotateRefreshToken(userId, refreshToken, newRefreshToken)
-        == RotationResult.COMPROMISED) {
+    RotationResult rotationResult =
+        jwtRegistry.rotateRefreshToken(userId, refreshToken, newRefreshToken, newAccessToken);
+    if (rotationResult == RotationResult.COMPROMISED) {
       log.warn("토큰 탈취 의심! 모든 토큰을 파기함: userId={}", userId);
       throw new CompromisedTokenException();
+    } else if (rotationResult == RotationResult.INVALID) {
+      log.debug("토큰이 만료되었거나 삭제되었습니다: userId={}", userId);
+      throw new InvalidTokenException();
     }
 
     log.info("토큰 교체 완료: userId={}", userId);
