@@ -1,23 +1,38 @@
 # 모두의 플리
-# {팀 이름}
+# 파트4-2팀
 
 [![codecov](https://codecov.io/gh/sb10-part04-team02/sb10-mopl-team02/graph/badge.svg?token=9J2Y96NIRM)](https://codecov.io/gh/sb10-part04-team02/sb10-mopl-team02)
 ### [팀 노션 페이지 링크](https://tar-sandwich-ba0.notion.site/_-04_-02-404f1e38171183698be38177e52096db?pvs=74)
 ## 팀원 구성
-웨인 (개인 Github 링크)  
-제이든 (개인 Github 링크)  
-마크 (개인 Github 링크)  
-데이지 (개인 Github 링크)  
-제이 (개인 Github 링크)
+박승민 ([@raonPsm](https://github.com/raonPsm))  
+이승민 ([@chosi123](https://github.com/chosi123))  
+임지호 ([@jiho0420](https://github.com/jiho0420))  
+조성진 ([@Amperisk9](https://github.com/Amperisk9))  
+최종인 ([@jonginCh](https://github.com/jonginCh))
 ---
 ## 프로젝트 소개
-- 프로그래밍 교육 사이트의 Spring 백엔드 시스템 구축
-- 프로젝트 기간: 2024.08.13 ~ 2024.09.03
+- 영화/TV/스포츠 콘텐츠에 대한 평가 및 큐레이션과, 실시간 함께보기(공동 시청, 콘텐츠 채팅, DM, 팔로우, 알림) 소셜 기능을 제공하는 플랫폼의 Spring 백엔드 시스템 구축
+- 프로젝트 기간: 2026.06.18 ~ 2026.07.29
 ---
 ## 기술 스택
-- Backend: Spring Boot, Spring Security, Spring Data JPA, QueryDSL
-- Database: PostgreSQL, Redis
+- Backend: Spring Boot, Spring Security (JWT/OAuth2), Spring Data JPA, QueryDSL, Spring Batch, Spring Retry
+- Real-time: WebSocket/STOMP, SSE
+- Messaging: Kafka
+- Database: PostgreSQL, Flyway, Redis
+- Storage: AWS S3
+- Mapping: MapStruct
+- Observability: Prometheus, Grafana, ELK (Elasticsearch/Logstash/Kibana)
+- Docs: Springdoc OpenAPI (Swagger)
+- Infra/CI-CD: Docker, GitHub Actions, AWS ECS
 - 공통 Tool: Git & Github, Discord
+---
+## API / 아키텍처 개요
+- REST API: Controller → Service → Repository 계층, JWT Bearer 인증. API 명세는 배포된 Swagger UI(`/swagger-ui.html`) 참고
+- WebSocket/STOMP (`/ws`, 핸드셰이크 헤더에 액세스 토큰 필요)
+    - `/sub/contents/{id}/watch` — 공동 시청(함께보기)
+    - `/sub|/pub /contents/{id}/chat` — 콘텐츠 채팅 (미영속)
+    - `/sub|/pub /conversations/{id}/direct-messages` — DM
+- SSE (`/api/sse`) — 알림(`notifications`), 비활성 대화 DM(`direct-messages`) 실시간 전달
 ---
 
 <details>
@@ -203,52 +218,123 @@ Prometheus는 호스트에서 실행 중인 앱(`host.docker.internal:8080`)의 
 </details>
 
 ---
+## 협업 컨벤션
+- 브랜치: `<type>/#<이슈번호>/<설명>` (예: `feat/#1/coderabbitai`). `type`은 `feat/fix/refactor/docs/test/chore`
+- PR: `dev` 브랜치로 대상 지정, `main`은 릴리즈 브랜치
+- 코드 리뷰: CodeRabbit이 PR을 한국어(`assertive` 프로필)로 자동 리뷰 (`.coderabbit.yml`)
+- 커밋 메시지: Conventional Commit 스타일 + 한국어 (`feat:`, `fix:`, `chore:`, `docs:` 등)
+- PR/이슈 종료 시 Discord로 알림 (`.github/workflows/pr-discord-notify.yml`)
+
+---
 ## 팀원별 구현 기능 상세
 ### 박승민
 
 (자신이 개발한 기능에 대한 사진이나 gif 파일 첨부)
 
-- **소셜 로그인 API**
-    - Google OAuth 2.0을 활용한 소셜 로그인 기능 구현
-    - 로그인 후 추가 정보 입력을 위한 RESTful API 엔드포인트 개발
-- **회원 추가 정보 입력 API**
-    - 회원 유형(관리자, 학생)에 따른 조건부 입력 처리 API 구현
+- **콘텐츠 데이터 관리**
+    - TMDB(영화/TV), The Sports DB(스포츠) 연동 콘텐츠 수집/적재
+    - Spring Batch 기반 idempotent·chunked 배치 처리
+    - 콘텐츠 CRUD 및 조회(타입 필터, 정렬, 커서 페이지네이션) API
 
 ### 이승민
 
+(자신이 개발한 기능에 대한 사진이나 gif 파일 첨부)
+
+- **실시간 함께보기 (공동 시청)**
+    - WebSocket/STOMP 기반 콘텐츠 동시 시청 기능
+- **콘텐츠 채팅**
+    - 콘텐츠별 실시간 채팅 (WebSocket, 비영속)
+- **DM (다이렉트 메시지)**
+    - 실시간 DM 송수신 및 대화 영속화
+
 ### 임지호
+
+(자신이 개발한 기능에 대한 사진이나 gif 파일 첨부)
+
+- **평가/큐레이팅**
+    - 리뷰(평점/코멘트) 작성·수정·삭제 API
+    - 플레이리스트 생성/구독 및 콘텐츠 추가·삭제 API
 
 ### 조성진
 
+(자신이 개발한 기능에 대한 사진이나 gif 파일 첨부)
+
+- **사용자 관리**
+    - 회원가입/조회/수정 등 사용자 도메인 API
+- **인프라/배포**
+    - AWS 인프라 구성 및 CI/CD 배포 파이프라인 구축
+
 ### 최종인
+
+(자신이 개발한 기능에 대한 사진이나 gif 파일 첨부)
+
+- **알림 / SSE**
+    - 알림 발행 및 SSE 기반 실시간 알림 전달
+- **프로필/팔로우**
+    - 프로필 조회, 팔로우/언팔로우 및 팔로우 알림
 
 ---
 ## 파일 구조
 ```markdown
 com.team02.mopl
 ├── domain
-│   ├── user
-│   │   ├── controller
-│   │   ├── service
-│   │   ├── repository
-│   │   ├── entity
-│   │   ├── dto
-│   │   ├── mapper
-|   |   └── exception
-|   |
-|
+│   ├── auth            # 인증/인가, JWT, OAuth 로그인
+│   │   ├── controller / service / dto / entity / exception
+│   │   ├── jwt
+│   │   ├── login
+│   │   └── oauth
+│   ├── content          # 콘텐츠(영화/TV/스포츠) CRUD, TMDB/스포츠 DB 배치 수집
+│   │   ├── controller / service / repository / mapper / dto / entity / enums / util / exception
+│   │   └── ingestion
+│   ├── contentchat       # 콘텐츠 채팅 (WebSocket, 미영속)
+│   │   └── controller / service / dto / exception
+│   ├── dm                # 다이렉트 메시지
+│   │   ├── controller / service / repository / dto / entity / enums / util / exception
+│   │   └── redis
+│   ├── follow            # 팔로우
+│   │   ├── controller / service / repository / dto / entity / exception
+│   │   └── event
+│   ├── notification       # 알림 (SSE)
+│   │   ├── controller / service / repository / dto / entity / enums / util / exception
+│   │   ├── kafka
+│   │   └── redis
+│   ├── playlist           # 플레이리스트, 구독
+│   │   ├── controller / service / repository / mapper / dto / entity / enums / util / exception
+│   │   └── event
+│   ├── review             # 리뷰/평점
+│   │   └── controller / service / repository / mapper / dto / entity / enums / util / exception
+│   ├── sse                # SSE 연결 관리
+│   │   └── controller / service / repository
+│   ├── subscription       # 플레이리스트 구독
+│   │   ├── controller / service / repository / entity / exception
+│   │   └── event
+│   ├── user               # 회원
+│   │   ├── controller / service / repository / mapper / dto / entity / enums / exception / util
+│   │   └── outbox
+│   └── watching           # 공동 시청 (WebSocket)
+│       ├── controller / service / repository / mapper / dto / entity / enums / exception / util
+│       ├── event
+│       └── websocket
+│
 └── global
-    ├── config
-    ├── security
-    ├── exception
-    ├── entity
-    ├── dto 
+    ├── config             # Spring 설정 (Security, WebSocket, Swagger 등)
+    ├── entity             # BaseEntity 등 공통 엔티티
+    ├── enums
+    ├── exception          # 전역 예외 처리 (@RestControllerAdvice)
+    ├── dto                # 공통 DTO (CursorResponse 등)
+    ├── kafka
+    ├── outbox
+    ├── redis
+    ├── storage
+    ├── logging
+    ├── alert
+    ├── init               # 관리자 계정 자동 초기화 등
+    ├── websocket
     └── util
 ```
 ---
 ## 구현 홈페이지
-(개발한 홈페이지에 대한 링크 게시)
-https://www.codeit.kr/
+https://api.mopl2.cloud/
 ---
 ## 프로젝트 회고록
 (제작한 발표자료 링크 혹은 첨부파일 첨부)
