@@ -296,4 +296,42 @@ class JwtUtilsTest {
       assertThat(result).isLessThanOrEqualTo(Duration.ofMinutes(10));
     }
   }
+
+  @Nested
+  class GetTokenId {
+
+    private final String token = "valid-token";
+
+    @Test
+    @DisplayName("예외가 발생하면 null을 반환한다")
+    void fail_shouldReturnDefaultZero_whenExceptionOccurs() {
+      // given
+      given(jwtTokenProvider.parseClaimsWithoutVerification(anyString()))
+          .willThrow(BadCredentialsException.class);
+
+      // when
+      String result = jwtUtils.getTokenId(token);
+
+      // then
+      assertThat(result).isNull();
+    }
+
+    @Test
+    @DisplayName("토큰 전달시 토큰id를 반환한다")
+    void success_shouldReturnTokenId_whenTokenGiven() {
+      // given
+      JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
+      given(jwtTokenProvider.parseClaimsWithoutVerification(anyString())).willReturn(mockClaimSet);
+
+      String tokenId = "token-id";
+      given(mockClaimSet.getJWTID()).willReturn(tokenId);
+
+      // when
+      String result = jwtUtils.getTokenId(token);
+
+      // then
+      assertThat(result).isNotNull();
+      assertThat(result).isEqualTo(tokenId);
+    }
+  }
 }

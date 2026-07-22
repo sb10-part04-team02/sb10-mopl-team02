@@ -117,4 +117,13 @@ public class JwtUtils {
       return Duration.ZERO;
     }
   }
+
+  public String getTokenId(String token) {
+    try {
+      JWTClaimsSet claimsSet = jwtTokenProvider.parseClaimsWithoutVerification(token);
+      return claimsSet.getJWTID();
+    } catch (BadCredentialsException e) {
+      return null;
+    }
+  }
 }
