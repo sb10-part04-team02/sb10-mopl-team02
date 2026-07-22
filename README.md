@@ -1,20 +1,29 @@
 # 모두의 플리
 # 파트4-2팀
 
-[![codecov](https://codecov.io/gh/sb10-part04-team02/sb10-mopl-team02/graph/badge.svg?token=9J2Y96NIRM)](https://codecov.io/gh/sb10-part04-team02/sb10-mopl-team02)
-### [팀 노션 페이지 링크](https://tar-sandwich-ba0.notion.site/_-04_-02-404f1e38171183698be38177e52096db?pvs=74)
+[![codecov](https://codecov.io/gh/sb10-part04-team02/sb10-mopl-team02/graph/badge.svg?token=9J2Y96NIRM&branch=main)](https://codecov.io/gh/sb10-part04-team02/sb10-mopl-team02?branch=main)
+
+## [팀 노션 페이지 링크](https://tar-sandwich-ba0.notion.site/_-04_-02-404f1e38171183698be38177e52096db?pvs=74)
+
 ## 팀원 구성
+
 박승민 ([@raonPsm](https://github.com/raonPsm))  
 이승민 ([@chosi123](https://github.com/chosi123))  
 임지호 ([@jiho0420](https://github.com/jiho0420))  
 조성진 ([@Amperisk9](https://github.com/Amperisk9))  
 최종인 ([@jonginCh](https://github.com/jonginCh))
+
 ---
+
 ## 프로젝트 소개
+
 - 영화/TV/스포츠 콘텐츠에 대한 평가 및 큐레이션과, 실시간 함께보기(공동 시청, 콘텐츠 채팅, DM, 팔로우, 알림) 소셜 기능을 제공하는 플랫폼의 Spring 백엔드 시스템 구축
 - 프로젝트 기간: 2026.06.18 ~ 2026.07.29
+
 ---
+
 ## 기술 스택
+
 - Backend: Spring Boot, Spring Security (JWT/OAuth2), Spring Data JPA, QueryDSL, Spring Batch, Spring Retry
 - Real-time: WebSocket/STOMP, SSE
 - Messaging: Kafka
@@ -25,14 +34,18 @@
 - Docs: Springdoc OpenAPI (Swagger)
 - Infra/CI-CD: Docker, GitHub Actions, AWS ECS
 - 공통 Tool: Git & Github, Discord
+
 ---
+
 ## API / 아키텍처 개요
-- REST API: Controller → Service → Repository 계층, JWT Bearer 인증. API 명세는 배포된 Swagger UI(`/swagger-ui.html`) 참고
+
+- REST API: Controller → Service → Repository 계층, JWT Bearer 인증. API 명세는 [배포된 Swagger UI](https://api.mopl2.cloud/swagger-ui.html) 참고
 - WebSocket/STOMP (`/ws`, 핸드셰이크 헤더에 액세스 토큰 필요)
     - `/sub/contents/{id}/watch` — 공동 시청(함께보기)
-    - `/sub|/pub /contents/{id}/chat` — 콘텐츠 채팅 (미영속)
-    - `/sub|/pub /conversations/{id}/direct-messages` — DM
+    - 구독: `/sub/contents/{id}/chat`, 발행: `/pub/contents/{id}/chat` — 콘텐츠 채팅 (미영속)
+    - 구독: `/sub/conversations/{id}/direct-messages`, 발행: `/pub/conversations/{id}/direct-messages` — DM
 - SSE (`/api/sse`) — 알림(`notifications`), 비활성 대화 DM(`direct-messages`) 실시간 전달
+
 ---
 
 <details>
@@ -218,7 +231,9 @@ Prometheus는 호스트에서 실행 중인 앱(`host.docker.internal:8080`)의 
 </details>
 
 ---
+
 ## 협업 컨벤션
+
 - 브랜치: `<type>/#<이슈번호>/<설명>` (예: `feat/#1/coderabbitai`). `type`은 `feat/fix/refactor/docs/test/chore`
 - PR: `dev` 브랜치로 대상 지정, `main`은 릴리즈 브랜치
 - 코드 리뷰: CodeRabbit이 PR을 한국어(`assertive` 프로필)로 자동 리뷰 (`.coderabbit.yml`)
@@ -226,7 +241,9 @@ Prometheus는 호스트에서 실행 중인 앱(`host.docker.internal:8080`)의 
 - PR/이슈 종료 시 Discord로 알림 (`.github/workflows/pr-discord-notify.yml`)
 
 ---
+
 ## 팀원별 구현 기능 상세
+
 ### 박승민
 
 (자신이 개발한 기능에 대한 사진이나 gif 파일 첨부)
@@ -274,7 +291,9 @@ Prometheus는 호스트에서 실행 중인 앱(`host.docker.internal:8080`)의 
     - 프로필 조회, 팔로우/언팔로우 및 팔로우 알림
 
 ---
+
 ## 파일 구조
+
 ```markdown
 com.team02.mopl
 ├── domain
@@ -332,9 +351,15 @@ com.team02.mopl
     ├── websocket
     └── util
 ```
+
 ---
+
 ## 구현 홈페이지
+
 https://api.mopl2.cloud/
+
 ---
+
 ## 프로젝트 회고록
+
 (제작한 발표자료 링크 혹은 첨부파일 첨부)
