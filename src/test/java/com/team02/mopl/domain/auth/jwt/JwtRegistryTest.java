@@ -498,4 +498,29 @@ class JwtRegistryTest {
       assertThat(result).isFalse();
     }
   }
+
+  @Nested
+  class DeleteAllToken {
+    @Test
+    @DisplayName("redis에 문제가 생기면 예외를 다시 던진다")
+    void fail_shouldThrowException_whenRedisConnectionFails() {
+      // given
+      willThrow(RedisConnectionFailureException.class)
+          .given(redisTemplate)
+          .execute(any(), anyList());
+
+      // when & then
+      assertThrows(
+          RedisConnectionFailureException.class,
+          () -> jwtRegistry.deleteAllToken(UUID.randomUUID()));
+    }
+
+    @Test
+    @DisplayName("userId로 리프레시, 액세스 토큰을 삭제한다")
+    void success_shouldDeleteRefreshAndAccessToken_whenUserIdIsProvided() {
+      // when & then
+      assertDoesNotThrow(() -> jwtRegistry.deleteAllToken(UUID.randomUUID()));
+      then(redisTemplate).should(times(1)).execute(any(), anyList());
+    }
+  }
 }

@@ -59,7 +59,7 @@ class UserEventListenerTest {
       eventListener.onUserRoleUpdated(event);
 
       // then
-      then(jwtRegistry).should(times(1)).deleteAllRefreshToken(userId);
+      then(jwtRegistry).should(times(1)).deleteAllToken(userId);
     }
 
     @Test
@@ -93,13 +93,11 @@ class UserEventListenerTest {
       // given
       UUID userId = UUID.randomUUID();
       RoleUpdatedEvent event = new RoleUpdatedEvent(userId, Role.USER, Role.ADMIN);
-      willThrow(RedisConnectionFailureException.class)
-          .given(jwtRegistry)
-          .deleteAllRefreshToken(userId);
+      willThrow(RedisConnectionFailureException.class).given(jwtRegistry).deleteAllToken(userId);
 
       // when & then
       assertDoesNotThrow(() -> eventListener.onUserRoleUpdated(event));
-      then(jwtRegistry).should(times(1)).deleteAllRefreshToken(userId);
+      then(jwtRegistry).should(times(1)).deleteAllToken(userId);
     }
 
     @Test
@@ -114,7 +112,7 @@ class UserEventListenerTest {
 
       // when & then
       assertDoesNotThrow(() -> eventListener.onUserRoleUpdated(event));
-      then(jwtRegistry).should(times(1)).deleteAllRefreshToken(userId);
+      then(jwtRegistry).should(times(1)).deleteAllToken(userId);
       then(notificationService).should(times(1)).createNotification(any());
     }
 

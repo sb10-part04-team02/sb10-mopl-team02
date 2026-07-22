@@ -153,6 +153,8 @@ public class JwtRegistry {
           return { isBlacklisted, isUserLocked, isAccessTokenActive }
           """,
           List.class);
+  private static final RedisScript<Long> DELETE_ALL_TOKENS_SCRIPT =
+      new DefaultRedisScript<>("return redis.call('DEL', KEYS[1], KEYS[2])", Long.class);
 
   public void registerToken(UUID userId, String refreshToken, String accessToken) {
     String refreshKey = getRefreshKey(userId);
@@ -366,5 +368,17 @@ public class JwtRegistry {
 
   private String tempPwKey(UUID userId) {
     return tempPwPrefix + userId.toString();
+  }
+
+  public void deleteAllToken(UUID userId) {
+    String accessKey = getActiveAccessKey(userId);
+    String refreshKey = getRefreshKey(userId);
+
+    try {
+      redisTemplate.execute(DELETE_ALL_TOKENS_SCRIPT, List.of(accessKey, refreshKey));
+    } catch (Exception e) {
+      log.error("[Redis] 액세스 토큰 삭제 실패: userId={}", userId, e);
+      throw e;
+    }
   }
 }
