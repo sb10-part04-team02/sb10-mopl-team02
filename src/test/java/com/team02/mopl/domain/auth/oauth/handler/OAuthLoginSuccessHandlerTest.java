@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 
@@ -17,20 +18,26 @@ import com.team02.mopl.domain.user.dto.UserDto;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.global.exception.BusinessException;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseCookie;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -101,6 +108,76 @@ class OAuthLoginSuccessHandlerTest {
   }
 
   @Test
+  @DisplayName("계정이 잠긴경우 에러문구가 담긴 url을 redirect 한다")
+  void fail_shouldRedirectUrl_whenUserIsLocked() throws IOException {
+    // given
+    OidcUser mockOidcUser = mock(OidcUser.class);
+    given(mockAuth.getPrincipal()).willReturn(mockOidcUser);
+    given(mockOidcUser.getAttribute(anyString())).willReturn("socialUserId");
+
+    User mockUser = mock(User.class);
+    String registrationId = "google";
+    given(((OAuth2AuthenticationToken) mockAuth).getAuthorizedClientRegistrationId())
+        .willReturn(registrationId);
+    given(userRepository.findBySubjectAndProviderAndDeletedAtIsNull(any(), anyString()))
+        .willReturn(Optional.of(mockUser));
+
+    given(mockUser.isLocked()).willReturn(true);
+
+    // when
+    successHandler.onAuthenticationSuccess(request, response, mockAuth);
+
+    // then
+    assertThat(response.getRedirectedUrl())
+        .startsWith("https://localhost:8080/#/sign-in?error=oauth_failed")
+        .contains("error_message=" + URLEncoder.encode("잠긴 계정입니다.", StandardCharsets.UTF_8));
+  }
+
+  private static Stream<Arguments> provideExceptions() {
+    return Stream.of(
+        Arguments.of(BusinessException.class, "서버 내부 오류가 발생했습니다."),
+        Arguments.of(BadCredentialsException.class, "유효한 토큰이 아닙니다."));
+  }
+
+  @ParameterizedTest
+  @MethodSource("provideExceptions")
+  @DisplayName("예외가 발생한경우 에러문구가 담긴 url을 redirect 한다")
+  void fail_shouldRedirectUrl_whenExceptionOccurs(
+      Class<? extends Exception> exceptionType, String errorMessage) throws IOException {
+    // given
+    OidcUser mockOidcUser = mock(OidcUser.class);
+    given(mockAuth.getPrincipal()).willReturn(mockOidcUser);
+    given(mockOidcUser.getAttribute(anyString())).willReturn("socialUserId");
+
+    User mockUser = mock(User.class);
+    String registrationId = "google";
+    given(((OAuth2AuthenticationToken) mockAuth).getAuthorizedClientRegistrationId())
+        .willReturn(registrationId);
+    given(userRepository.findBySubjectAndProviderAndDeletedAtIsNull(any(), anyString()))
+        .willReturn(Optional.of(mockUser));
+
+    UserDto mockUserDto = mock(UserDto.class);
+    given(userMapper.toDto(mockUser)).willReturn(mockUserDto);
+
+    String refreshToken = "refreshToken";
+    given(jwtTokenProvider.generateRefreshToken(any(MoplUserDetails.class)))
+        .willReturn(refreshToken);
+    String accessToken = "accessToken";
+    given(jwtTokenProvider.generateAccessToken(any(MoplUserDetails.class))).willReturn(accessToken);
+    willThrow(exceptionType)
+        .given(jwtRegistry)
+        .registerToken(any(), eq(refreshToken), eq(accessToken));
+
+    // when
+    successHandler.onAuthenticationSuccess(request, response, mockAuth);
+
+    // then
+    assertThat(response.getRedirectedUrl())
+        .startsWith("https://localhost:8080/#/sign-in?error=oauth_failed")
+        .contains("error_message=" + URLEncoder.encode(errorMessage, StandardCharsets.UTF_8));
+  }
+
+  @Test
   @DisplayName("토큰을 발급하고 response에 담아 메인페이지 url에 redirect 한다")
   void success_shouldIssueTokensAndRedirectToMainPage_whenAuthenticationSucceeds()
       throws IOException {
@@ -122,6 +199,8 @@ class OAuthLoginSuccessHandlerTest {
     String refreshToken = "refreshToken";
     given(jwtTokenProvider.generateRefreshToken(any(MoplUserDetails.class)))
         .willReturn(refreshToken);
+    String accessToken = "accessToken";
+    given(jwtTokenProvider.generateAccessToken(any(MoplUserDetails.class))).willReturn(accessToken);
 
     ResponseCookie mockCookie =
         ResponseCookie.from("REFRESH_TOKEN", refreshToken).path("/").httpOnly(true).build();
@@ -131,7 +210,7 @@ class OAuthLoginSuccessHandlerTest {
     successHandler.onAuthenticationSuccess(request, response, mockAuth);
 
     // then
-    then(jwtRegistry).should(times(1)).registerRefreshToken(any(), eq(refreshToken));
+    then(jwtRegistry).should(times(1)).registerToken(any(), eq(refreshToken), eq(accessToken));
     assertThat(response.getRedirectedUrl()).isEqualTo("https://localhost:8080/");
     assertThat(response.getCookies())
         .anyMatch(

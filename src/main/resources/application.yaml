@@ -166,6 +166,7 @@ app:
     refresh-token-expiration: 7d  # 일주일
     redis:
       refresh-prefix: "jwt:refresh:"
+      active-access-prefix: "jwt:active-access:"
       max-account-count: 1
       blacklist-prefix: "jwt:blacklist:"
       user-lock-prefix: "jwt:userlock:"

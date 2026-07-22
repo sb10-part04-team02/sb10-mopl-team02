@@ -1,5 +1,8 @@
 package com.team02.mopl.domain.auth.jwt;
 
+import com.team02.mopl.domain.auth.jwt.utils.JwtUtils;
+import com.team02.mopl.global.exception.BusinessException;
+import com.team02.mopl.global.exception.ErrorCode;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
@@ -11,6 +14,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +25,9 @@ public class JwtRegistry {
 
   @Value("${app.jwt.redis.refresh-prefix}")
   private String refreshPrefix;
+
+  @Value("${app.jwt.redis.active-access-prefix}")
+  private String activeAccessPrefix;
 
   @Value("${app.jwt.redis.max-account-count}")
   private long maxAccountCount;
@@ -35,38 +42,92 @@ public class JwtRegistry {
   private String tempPwPrefix;
 
   private final JwtProperties properties;
+  private final JwtUtils jwtUtils;
   private final StringRedisTemplate redisTemplate;
+
   private static final RedisScript<Long> RELEASE_SCRIPT =
       new DefaultRedisScript<>(
           "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
           Long.class);
+  private static final RedisScript<String> REGISTER_SCRIPT =
+      new DefaultRedisScript<>(
+          """
+          local refreshKey = KEYS[1]
+          local accessKey = KEYS[2]
 
-  // TODO: 기본구현 후 LuaScript를 통한 원자적 처리 구현
-  public void registerRefreshToken(UUID userId, String refreshToken) {
-    String key = refreshKey(userId);
+          local refreshToken = ARGV[1]
+          local accessToken = ARGV[2]
+          local now = tonumber(ARGV[3])
+          local refreshExpirationMillis = tonumber(ARGV[4])
+          local tokenExpirationTime = tonumber(ARGV[5])
+          local maxAccountCount = tonumber(ARGV[6])
+          local remainingAccessMillis = tonumber(ARGV[7])
+
+          -- 만료시간 토큰 지우기
+          redis.call('ZREMRANGEBYSCORE', refreshKey, 0, now)
+          -- 순서있는 Set(만료시간을 기준으로 정렬됨)
+          redis.call('ZADD', refreshKey, tokenExpirationTime, refreshToken)
+
+          -- 개수제한
+          local currentCount = redis.call('ZCARD', refreshKey)
+          if currentCount > maxAccountCount then
+              local removeCount = currentCount - maxAccountCount
+              redis.call('ZREMRANGEBYRANK', refreshKey, 0, removeCount - 1)
+          end
+
+          -- refresh 토큰키값 최신화
+          local refreshTtlSeconds = math.ceil(refreshExpirationMillis / 1000)
+          redis.call('EXPIRE', refreshKey, refreshTtlSeconds)
+
+          -- access 토큰 저장
+          if remainingAccessMillis > 0 then
+              redis.call('PSETEX', accessKey, remainingAccessMillis, accessToken)
+          end
+
+          return "OK"
+          """,
+          String.class);
+
+  public void registerToken(UUID userId, String refreshToken, String accessToken) {
+    String refreshKey = getRefreshKey(userId);
+    String accessKey = getActiveAccessKey(userId, accessToken);
+
     long now = System.currentTimeMillis();
-    long tokenExpirationTime = now + properties.refreshTokenExpiration().toMillis();
+    long refreshExpirationMillis = properties.refreshTokenExpiration().toMillis();
+    long tokenExpirationTime = now + refreshExpirationMillis;
+    long remainingAccessMillis = jwtUtils.getRemainingTimeToExpiration(accessToken).toMillis();
 
-    // 만료시간 토큰 지우기
-    redisTemplate.opsForZSet().removeRangeByScore(key, 0, now);
-    // 순서있는 Set(만료시간을 기준으로 정렬됨)
-    redisTemplate.opsForZSet().add(key, refreshToken, tokenExpirationTime);
-    // 개수제한
-    Long currentCount = redisTemplate.opsForZSet().size(key);
-    if (currentCount != null && currentCount > maxAccountCount) {
-      long removeCount = currentCount - maxAccountCount;
-      redisTemplate.opsForZSet().removeRange(key, 0, removeCount - 1);
+    try {
+      redisTemplate.execute(
+          REGISTER_SCRIPT,
+          List.of(refreshKey, accessKey),
+          refreshToken,
+          accessToken,
+          String.valueOf(now),
+          String.valueOf(refreshExpirationMillis),
+          String.valueOf(tokenExpirationTime),
+          String.valueOf(maxAccountCount),
+          String.valueOf(remainingAccessMillis));
+    } catch (DataAccessException e) {
+      log.error("[Redis] 토큰 등록 중 네트워크/redis 장애 발생 - userId: {}", userId, e);
+      throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
-    // 토큰키 값 TTL 최신화
-    redisTemplate.expire(key, properties.refreshTokenExpiration());
   }
 
-  private String refreshKey(UUID userId) {
+  private String getRefreshKey(UUID userId) {
     return refreshPrefix + userId.toString();
   }
 
+  private String getActiveAccessKey(UUID userId, String accessToken) {
+    String accessTokenId = jwtUtils.getTokenId(accessToken);
+    if (accessTokenId == null) {
+      throw new BadCredentialsException("토큰 식별자가 없는 유효하지 않은 토큰입니다.");
+    }
+    return activeAccessPrefix + userId.toString() + ":" + accessTokenId;
+  }
+
   public void deleteRefreshToken(UUID userId, String refreshToken) {
-    String key = refreshKey(userId);
+    String key = getRefreshKey(userId);
 
     // RefreshToken 삭제
     redisTemplate.opsForZSet().remove(key, refreshToken);
@@ -88,7 +149,7 @@ public class JwtRegistry {
   // TODO: 기본구현 후 LuaScript를 통한 원자적 처리 구현
   public RotationResult rotateRefreshToken(
       UUID userId, String refreshToken, String newRefreshToken) {
-    String key = refreshKey(userId);
+    String key = getRefreshKey(userId);
 
     // 값이 있으면 double값, 없으면 null. O(1)
     if (redisTemplate.opsForZSet().score(key, refreshToken) == null) {
@@ -115,13 +176,13 @@ public class JwtRegistry {
   }
 
   public void deleteAllRefreshToken(UUID userId) {
-    String refreshKey = refreshKey(userId);
+    String refreshKey = getRefreshKey(userId);
     // RefreshToken 전체삭제
     redisTemplate.delete(refreshKey);
   }
 
   public void lockUser(UUID userId) {
-    String refreshKey = refreshKey(userId);
+    String refreshKey = getRefreshKey(userId);
     String lockKey = lockKey(userId);
 
     // TODO: 기본 구현 후, 원자적 처리
