@@ -12,6 +12,7 @@ import com.team02.mopl.domain.auth.oauth.handler.OAuthLoginSuccessHandler;
 import com.team02.mopl.domain.auth.oauth.repository.MoplCookieOAuth2AuthorizationRequestRepository;
 import com.team02.mopl.domain.auth.oauth.service.MoplOidcUserService;
 import com.team02.mopl.global.config.auth.handler.SpaCsrfTokenRequestHandler;
+import jakarta.servlet.DispatcherType;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -81,6 +82,10 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             auth ->
                 auth
+                    // 비동기 내부 호출은 허용
+                    .dispatcherTypeMatchers(DispatcherType.ASYNC)
+                    .permitAll()
+
                     // 예외 URL
                     .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token")
                     .permitAll()
