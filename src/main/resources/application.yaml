@@ -14,6 +14,14 @@ spring:
   flyway:
     enabled: true  # 기동 시 db/migration 마이그레이션 적용 (스키마 자동 생성·버전관리)
 
+  datasource:
+    hikari:
+      # 운영 스펙 기준 산정: RDS db.t4g.micro(max_connections ≈ 112), 앱 ECS 인스턴스 2대
+      # → 인스턴스 수 × 풀 ≤ RDS 가용 커넥션 (2 × 15 = 30, ~100 대비 안전). 무설정 시 Spring 기본값 10이 방치됨.
+      maximum-pool-size: 15
+      minimum-idle: 5           # 프리티어 유휴 커넥션 절약
+      connection-timeout: 10000  # 30초→10초. 빠른 실패로 대기 큐 폭주 방지
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
