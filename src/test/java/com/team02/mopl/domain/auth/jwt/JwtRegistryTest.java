@@ -10,7 +10,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
@@ -263,19 +262,29 @@ class JwtRegistryTest {
   @Nested
   class LockUser {
     @Test
+    @DisplayName("redis에 문제가 생기면 예외를 다시 던진다")
+    void fail_shouldThrowException_whenRedisConnectionFails() {
+      // given
+      given(properties.accessTokenExpiration()).willReturn(Duration.ZERO);
+      willThrow(RedisConnectionFailureException.class)
+          .given(redisTemplate)
+          .execute(any(), anyList(), any(), any());
+
+      // when & then
+      assertThrows(
+          RedisConnectionFailureException.class, () -> jwtRegistry.lockUser(UUID.randomUUID()));
+    }
+
+    @Test
     @DisplayName("유저ID가 주어지면 리프레시 토큰을 전체 삭제하고 유저 잠금키를 추가한다")
     void success_shouldDeleteAllRefreshTokenAndLockKeyUserId_whenUserIdIsProvided() {
       // given
       UUID userId = UUID.randomUUID();
-      given(redisTemplate.opsForValue()).willReturn(valueOperations);
-      given(properties.accessTokenExpiration()).willReturn(mock(Duration.class));
+      given(properties.accessTokenExpiration()).willReturn(Duration.ZERO);
 
-      // when
-      jwtRegistry.lockUser(userId);
-
-      // then
-      then(redisTemplate).should(times(1)).delete(anyString());
-      then(valueOperations).should(times(1)).set(anyString(), anyString(), any(Duration.class));
+      // when & then
+      assertDoesNotThrow(() -> jwtRegistry.lockUser(UUID.randomUUID()));
+      then(redisTemplate).should(times(1)).execute(any(), anyList(), any(), any());
     }
   }
 

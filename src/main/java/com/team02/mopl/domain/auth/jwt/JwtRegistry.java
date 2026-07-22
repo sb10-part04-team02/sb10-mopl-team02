@@ -155,6 +155,14 @@ public class JwtRegistry {
           List.class);
   private static final RedisScript<Long> DELETE_ALL_TOKENS_SCRIPT =
       new DefaultRedisScript<>("return redis.call('DEL', KEYS[1], KEYS[2])", Long.class);
+  private static final RedisScript<String> LOCK_USER_SCRIPT =
+      new DefaultRedisScript<>(
+          """
+          redis.call('DEL', KEYS[1])
+          redis.call('SETEX', KEYS[2], ARGV[2], ARGV[1])
+          return 'OK'
+          """,
+          String.class);
 
   public void registerToken(UUID userId, String refreshToken, String accessToken) {
     String refreshKey = getRefreshKey(userId);
@@ -271,13 +279,15 @@ public class JwtRegistry {
   public void lockUser(UUID userId) {
     String refreshKey = getRefreshKey(userId);
     String lockKey = lockKey(userId);
+    long ttlSeconds = properties.accessTokenExpiration().toSeconds();
 
-    // TODO: 기본 구현 후, 원자적 처리
-
-    // RefreshToken 전체삭제
-    redisTemplate.delete(refreshKey);
-    // AccessToken 만료시간만큼 TTL 설정
-    redisTemplate.opsForValue().set(lockKey, "lock", properties.accessTokenExpiration());
+    try {
+      redisTemplate.execute(
+          LOCK_USER_SCRIPT, List.of(refreshKey, lockKey), "lock", String.valueOf(ttlSeconds));
+    } catch (DataAccessException e) {
+      log.error("[Redis] 유저 잠금 처리 실패: userId={}", userId, e);
+      throw e;
+    }
   }
 
   public void unlockUser(UUID userId) {
