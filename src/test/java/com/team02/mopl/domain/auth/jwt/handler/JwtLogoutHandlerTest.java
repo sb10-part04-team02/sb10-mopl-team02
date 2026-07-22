@@ -10,6 +10,7 @@ import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -26,9 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -44,10 +43,10 @@ class JwtLogoutHandlerTest {
           "this-is-a-dummy-secret-key-for-testing-purposes-only-32bytes",
           Duration.ofMinutes(10),
           Duration.ofDays(7));
-  @Spy private JwtUtils jwtUtils = new JwtUtils(jwtProperties);
   @Mock private JwtTokenProvider jwtTokenProvider;
   @Mock private JwtRegistry jwtRegistry;
-  @InjectMocks private JwtLogoutHandler jwtLogoutHandler;
+  private JwtUtils jwtUtils;
+  private JwtLogoutHandler jwtLogoutHandler;
 
   private MockHttpServletRequest request;
   private MockHttpServletResponse response;
@@ -58,6 +57,9 @@ class JwtLogoutHandlerTest {
     request = new MockHttpServletRequest();
     response = new MockHttpServletResponse();
     mockAuth = mock(Authentication.class);
+
+    jwtUtils = spy(new JwtUtils(jwtProperties, jwtTokenProvider));
+    jwtLogoutHandler = new JwtLogoutHandler(jwtUtils, jwtTokenProvider, jwtRegistry);
   }
 
   @Test

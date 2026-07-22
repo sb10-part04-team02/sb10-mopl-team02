@@ -8,10 +8,14 @@ import static org.mockito.Mockito.mock;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.team02.mopl.domain.auth.jwt.JwtProperties;
+import com.team02.mopl.domain.auth.jwt.JwtTokenProvider;
 import java.text.ParseException;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -29,6 +33,7 @@ import org.springframework.security.core.GrantedAuthority;
 @ExtendWith(MockitoExtension.class)
 class JwtUtilsTest {
 
+  @Mock private JwtTokenProvider jwtTokenProvider;
   @Mock private JwtProperties jwtProperties;
   @InjectMocks private JwtUtils jwtUtils;
 
@@ -221,6 +226,74 @@ class JwtUtilsTest {
           .hasSize(1)
           .extracting(GrantedAuthority::getAuthority)
           .containsExactly("ROLE_USER");
+    }
+  }
+
+  @Nested
+  class GetRemainingTimeToExpiration {
+
+    private final String token = "valid-token";
+
+    @Test
+    @DisplayName("예외가 발생하면 기본값을 반환한다")
+    void fail_shouldReturnDefaultZero_whenExceptionOccurs() {
+      // given
+      given(jwtTokenProvider.parseClaimsWithoutVerification(anyString()))
+          .willThrow(BadCredentialsException.class);
+
+      // when
+      Duration result = jwtUtils.getRemainingTimeToExpiration(token);
+
+      // then
+      assertThat(result).isEqualTo(Duration.ZERO);
+    }
+
+    @Test
+    @DisplayName("만료시간이 없으면 기본값을 반환한다")
+    void fail_shouldReturnDefaultZero_whenExpirationTimeIsNull() {
+      // given
+      JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
+      given(jwtTokenProvider.parseClaimsWithoutVerification(anyString())).willReturn(mockClaimSet);
+      given(mockClaimSet.getExpirationTime()).willReturn(null);
+
+      // when
+      Duration result = jwtUtils.getRemainingTimeToExpiration(token);
+
+      // then
+      assertThat(result).isEqualTo(Duration.ZERO);
+    }
+
+    @Test
+    @DisplayName("만료시간이 지났면 기본값을 반환한다")
+    void fail_shouldReturnDefaultZero_whenExpirationTimeIsPast() {
+      // given
+      JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
+      given(jwtTokenProvider.parseClaimsWithoutVerification(anyString())).willReturn(mockClaimSet);
+      given(mockClaimSet.getExpirationTime())
+          .willReturn(Date.from(Instant.now().minus(10, ChronoUnit.MINUTES)));
+
+      // when
+      Duration result = jwtUtils.getRemainingTimeToExpiration(token);
+
+      // then
+      assertThat(result).isEqualTo(Duration.ZERO);
+    }
+
+    @Test
+    @DisplayName("토큰 전달시 남은시간을 반환한다")
+    void success_shouldReturnRemainingDuration_whenTokenGiven() {
+      // given
+      JWTClaimsSet mockClaimSet = mock(JWTClaimsSet.class);
+      given(jwtTokenProvider.parseClaimsWithoutVerification(anyString())).willReturn(mockClaimSet);
+      given(mockClaimSet.getExpirationTime())
+          .willReturn(Date.from(Instant.now().plus(10, ChronoUnit.MINUTES)));
+
+      // when
+      Duration result = jwtUtils.getRemainingTimeToExpiration(token);
+
+      // then
+      assertThat(result).isPositive();
+      assertThat(result).isLessThanOrEqualTo(Duration.ofMinutes(10));
     }
   }
 }

@@ -2,9 +2,13 @@ package com.team02.mopl.domain.auth.jwt.utils;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.team02.mopl.domain.auth.jwt.JwtProperties;
+import com.team02.mopl.domain.auth.jwt.JwtTokenProvider;
 import com.team02.mopl.domain.user.entity.enums.Role;
 import java.text.ParseException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +26,7 @@ public class JwtUtils {
 
   public static final String REFRESH_TOKEN_COOKIE_NAME = "REFRESH_TOKEN";
   private final JwtProperties properties;
+  private final JwtTokenProvider jwtTokenProvider;
 
   public String resolveAccessToken(String bearerToken) {
     if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
@@ -92,6 +97,24 @@ public class JwtUtils {
       return true;
     } catch (IllegalArgumentException e) {
       return false;
+    }
+  }
+
+  public Duration getRemainingTimeToExpiration(String token) {
+    try {
+      JWTClaimsSet claimsSet = jwtTokenProvider.parseClaimsWithoutVerification(token);
+      Date expirationDate = claimsSet.getExpirationTime();
+      if (expirationDate == null) {
+        return Duration.ZERO;
+      }
+
+      // 남은시간 구하기
+      Instant expirationTime = expirationDate.toInstant();
+      Duration remaining = Duration.between(Instant.now(), expirationTime);
+
+      return remaining.isNegative() ? Duration.ZERO : remaining;
+    } catch (BadCredentialsException e) {
+      return Duration.ZERO;
     }
   }
 }
