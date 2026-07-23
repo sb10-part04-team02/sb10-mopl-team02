@@ -24,16 +24,45 @@
 
 ## 기술 스택
 
-- Backend: Spring Boot, Spring Security (JWT/OAuth2), Spring Data JPA, QueryDSL, Spring Batch, Spring Retry
-- Real-time: WebSocket/STOMP, SSE
-- Messaging: Kafka
-- Database: PostgreSQL, Flyway, Redis
-- Storage: AWS S3
-- Mapping: MapStruct
-- Observability: Prometheus, Grafana, ELK (Elasticsearch/Logstash/Kibana)
-- Docs: Springdoc OpenAPI (Swagger)
-- Infra/CI-CD: Docker, GitHub Actions, AWS ECS
-- 공통 Tool: Git & Github, Discord
+**Backend**
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-6DB33F?style=flat-square&logo=springboot&logoColor=white)
+![Spring Security](https://img.shields.io/badge/Spring%20Security-6DB33F?style=flat-square&logo=springsecurity&logoColor=white)
+![Spring Data JPA](https://img.shields.io/badge/Spring%20Data%20JPA-6DB33F?style=flat-square&logo=spring&logoColor=white)
+![QueryDSL](https://img.shields.io/badge/QueryDSL-59666C?style=flat-square)
+![Spring Batch](https://img.shields.io/badge/Spring%20Batch-6DB33F?style=flat-square&logo=spring&logoColor=white)
+![OAuth2/JWT](https://img.shields.io/badge/OAuth2%2FJWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)
+
+**Real-time / Messaging**
+![WebSocket](https://img.shields.io/badge/WebSocket%2FSTOMP-010101?style=flat-square&logo=socketdotio&logoColor=white)
+![SSE](https://img.shields.io/badge/SSE-FF6600?style=flat-square)
+![Kafka](https://img.shields.io/badge/Kafka-231F20?style=flat-square&logo=apachekafka&logoColor=white)
+
+**Database / Storage**
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![Flyway](https://img.shields.io/badge/Flyway-CC0200?style=flat-square&logo=flyway&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white)
+![AWS S3](https://img.shields.io/badge/AWS%20S3-569A31?style=flat-square&logo=amazons3&logoColor=white)
+
+**Mapping / Docs**
+![MapStruct](https://img.shields.io/badge/MapStruct-59666C?style=flat-square)
+![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=flat-square&logo=swagger&logoColor=black)
+
+**Observability**
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=flat-square&logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-F46800?style=flat-square&logo=grafana&logoColor=white)
+![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?style=flat-square&logo=elasticsearch&logoColor=white)
+![Logstash](https://img.shields.io/badge/Logstash-005571?style=flat-square&logo=logstash&logoColor=white)
+![Kibana](https://img.shields.io/badge/Kibana-005571?style=flat-square&logo=kibana&logoColor=white)
+
+**Infra / CI-CD**
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)
+![AWS ECS](https://img.shields.io/badge/AWS%20ECS-FF9900?style=flat-square&logo=amazonecs&logoColor=white)
+
+**공통 Tool**
+![Git](https://img.shields.io/badge/Git-F05032?style=flat-square&logo=git&logoColor=white)
+![GitHub](https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=github&logoColor=white)
+![Discord](https://img.shields.io/badge/Discord-5865F2?style=flat-square&logo=discord&logoColor=white)
 
 ---
 
@@ -267,17 +296,26 @@ Prometheus는 호스트에서 실행 중인 앱(`host.docker.internal:8080`)의 
 
 ### 임지호
 
-- **평가/큐레이팅**
-    - 리뷰(평점/코멘트) 작성·수정·삭제 API
-    - 플레이리스트 생성/구독 및 콘텐츠 추가·삭제 API
-- **AWS 인프라 구성 및 CI/CD 배포 파이프라인 구축**
+- **평가/큐레이팅 도메인**
+    - 리뷰 작성·수정·삭제 및 콘텐츠 평점·리뷰 수 집계
+    - 플레이리스트 생성·수정·삭제, 콘텐츠 추가·삭제, 구독/구독 취소 API
+    - 리뷰·플레이리스트 목록 커서 페이지네이션 조회
+- **AWS 인프라 구성 / 배포**
+    - ECS Fargate(ARM64) 운영 환경 구축, nginx·app 서비스 분리 + Service Connect로 app 인스턴스 요청 분산
+    - CloudFlare → ALB(HTTPS/ACM) → nginx → app 엣지 TLS 구성, RDS·ElastiCache·Kafka·S3/CloudFront 연동
+    - Flyway 도입으로 DB 스키마 마이그레이션 자동화
+- **CI/CD 파이프라인**
+    - CI: Spotless·SpotBugs 검사, 테스트, JaCoCo 커버리지 검증
+    - CD: `dev` push 시 자동 배포. GitHub OIDC 인증, ECR 푸시 → 태스크 정의 등록 → ECS 서비스 업데이트
+    - circuit breaker 자동 롤백 및 배포 결과 검증
 
 ### 조성진
 
 - **사용자 관리**
     - 회원가입/조회/수정 등 사용자 도메인 API
-- **인프라/배포**
-    - AWS 인프라 구성 및 CI/CD 배포 파이프라인 구축
+- **인증/인가**
+    - Custom FilterChain 및 AuthenticationProvider 기반 인증/인가 파이프라인 구축
+    - OAuth2기반 Google, Kakao OIDC 로그인 파이프라인 구축=
 
 ### 최종인
 
