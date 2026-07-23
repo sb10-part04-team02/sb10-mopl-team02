@@ -1,23 +1,95 @@
 # 모두의 플리
-# {팀 이름}
+# 파트4-2팀
 
-[![codecov](https://codecov.io/gh/sb10-part04-team02/sb10-mopl-team02/graph/badge.svg?token=9J2Y96NIRM)](https://codecov.io/gh/sb10-part04-team02/sb10-mopl-team02)
-### [팀 노션 페이지 링크](https://tar-sandwich-ba0.notion.site/_-04_-02-404f1e38171183698be38177e52096db?pvs=74)
+[![codecov](https://codecov.io/gh/sb10-part04-team02/sb10-mopl-team02/graph/badge.svg?token=9J2Y96NIRM&branch=main)](https://codecov.io/gh/sb10-part04-team02/sb10-mopl-team02?branch=main)
+
+## [팀 노션 페이지 링크](https://tar-sandwich-ba0.notion.site/_-04_-02-404f1e38171183698be38177e52096db?pvs=74)
+
 ## 팀원 구성
-웨인 (개인 Github 링크)  
-제이든 (개인 Github 링크)  
-마크 (개인 Github 링크)  
-데이지 (개인 Github 링크)  
-제이 (개인 Github 링크)
+
+박승민 ([@raonPsm](https://github.com/raonPsm))  
+이승민 ([@chosi123](https://github.com/chosi123))  
+임지호 ([@jiho0420](https://github.com/jiho0420))  
+조성진 ([@Amperisk9](https://github.com/Amperisk9))  
+최종인 ([@jonginCh](https://github.com/jonginCh))
+
 ---
+
 ## 프로젝트 소개
-- 프로그래밍 교육 사이트의 Spring 백엔드 시스템 구축
-- 프로젝트 기간: 2024.08.13 ~ 2024.09.03
+
+- 영화/TV/스포츠 콘텐츠에 대한 평가 및 큐레이션과, 실시간 함께보기(공동 시청, 콘텐츠 채팅, DM, 팔로우, 알림) 소셜 기능을 제공하는 플랫폼의 Spring 백엔드 시스템 구축
+- 프로젝트 기간: 2026.06.18 ~ 2026.07.29
+
 ---
+
 ## 기술 스택
-- Backend: Spring Boot, Spring Security, Spring Data JPA, QueryDSL
-- Database: PostgreSQL, Redis
-- 공통 Tool: Git & Github, Discord
+
+**Backend**
+![Java 17](https://img.shields.io/badge/Java%2017-437291?style=flat-square&logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-6DB33F?style=flat-square&logo=springboot&logoColor=white)
+![Spring Security](https://img.shields.io/badge/Spring%20Security-6DB33F?style=flat-square&logo=springsecurity&logoColor=white)
+![Spring Data JPA](https://img.shields.io/badge/Spring%20Data%20JPA-6DB33F?style=flat-square&logo=spring&logoColor=white)
+![QueryDSL](https://img.shields.io/badge/QueryDSL-59666C?style=flat-square)
+![Spring Batch](https://img.shields.io/badge/Spring%20Batch-6DB33F?style=flat-square&logo=spring&logoColor=white)
+![Bean Validation](https://img.shields.io/badge/Bean%20Validation-6DB33F?style=flat-square&logo=hibernate&logoColor=white)
+![Actuator](https://img.shields.io/badge/Actuator-6DB33F?style=flat-square&logo=spring&logoColor=white)
+![Lombok](https://img.shields.io/badge/Lombok-BC4521?style=flat-square)
+![OAuth2/JWT](https://img.shields.io/badge/OAuth2%2FJWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)
+
+**Real-time / Messaging**
+![WebSocket](https://img.shields.io/badge/WebSocket%2FSTOMP-010101?style=flat-square&logo=socketdotio&logoColor=white)
+![SSE](https://img.shields.io/badge/SSE-FF6600?style=flat-square)
+![Kafka](https://img.shields.io/badge/Kafka-231F20?style=flat-square&logo=apachekafka&logoColor=white)
+
+**Database / Storage**
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![Flyway](https://img.shields.io/badge/Flyway-CC0200?style=flat-square&logo=flyway&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white)
+![AWS S3](https://img.shields.io/badge/AWS%20S3-569A31?style=flat-square&logo=amazons3&logoColor=white)
+
+**Mapping / Docs**
+![MapStruct](https://img.shields.io/badge/MapStruct-59666C?style=flat-square)
+![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=flat-square&logo=swagger&logoColor=black)
+
+**Observability**
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=flat-square&logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-F46800?style=flat-square&logo=grafana&logoColor=white)
+![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?style=flat-square&logo=elasticsearch&logoColor=white)
+![Logstash](https://img.shields.io/badge/Logstash-005571?style=flat-square&logo=logstash&logoColor=white)
+![Kibana](https://img.shields.io/badge/Kibana-005571?style=flat-square&logo=kibana&logoColor=white)
+
+**Infra / CI-CD**
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)
+![AWS ECS](https://img.shields.io/badge/AWS%20ECS-FF9900?style=flat-square&logo=amazonecs&logoColor=white)
+
+**공통 Tool**
+![Git](https://img.shields.io/badge/Git-F05032?style=flat-square&logo=git&logoColor=white)
+![GitHub](https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=github&logoColor=white)
+![Discord](https://img.shields.io/badge/Discord-5865F2?style=flat-square&logo=discord&logoColor=white)
+
+---
+
+## 시스템 아키텍처
+
+(추후 추가 예정)
+
+---
+
+## API / 아키텍처 개요
+
+- REST API: Controller → Service → Repository 계층, JWT Bearer 인증. API 명세는 [배포된 Swagger UI](https://api.mopl2.cloud/swagger-ui.html) 참고
+- 인증(로그인)
+    - 자체 로그인(이메일/비밀번호) + OAuth2/OIDC 소셜 로그인(Google, Kakao) 지원
+    - 소셜 로그인 시작: `GET /oauth2/authorization/{google|kakao}`
+    - 로그인 성공 시 JWT 발급, 이후 요청은 `Authorization: Bearer <accessToken>` 헤더로 인증
+    - 역할은 `USER`/`ADMIN`, 관리자 계정은 앱 기동 시 자동 초기화되며 역할 변경·계정 잠금 시 해당 사용자는 강제 로그아웃
+- WebSocket/STOMP (`/ws`, 핸드셰이크 헤더에 액세스 토큰 필요)
+    - `/sub/contents/{id}/watch` — 공동 시청(함께보기)
+    - 구독: `/sub/contents/{id}/chat`, 발행: `/pub/contents/{id}/chat` — 콘텐츠 채팅 (미영속)
+    - 구독: `/sub/conversations/{id}/direct-messages`, 발행: `/pub/conversations/{id}/direct-messages` — DM
+- SSE (`/api/sse`) — 알림(`notifications`), 비활성 대화 DM(`direct-messages`) 실시간 전달
+
 ---
 
 <details>
@@ -203,52 +275,138 @@ Prometheus는 호스트에서 실행 중인 앱(`host.docker.internal:8080`)의 
 </details>
 
 ---
+
+## 협업 컨벤션
+
+- 브랜치: `<type>/#<이슈번호>/<설명>` (예: `feat/#1/coderabbitai`). `type`은 `feat/fix/refactor/docs/test/chore`
+- PR: `dev` 브랜치로 대상 지정, `main`은 릴리즈 브랜치
+- 코드 리뷰: CodeRabbit이 PR을 한국어(`assertive` 프로필)로 자동 리뷰 (`.coderabbit.yml`)
+- 커밋 메시지: Conventional Commit 스타일 + 한국어 (`feat:`, `fix:`, `chore:`, `docs:` 등)
+- PR/이슈 종료 시 Discord로 알림 (`.github/workflows/pr-discord-notify.yml`)
+
+---
+
 ## 팀원별 구현 기능 상세
+
 ### 박승민
 
-(자신이 개발한 기능에 대한 사진이나 gif 파일 첨부)
-
-- **소셜 로그인 API**
-    - Google OAuth 2.0을 활용한 소셜 로그인 기능 구현
-    - 로그인 후 추가 정보 입력을 위한 RESTful API 엔드포인트 개발
-- **회원 추가 정보 입력 API**
-    - 회원 유형(관리자, 학생)에 따른 조건부 입력 처리 API 구현
+- **콘텐츠 데이터 관리**
+    - Spring Batch 기반 배치 처리로 외부 API(TMDB, The Sports DB) 콘텐츠 수집/적재
+    - 주기 스케줄러 + 중복 실행 방지 락, 커서 기반 backfill로 과거 데이터 점진 수집
+    - 콘텐츠 CRUD 및 조회(타입 필터, 정렬, 커서 페이지네이션) API
 
 ### 이승민
 
+- **실시간 함께보기 (공동 시청)**
+    - WebSocket/STOMP 기반 콘텐츠 동시 시청 기능
+- **콘텐츠 채팅**
+    - 콘텐츠별 실시간 채팅 (WebSocket, 비영속)
+- **DM (다이렉트 메시지)**
+    - 실시간 DM 송수신 및 대화 영속화
+
 ### 임지호
+
+- **평가/큐레이팅 도메인**
+    - 리뷰 작성·수정·삭제 및 콘텐츠 평점·리뷰 수 집계
+    - 플레이리스트 생성·수정·삭제, 콘텐츠 추가·삭제, 구독/구독 취소 API
+    - 리뷰·플레이리스트 목록 커서 페이지네이션 조회
+- **AWS 인프라 구성 / 배포**
+    - ECS Fargate(ARM64) 운영 환경 구축, nginx·app 서비스 분리 + Service Connect로 app 인스턴스 요청 분산
+    - CloudFlare → ALB(HTTPS/ACM) → nginx → app 엣지 TLS 구성, RDS·ElastiCache·Kafka·S3/CloudFront 연동
+    - Flyway 도입으로 DB 스키마 마이그레이션 자동화
+- **CI/CD 파이프라인**
+    - CI: Spotless·SpotBugs 검사, 테스트, JaCoCo 커버리지 검증
+    - CD: `dev` push 시 자동 배포. GitHub OIDC 인증, ECR 푸시 → 태스크 정의 등록 → ECS 서비스 업데이트
+    - circuit breaker 자동 롤백 및 배포 결과 검증
 
 ### 조성진
 
+- **사용자 관리**
+    - 회원가입/조회/수정 등 사용자 도메인 API
+- **인증/인가**
+    - Custom FilterChain 및 AuthenticationProvider 기반 인증/인가 파이프라인 구축
+    - OAuth2 기반 Google, Kakao OIDC 로그인 파이프라인 구축
+
 ### 최종인
 
+- **알림 / SSE**
+    - 알림 발행 및 SSE 기반 실시간 알림 전달
+    - Kafka 이벤트 처리 및 Redis Pub/Sub 기반 SSE fan-out 구현
+
+- **프로필 / 팔로우**
+    - 프로필 조회, 팔로우/언팔로우 및 팔로우 알림
+    - 팔로우 상태 조회 API 계약 검증 및 배포 환경 QA
+
 ---
+
 ## 파일 구조
+
 ```markdown
 com.team02.mopl
 ├── domain
-│   ├── user
-│   │   ├── controller
-│   │   ├── service
-│   │   ├── repository
-│   │   ├── entity
-│   │   ├── dto
-│   │   ├── mapper
-|   |   └── exception
-|   |
-|
+│   ├── auth            # 인증/인가, JWT, OAuth 로그인
+│   │   ├── controller / service / dto / entity / exception
+│   │   ├── jwt
+│   │   ├── login
+│   │   └── oauth
+│   ├── content          # 콘텐츠(영화/TV/스포츠) CRUD, TMDB/스포츠 DB 배치 수집
+│   │   ├── controller / service / repository / mapper / dto / entity / enums / util / exception
+│   │   └── ingestion
+│   ├── contentchat       # 콘텐츠 채팅 (WebSocket, 미영속)
+│   │   └── controller / service / dto / exception
+│   ├── dm                # 다이렉트 메시지
+│   │   ├── controller / service / repository / dto / entity / enums / util / exception
+│   │   └── redis
+│   ├── follow            # 팔로우
+│   │   ├── controller / service / repository / dto / entity / exception
+│   │   └── event
+│   ├── notification       # 알림 (SSE)
+│   │   ├── controller / service / repository / dto / entity / enums / util / exception
+│   │   ├── kafka
+│   │   └── redis
+│   ├── playlist           # 플레이리스트, 구독
+│   │   ├── controller / service / repository / mapper / dto / entity / enums / util / exception
+│   │   └── event
+│   ├── review             # 리뷰/평점
+│   │   └── controller / service / repository / mapper / dto / entity / enums / util / exception
+│   ├── sse                # SSE 연결 관리
+│   │   └── controller / service / repository
+│   ├── subscription       # 플레이리스트 구독
+│   │   ├── controller / service / repository / entity / exception
+│   │   └── event
+│   ├── user               # 회원
+│   │   ├── controller / service / repository / mapper / dto / entity / enums / exception / util
+│   │   └── outbox
+│   └── watching           # 공동 시청 (WebSocket)
+│       ├── controller / service / repository / mapper / dto / entity / enums / exception / util
+│       ├── event
+│       └── websocket
+│
 └── global
-    ├── config
-    ├── security
-    ├── exception
-    ├── entity
-    ├── dto 
+    ├── config             # Spring 설정 (Security, WebSocket, Swagger 등)
+    ├── entity             # BaseEntity 등 공통 엔티티
+    ├── enums
+    ├── exception          # 전역 예외 처리 (@RestControllerAdvice)
+    ├── dto                # 공통 DTO (CursorResponse 등)
+    ├── kafka
+    ├── outbox
+    ├── redis
+    ├── storage
+    ├── logging
+    ├── alert
+    ├── init               # 관리자 계정 자동 초기화 등
+    ├── websocket
     └── util
 ```
+
 ---
+
 ## 구현 홈페이지
-(개발한 홈페이지에 대한 링크 게시)
-https://www.codeit.kr/
+
+https://api.mopl2.cloud/
+
 ---
+
 ## 프로젝트 회고록
+
 (제작한 발표자료 링크 혹은 첨부파일 첨부)
