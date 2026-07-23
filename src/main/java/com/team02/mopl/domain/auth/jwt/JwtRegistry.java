@@ -31,8 +31,7 @@ public class JwtRegistry {
   @Value("${app.jwt.redis.active-access-prefix}")
   private String activeAccessPrefix;
 
-  @Value("${app.jwt.redis.max-account-count}")
-  private long maxAccountCount;
+  private static final long MAX_ACCOUNT_COUNT = 1;
 
   @Value("${app.jwt.redis.blacklist-prefix}")
   private String blacklistPrefix;
@@ -151,11 +150,13 @@ public class JwtRegistry {
           """,
           List.class);
   private static final RedisScript<Long> DELETE_ALL_TOKENS_SCRIPT =
+      new DefaultRedisScript<>("return redis.call('DEL', KEYS[1], KEYS[2], KEYS[3])", Long.class);
+  private static final RedisScript<Long> DELETE_ALL_REFRESH_TOKENS_SCRIPT =
       new DefaultRedisScript<>("return redis.call('DEL', KEYS[1], KEYS[2])", Long.class);
   private static final RedisScript<String> LOCK_USER_SCRIPT =
       new DefaultRedisScript<>(
           """
-          redis.call('DEL', KEYS[1])
+          redis.call('DEL', KEYS[1], KEYS[3])
           redis.call('SETEX', KEYS[2], ARGV[2], ARGV[1])
           return 'OK'
           """,
@@ -179,7 +180,7 @@ public class JwtRegistry {
           String.valueOf(now),
           String.valueOf(refreshExpirationMillis),
           String.valueOf(tokenExpirationTime),
-          String.valueOf(maxAccountCount),
+          String.valueOf(MAX_ACCOUNT_COUNT),
           String.valueOf(remainingAccessMillis));
     } catch (DataAccessException e) {
       log.error("[Redis] 토큰 등록 중 네트워크/redis 장애 발생 - userId: {}", userId, e);
@@ -269,20 +270,31 @@ public class JwtRegistry {
 
   public void deleteAllRefreshToken(UUID userId) {
     String refreshKey = getRefreshKey(userId);
-    // RefreshToken 전체삭제
-    redisTemplate.delete(refreshKey);
+    String usedKey = getUsedRefreshPrefix(userId);
+
+    try {
+      redisTemplate.execute(DELETE_ALL_REFRESH_TOKENS_SCRIPT, List.of(refreshKey, usedKey));
+    } catch (Exception e) {
+      log.error("[Redis] Refresh 토큰 및 폐기 기록 삭제 실패: userId={}", userId, e);
+      throw e;
+    }
   }
 
   public void lockUser(UUID userId) {
     String refreshKey = getRefreshKey(userId);
     String lockKey = lockKey(userId);
+    String usedKey = getUsedRefreshPrefix(userId);
     long ttlSeconds = properties.accessTokenExpiration().toSeconds();
 
     try {
       redisTemplate.execute(
-          LOCK_USER_SCRIPT, List.of(refreshKey, lockKey), "lock", String.valueOf(ttlSeconds));
+          LOCK_USER_SCRIPT,
+          List.of(refreshKey, lockKey, usedKey),
+          "lock",
+          String.valueOf(ttlSeconds));
     } catch (DataAccessException e) {
       log.error("[Redis] 유저 잠금 처리 실패: userId={}", userId, e);
+      // 외부에서 처리를 진행함
       throw e;
     }
   }
@@ -380,9 +392,10 @@ public class JwtRegistry {
   public void deleteAllToken(UUID userId) {
     String accessKey = getActiveAccessKey(userId);
     String refreshKey = getRefreshKey(userId);
+    String usedKey = getUsedRefreshPrefix(userId);
 
     try {
-      redisTemplate.execute(DELETE_ALL_TOKENS_SCRIPT, List.of(accessKey, refreshKey));
+      redisTemplate.execute(DELETE_ALL_TOKENS_SCRIPT, List.of(accessKey, refreshKey, usedKey));
     } catch (Exception e) {
       log.error("[Redis] 액세스 토큰 삭제 실패: userId={}", userId, e);
       throw e;

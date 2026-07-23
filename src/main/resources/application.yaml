@@ -168,7 +168,6 @@ app:
       refresh-prefix: "jwt:refresh:"
       used-refresh-prefix: "jwt:used-refresh:"
       active-access-prefix: "jwt:active-access:userId:"
-      max-account-count: 1
       blacklist-prefix: "jwt:blacklist:"
       user-lock-prefix: "jwt:userlock:"
       temp-password-prefix: "temp:pw:"

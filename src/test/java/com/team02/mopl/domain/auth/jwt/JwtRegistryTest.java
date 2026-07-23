@@ -29,6 +29,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -55,7 +56,6 @@ class JwtRegistryTest {
   @BeforeEach
   void setUp() {
     ReflectionTestUtils.setField(jwtRegistry, "refreshPrefix", "jwt:refresh:");
-    ReflectionTestUtils.setField(jwtRegistry, "maxAccountCount", 1L);
 
     accessToken = "accessToken";
     refreshToken = "refreshToken";
@@ -87,8 +87,12 @@ class JwtRegistryTest {
     void success_shouldSaveRefreshAndAccessToken_whenUserIdAndRefreshTokenAndAccessTokenHas() {
       // given
       UUID userId = UUID.randomUUID();
-      given(properties.refreshTokenExpiration()).willReturn(Duration.ZERO);
-      given(jwtUtils.getRemainingTimeToExpiration(anyString())).willReturn(Duration.ZERO);
+
+      Duration refreshTokenExpiration = Duration.ofDays(7);
+      Duration accessTokenExpiration = Duration.ofMinutes(10);
+
+      given(properties.refreshTokenExpiration()).willReturn(refreshTokenExpiration);
+      given(jwtUtils.getRemainingTimeToExpiration(anyString())).willReturn(accessTokenExpiration);
       given(
               redisTemplate.execute(
                   any(), anyList(), any(), any(), any(), any(), any(), any(), any()))
@@ -96,9 +100,26 @@ class JwtRegistryTest {
 
       // when
       assertDoesNotThrow(() -> jwtRegistry.registerToken(userId, refreshToken, accessToken));
+
+      ArgumentCaptor<String> refreshTTLCaptor = ArgumentCaptor.forClass(String.class);
+      ArgumentCaptor<String> accessTTLCaptor = ArgumentCaptor.forClass(String.class);
+
       then(redisTemplate)
           .should(times(1))
-          .execute(any(), anyList(), any(), any(), any(), any(), any(), any(), any());
+          .execute(
+              any(),
+              anyList(),
+              any(),
+              any(),
+              any(),
+              refreshTTLCaptor.capture(),
+              any(),
+              any(),
+              accessTTLCaptor.capture());
+      assertThat(refreshTTLCaptor.getValue())
+          .isEqualTo(String.valueOf(refreshTokenExpiration.toMillis()));
+      assertThat(accessTTLCaptor.getValue())
+          .isEqualTo(String.valueOf(accessTokenExpiration.toMillis()));
     }
   }
 
@@ -246,16 +267,25 @@ class JwtRegistryTest {
   @Nested
   class DeleteAllRefreshToken {
     @Test
-    @DisplayName("리프레시 토큰을 전체 삭제한다")
-    void success_shouldDeleteAllRefreshToken_whenUserIdIsProvided() {
+    @DisplayName("redis에 문제가 생기면 예외를 다시 던진다")
+    void fail_shouldThrowException_whenRedisConnectionFails() {
       // given
-      UUID userId = UUID.randomUUID();
+      willThrow(RedisConnectionFailureException.class)
+          .given(redisTemplate)
+          .execute(any(), anyList());
 
-      // when
-      jwtRegistry.deleteAllRefreshToken(userId);
+      // when & then
+      assertThrows(
+          RedisConnectionFailureException.class,
+          () -> jwtRegistry.deleteAllRefreshToken(UUID.randomUUID()));
+    }
 
-      // then
-      then(redisTemplate).should(times(1)).delete(anyString());
+    @Test
+    @DisplayName("userId로 리프레시토큰, usedKey를 삭제한다")
+    void success_shouldDeleteRefreshAndUsedKey_whenUserIdIsProvided() {
+      // when & then
+      assertDoesNotThrow(() -> jwtRegistry.deleteAllRefreshToken(UUID.randomUUID()));
+      then(redisTemplate).should(times(1)).execute(any(), anyList());
     }
   }
 
