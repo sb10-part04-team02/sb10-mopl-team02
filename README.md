@@ -40,6 +40,11 @@
 ## API / 아키텍처 개요
 
 - REST API: Controller → Service → Repository 계층, JWT Bearer 인증. API 명세는 [배포된 Swagger UI](https://api.mopl2.cloud/swagger-ui.html) 참고
+- 인증(로그인)
+    - 자체 로그인(이메일/비밀번호) + OAuth2/OIDC 소셜 로그인(Google, Kakao) 지원
+    - 소셜 로그인 시작: `GET /oauth2/authorization/{google|kakao}`
+    - 로그인 성공 시 JWT 발급, 이후 요청은 `Authorization: Bearer <accessToken>` 헤더로 인증
+    - 역할은 `USER`/`ADMIN`, 관리자 계정은 앱 기동 시 자동 초기화되며 역할 변경·계정 잠금 시 해당 사용자는 강제 로그아웃
 - WebSocket/STOMP (`/ws`, 핸드셰이크 헤더에 액세스 토큰 필요)
     - `/sub/contents/{id}/watch` — 공동 시청(함께보기)
     - 구독: `/sub/contents/{id}/chat`, 발행: `/pub/contents/{id}/chat` — 콘텐츠 채팅 (미영속)
@@ -271,6 +276,7 @@ Prometheus는 호스트에서 실행 중인 앱(`host.docker.internal:8080`)의 
 - **평가/큐레이팅**
     - 리뷰(평점/코멘트) 작성·수정·삭제 API
     - 플레이리스트 생성/구독 및 콘텐츠 추가·삭제 API
+- **AWS 인프라 구성 및 CI/CD 배포 파이프라인 구축**
 
 ### 조성진
 
@@ -287,8 +293,11 @@ Prometheus는 호스트에서 실행 중인 앱(`host.docker.internal:8080`)의 
 
 - **알림 / SSE**
     - 알림 발행 및 SSE 기반 실시간 알림 전달
-- **프로필/팔로우**
+    - Kafka 이벤트 처리 및 Redis Pub/Sub 기반 SSE fan-out 구현
+
+- **프로필 / 팔로우**
     - 프로필 조회, 팔로우/언팔로우 및 팔로우 알림
+    - 팔로우 상태 조회 API 계약 검증 및 배포 환경 QA
 
 ---
 
