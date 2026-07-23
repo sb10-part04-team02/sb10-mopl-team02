@@ -10,6 +10,7 @@ import com.team02.mopl.domain.auth.oauth.provider.OAuthType;
 import com.team02.mopl.domain.user.entity.User;
 import com.team02.mopl.domain.user.mapper.UserMapper;
 import com.team02.mopl.domain.user.repository.UserRepository;
+import com.team02.mopl.global.exception.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -17,6 +18,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -74,9 +76,18 @@ public class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
 
     // 토큰발급
     String refreshToken = jwtTokenProvider.generateRefreshToken(userDetails);
+    String accessToken = jwtTokenProvider.generateAccessToken(userDetails);
 
-    // refresh 토큰 Redis 등록
-    jwtRegistry.registerRefreshToken(findUser.getId(), refreshToken);
+    try {
+      // 토큰 Redis 등록
+      jwtRegistry.registerToken(findUser.getId(), refreshToken, accessToken);
+    } catch (BusinessException e) {
+      response.sendRedirect(generateErrorUrl(baseUrl, "서버 내부 오류가 발생했습니다."));
+      return;
+    } catch (BadCredentialsException e) {
+      response.sendRedirect(generateErrorUrl(baseUrl, "유효한 토큰이 아닙니다."));
+      return;
+    }
 
     // refresh 토큰 헤더에 등록
     ResponseCookie cookie = jwtUtils.generateRefreshTokenCookie(refreshToken);

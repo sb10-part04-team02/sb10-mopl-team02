@@ -72,7 +72,7 @@ class AuthServiceTest {
       String newRefresh = "new Refresh";
       given(jwtTokenProvider.generateAccessToken(mockUserDetails)).willReturn(newAccess);
       given(jwtTokenProvider.generateRefreshToken(mockUserDetails)).willReturn(newRefresh);
-      given(jwtRegistry.rotateRefreshToken(userId, refresh, newRefresh))
+      given(jwtRegistry.rotateRefreshToken(userId, refresh, newRefresh, newAccess))
           .willReturn(RotationResult.OK);
 
       UserDto userDto = new UserDto(userId, Instant.now(), email, "이름", null, Role.USER, false);
@@ -190,11 +190,40 @@ class AuthServiceTest {
       String newRefresh = "newRefresh";
       given(jwtTokenProvider.generateAccessToken(mockUserDetails)).willReturn(newAccess);
       given(jwtTokenProvider.generateRefreshToken(mockUserDetails)).willReturn(newRefresh);
-      given(jwtRegistry.rotateRefreshToken(userId, refresh, newRefresh))
+      given(jwtRegistry.rotateRefreshToken(userId, refresh, newRefresh, newAccess))
           .willReturn(RotationResult.COMPROMISED);
 
       // when & then
       assertThrows(CompromisedTokenException.class, () -> authService.update(refresh));
+    }
+
+    @Test
+    @DisplayName("토큰이 만료가 됐으면 예외를 던진다")
+    void fail_shouldThrowInvalidTokenException_whenTokenIsExpired() {
+      // given
+      JWTClaimsSet mockClaims = mock(JWTClaimsSet.class);
+      given(jwtTokenProvider.verifyRefreshToken(anyString())).willReturn(mockClaims);
+
+      UUID userId = UUID.randomUUID();
+      given(jwtUtils.getUserId(mockClaims)).willReturn(userId);
+
+      String email = "example@gmail.com";
+      given(mockClaims.getSubject()).willReturn(email);
+
+      MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
+      given(userDetailsService.loadUserByUsername(email)).willReturn(mockUserDetails);
+      given(mockUserDetails.isAccountNonLocked()).willReturn(true);
+
+      String refresh = "refresh";
+      String newAccess = "newAccess";
+      String newRefresh = "newRefresh";
+      given(jwtTokenProvider.generateAccessToken(mockUserDetails)).willReturn(newAccess);
+      given(jwtTokenProvider.generateRefreshToken(mockUserDetails)).willReturn(newRefresh);
+      given(jwtRegistry.rotateRefreshToken(userId, refresh, newRefresh, newAccess))
+          .willReturn(RotationResult.INVALID);
+
+      // when & then
+      assertThrows(InvalidTokenException.class, () -> authService.update(refresh));
     }
   }
 }
