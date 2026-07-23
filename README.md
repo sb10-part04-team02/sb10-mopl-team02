@@ -254,8 +254,8 @@ Prometheus는 호스트에서 실행 중인 앱(`host.docker.internal:8080`)의 
 (자신이 개발한 기능에 대한 사진이나 gif 파일 첨부)
 
 - **콘텐츠 데이터 관리**
-    - TMDB(영화/TV), The Sports DB(스포츠) 연동 콘텐츠 수집/적재
-    - Spring Batch 기반 idempotent·chunked 배치 처리
+    - Spring Batch 기반 배치 처리로 외부 API(TMDB, The Sports DB) 콘텐츠 수집/적재
+    - 주기 스케줄러 + 중복 실행 방지 락, 커서 기반 backfill로 과거 데이터 점진 수집
     - 콘텐츠 CRUD 및 조회(타입 필터, 정렬, 커서 페이지네이션) API
 
 ### 이승민
