@@ -274,7 +274,7 @@ public class JwtRegistry {
 
     try {
       redisTemplate.execute(DELETE_ALL_REFRESH_TOKENS_SCRIPT, List.of(refreshKey, usedKey));
-    } catch (Exception e) {
+    } catch (DataAccessException e) {
       log.error("[Redis] Refresh 토큰 및 폐기 기록 삭제 실패: userId={}", userId, e);
       throw e;
     }
