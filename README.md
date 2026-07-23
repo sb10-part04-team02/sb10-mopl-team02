@@ -25,11 +25,15 @@
 ## 기술 스택
 
 **Backend**
+![Java 17](https://img.shields.io/badge/Java%2017-437291?style=flat-square&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-6DB33F?style=flat-square&logo=springboot&logoColor=white)
 ![Spring Security](https://img.shields.io/badge/Spring%20Security-6DB33F?style=flat-square&logo=springsecurity&logoColor=white)
 ![Spring Data JPA](https://img.shields.io/badge/Spring%20Data%20JPA-6DB33F?style=flat-square&logo=spring&logoColor=white)
 ![QueryDSL](https://img.shields.io/badge/QueryDSL-59666C?style=flat-square)
 ![Spring Batch](https://img.shields.io/badge/Spring%20Batch-6DB33F?style=flat-square&logo=spring&logoColor=white)
+![Bean Validation](https://img.shields.io/badge/Bean%20Validation-6DB33F?style=flat-square&logo=hibernate&logoColor=white)
+![Actuator](https://img.shields.io/badge/Actuator-6DB33F?style=flat-square&logo=spring&logoColor=white)
+![Lombok](https://img.shields.io/badge/Lombok-BC4521?style=flat-square)
 ![OAuth2/JWT](https://img.shields.io/badge/OAuth2%2FJWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)
 
 **Real-time / Messaging**
@@ -63,6 +67,48 @@
 ![Git](https://img.shields.io/badge/Git-F05032?style=flat-square&logo=git&logoColor=white)
 ![GitHub](https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=github&logoColor=white)
 ![Discord](https://img.shields.io/badge/Discord-5865F2?style=flat-square&logo=discord&logoColor=white)
+
+---
+
+## 시스템 아키텍처
+
+```mermaid
+flowchart LR
+    Client[Client]
+
+    subgraph Edge["Edge"]
+        CF[CloudFlare]
+        ALB[ALB / HTTPS·ACM]
+        NGINX[nginx]
+    end
+
+    subgraph ECS["ECS Fargate (ARM64)"]
+        APP[App Service<br/>Spring Boot]
+    end
+
+    subgraph Data["Data Store"]
+        RDS[(RDS · PostgreSQL)]
+        Redis[(ElastiCache · Redis)]
+        S3[(S3 / CloudFront)]
+    end
+
+    Kafka[[Kafka]]
+
+    subgraph Observability["Observability"]
+        Prom[Prometheus]
+        Grafana[Grafana]
+        ELK[ELK Stack]
+    end
+
+    Client --> CF --> ALB --> NGINX --> APP
+    APP -- Service Connect --> APP
+    APP --> RDS
+    APP --> Redis
+    APP --> S3
+    APP --> Kafka
+    APP -. metrics .-> Prom --> Grafana
+    APP -. logs .-> ELK
+```
 
 ---
 
@@ -315,7 +361,7 @@ Prometheus는 호스트에서 실행 중인 앱(`host.docker.internal:8080`)의 
     - 회원가입/조회/수정 등 사용자 도메인 API
 - **인증/인가**
     - Custom FilterChain 및 AuthenticationProvider 기반 인증/인가 파이프라인 구축
-    - OAuth2기반 Google, Kakao OIDC 로그인 파이프라인 구축=
+    - OAuth2 기반 Google, Kakao OIDC 로그인 파이프라인 구축
 
 ### 최종인
 
