@@ -72,43 +72,7 @@
 
 ## 시스템 아키텍처
 
-```mermaid
-flowchart LR
-    Client[Client]
-
-    subgraph Edge["Edge"]
-        CF[CloudFlare]
-        ALB[ALB / HTTPS·ACM]
-        NGINX[nginx]
-    end
-
-    subgraph ECS["ECS Fargate (ARM64)"]
-        APP[App Service<br/>Spring Boot]
-    end
-
-    subgraph Data["Data Store"]
-        RDS[(RDS · PostgreSQL)]
-        Redis[(ElastiCache · Redis)]
-        S3[(S3 / CloudFront)]
-    end
-
-    Kafka[[Kafka]]
-
-    subgraph Observability["Observability"]
-        Prom[Prometheus]
-        Grafana[Grafana]
-        ELK[ELK Stack]
-    end
-
-    Client --> CF --> ALB --> NGINX --> APP
-    APP -- Service Connect --> APP
-    APP --> RDS
-    APP --> Redis
-    APP --> S3
-    APP --> Kafka
-    APP -. metrics .-> Prom --> Grafana
-    APP -. logs .-> ELK
-```
+(추후 추가 예정)
 
 ---
 
