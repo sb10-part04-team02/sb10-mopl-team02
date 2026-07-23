@@ -315,7 +315,7 @@ class JwtUtilsTest {
 
     @Test
     @DisplayName("예외가 발생하면 null을 반환한다")
-    void fail_shouldReturnDefaultZero_whenExceptionOccurs() {
+    void fail_shouldReturnNull_whenExceptionOccurs() {
       // given
       given(jwtTokenProvider.parseClaimsWithoutVerification(anyString()))
           .willThrow(BadCredentialsException.class);

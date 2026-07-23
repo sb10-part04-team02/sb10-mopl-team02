@@ -66,7 +66,7 @@ class JwtRegistryTest {
 
     @Test
     @DisplayName("네트워크 오류가 생기면 예외를 던진다")
-    void fail_shouldNotRemoveToken_whenCurrentCountIsNull() {
+    void fail_shouldThrowException_whenRedisConnectionFails() {
       // given
       UUID userId = UUID.randomUUID();
       given(properties.refreshTokenExpiration()).willReturn(Duration.ZERO);
@@ -279,7 +279,6 @@ class JwtRegistryTest {
     @DisplayName("유저ID가 주어지면 리프레시 토큰을 전체 삭제하고 유저 잠금키를 추가한다")
     void success_shouldDeleteAllRefreshTokenAndLockKeyUserId_whenUserIdIsProvided() {
       // given
-      UUID userId = UUID.randomUUID();
       given(properties.accessTokenExpiration()).willReturn(Duration.ZERO);
 
       // when & then

@@ -120,10 +120,7 @@ public class JwtRegistry {
           redis.call('ZREMRANGEBYSCORE', refreshKey, 0, now)
           redis.call('ZREM', refreshKey, oldRefreshToken)
           redis.call('SADD', usedKey, oldRefreshToken)
-
-          if remainingAccessMillis > 0 then
-              redis.call('PEXPIRE', usedKey, remainingAccessMillis)
-          end
+          redis.call('PEXPIRE', usedKey, refreshExpirationMillis)
 
           -- 순서있는 Set(만료시간을 기준으로 정렬됨)
           redis.call('ZADD', refreshKey, tokenExpirationTime, newRefreshToken)

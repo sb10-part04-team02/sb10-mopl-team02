@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team02.mopl.domain.auth.entity.MoplUserDetails;
+import com.team02.mopl.domain.auth.jwt.JwtRegistry;
 import com.team02.mopl.domain.auth.jwt.JwtTokenProvider;
 import com.team02.mopl.domain.content.entity.Content;
 import com.team02.mopl.domain.content.enums.ContentType;
@@ -78,6 +79,7 @@ class WebSocketStompIntegrationTest {
 
   @LocalServerPort private int port;
 
+  @Autowired private JwtRegistry jwtRegistry;
   @Autowired private JwtTokenProvider jwtTokenProvider;
   @Autowired private UserRepository userRepository;
   @Autowired private ContentRepository contentRepository;
@@ -248,7 +250,12 @@ class WebSocketStompIntegrationTest {
             user.getProfileImageUrl(),
             user.getRole(),
             false);
-    return jwtTokenProvider.generateAccessToken(new MoplUserDetails(userDto, user.getPassword()));
+
+    MoplUserDetails userDetails = new MoplUserDetails(userDto, user.getPassword());
+    String refreshToken = jwtTokenProvider.generateRefreshToken(userDetails);
+    String accessToken = jwtTokenProvider.generateAccessToken(userDetails);
+    jwtRegistry.registerToken(user.getId(), refreshToken, accessToken);
+    return accessToken;
   }
 
   private StompSession connect(String accessToken, StompSessionHandlerAdapter handler)

@@ -93,7 +93,7 @@ class JwtAuthenticationProviderTest {
 
   @Test
   @DisplayName("액세스토큰이 만료되었다면 예외를 던진다")
-  void fail_shouldThrowCredentialsExpiredException_whenAccessTokenIsExpired() {
+  void fail_shouldThrowCredentialsExpiredException_whenAccessTokenIsInactive() {
     // given
     Authentication mockAuth = mock(Authentication.class);
     given(mockAuth.getCredentials()).willReturn("ValidToken");
