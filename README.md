@@ -72,7 +72,7 @@
 
 ## 시스템 아키텍처
 
-(추후 추가 예정)
+![시스템 아키텍처](docs/images/system-architecture.png)
 
 ---
 
@@ -421,4 +421,4 @@ https://api.mopl2.cloud/
 
 ## 프로젝트 회고록
 
-(제작한 발표자료 링크 혹은 첨부파일 첨부)
+https://tar-sandwich-ba0.notion.site/367f1e381711804cacb5c883f1a165f3?v=367f1e38171180a09942000c2356eae1
