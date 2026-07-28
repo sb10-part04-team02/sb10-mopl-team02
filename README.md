@@ -72,7 +72,7 @@
 
 ## 시스템 아키텍처
 
-(추후 추가 예정)
+![시스템 아키텍처](docs/images/system-architecture.png)
 
 ---
 
@@ -93,8 +93,10 @@
 ---
 
 <details>
-<summary><span style="font-size: 1.5em; font-weight: bold;">로컬 개발 환경</span></summary>
+<summary><span style="font-size: 1.5em; font-weight: bold;">로컬에서 애플리케이션 실행하기</span></summary>
 <div markdown="1">
+
+아래는 로컬 PC에서 이 프로젝트를 빌드/실행/테스트하는 데 필요한 절차입니다 (배포 환경 설정이 아닙니다).
 
 ### 사전 요구사항
 - JDK 17
@@ -262,6 +264,8 @@ Prometheus는 호스트에서 실행 중인 앱(`host.docker.internal:8080`)의 
    - 좌측 메뉴 **Dashboards -> Mopl -> "Mopl 서버 모니터링"** 대시보드에서 HTTP 요청 처리율/응답 시간 등 확인
    - 데이터소스(Prometheus)와 대시보드는 `config/monitoring/grafana`에서 자동 프로비저닝됩니다.
 
+![Mopl 서버 모니터링 대시보드](docs/images/grafana-server-dashboard.png)
+
 | 서비스 | 주소 | 비고 |
 | --- | --- | --- |
 | 앱 메트릭 | http://localhost:8080/actuator/prometheus | 호스트에서 `bootRun`으로 실행 |
@@ -270,6 +274,14 @@ Prometheus는 호스트에서 실행 중인 앱(`host.docker.internal:8080`)의 
 
 > `include: health, info, prometheus`로 지정된 actuator 엔드포인트만 노출되며, 나머지는 `SecurityConfig`에서 차단됩니다.
 > 타깃이 **DOWN**이면 앱이 호스트에서 실행 중인지(2번이 아닌 3번), `8080` 포트가 열려 있는지 확인하세요.
+
+### 8. 부하 테스트 (k6)
+
+[`load-test/`](load-test/README.md)에 k6 기반 부하테스트가 구성되어 있습니다. 실행 프로파일(smoke/load/stress), 인증, 커서 순회, 시딩 절차가 공통 모듈로 준비되어 있어 시나리오 파일 하나만 추가하면 새 부하테스트를 만들 수 있습니다.
+
+- 시나리오: 콘텐츠 조회, 리뷰 조회/작성, 플레이리스트 조회, 구독 작성, 알림 조회, 팔로우-알림 파이프라인, 비밀번호 재설정 등
+- k6 메트릭을 Prometheus remote write로 전송해 기존 Grafana 스택에서 **k6 부하테스트** 대시보드로 실시간 확인 가능
+- 자세한 실행 방법과 시나리오별 설명은 [`load-test/README.md`](load-test/README.md) 참고
 
 </div>
 </details>
@@ -409,4 +421,4 @@ https://api.mopl2.cloud/
 
 ## 프로젝트 회고록
 
-(제작한 발표자료 링크 혹은 첨부파일 첨부)
+https://tar-sandwich-ba0.notion.site/367f1e381711804cacb5c883f1a165f3?v=367f1e38171180a09942000c2356eae1
