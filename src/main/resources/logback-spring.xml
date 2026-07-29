@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <!-- Spring Boot 기본 콘솔 출력(색상, 예외 변환 등)을 그대로 유지 -->
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+  <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+  <!-- 설정값을 로그 컨텍스트로 주입 -->
+  <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="mopl"/>
+
+  <!-- dev에서만 로컬 Logstash(TCP 5000)로 JSON 로그 전송 -->
+  <springProfile name="dev">
+    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+      <destination>${LOGSTASH_HOST:-localhost}:${LOGSTASH_PORT:-5000}</destination>
+      <!-- Encoder - 로그를 JSON으로 변환 -->
+      <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+        <!-- context 포함 시 appName이 중복 필드로 실려서 customFields의 app만 남김 -->
+        <includeContext>false</includeContext>
+        <customFields>{"app":"${appName}"}</customFields>
+      </encoder>
+    </appender>
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+      <appender-ref ref="LOGSTASH"/>
+    </root>
+  </springProfile>
+
+  <springProfile name="!dev">
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+    </root>
+  </springProfile>
+</configuration>
+
+<!--
+[dev 프로파일]
+  앱 로그 ─ LogstashEncoder(JSON+개행) ─ TCP 5000 ─> Logstash ─> Elasticsearch
+  └─ CONSOLE(사람이 읽는 색상 로그) ─> 터미널
+
+[!dev 프로파일]
+  앱 로그 ─ CONSOLE ─> 터미널만
+-->

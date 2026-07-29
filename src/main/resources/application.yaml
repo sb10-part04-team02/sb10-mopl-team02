@@ -1,3 +1,181 @@
 spring:
   application:
     name: mopl
+
+  profiles:
+    active: dev
+
+  batch:
+    job:
+      enabled: false  # 기동 시 Job 자동 실행 방지 (스케줄러/러너가 JobLauncher로 실행)
+    jdbc:
+      initialize-schema: never  # BATCH_* 메타테이블은 Flyway(V3)가 관리
+
+  flyway:
+    enabled: true  # 기동 시 db/migration 마이그레이션 적용 (스키마 자동 생성·버전관리)
+
+  datasource:
+    hikari:
+      # 운영 스펙 기준 산정: RDS db.t4g.micro(max_connections ≈ 112), 앱 ECS 인스턴스 2대
+      # → 인스턴스 수 × 풀 ≤ RDS 가용 커넥션 (2 × 15 = 30, ~100 대비 안전). 무설정 시 Spring 기본값 10이 방치됨.
+      maximum-pool-size: 15
+      minimum-idle: 5           # 프리티어 유휴 커넥션 절약
+      connection-timeout: 10000  # 30초→10초. 빠른 실패로 대기 큐 폭주 방지
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:mopl-local}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+  servlet:
+    multipart:
+      max-file-size: 10MB     # 업로드 가능한 개별 파일의 최대 크기
+      max-request-size: 20MB  # 단일 요청 전체의 최대 크기
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${EMAIL_ACCOUNT}
+    password: ${EMAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true    # TLS 보안설정
+            required: true
+          connectiontimeout: 5000   # 연결대기시간 5초
+          timeout: 5000             # 응답대기시간 5초
+          writetimeout: 5000        # 쓰기대기시간 5초
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: email, profile, openid
+          kakao:
+            client-id: ${KAKAO_CLIENT_ID}
+            client-secret: ${KAKAO_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            client-authentication-method: client_secret_post
+            scope: profile_nickname, profile_image, openid
+        provider: # 구글은 default로 등록되어있음
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            jwk-set-uri: https://kauth.kakao.com/.well-known/jwks.json
+            user-name-attribute: sub
+
+server:
+  # 프록시의 X-Forwarded-* 헤더를 신뢰해서 사용
+  forward-headers-strategy: framework
+
+# 모니터링(Prometheus/Grafana): health/info 외에 prometheus 메트릭 엔드포인트만 노출한다.
+# 나머지 actuator 엔드포인트는 SecurityConfig에서 접근을 차단한다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  health:
+    mail:
+      enabled: false  # 메일은 부가 기능(비번 재설정 발송용)이라 SMTP 장애가 전체 health를 DOWN시키지 않도록 제외
+  metrics:
+    tags:
+      application: ${spring.application.name}  # 인스턴스 여러 대일 때 메트릭 출처 구분용 공통 태그
+
+logging:
+  pattern:
+    correlation: "[%X{requestId:-}] "  # 전 프로파일 공통. 콘솔/파일 로그의 레벨 옆에 MDC requestId를 표시 (요청 밖 로그는 빈 값)
+
+app:
+  realtime:
+    redis-fan-out:
+      # 실시간 이벤트의 인스턴스 간 Redis Pub/Sub fan-out 전체를 제어한다.
+      # 알림 SSE(notifications)·콘텐츠 채팅·DM(WebSocket + direct-messages SSE)·코워칭 브로드캐스트가 모두 이 키에 좌우된다.
+      # false로 두면 세 경로 전부 로컬 전용으로 전환되어 다중 인스턴스에서 교차 노드 전달이 끊긴다(단일 인스턴스 전용).
+      enabled: true
+  alert:
+    discord:
+      webhook-url: ${DISCORD_ALERT_WEBHOOK_URL:}  # 빈 값이면 알림 비활성 (운영에서 env로 주입)
+      connect-timeout: 2s
+      read-timeout: 5s
+  admin:
+    email: ${ADMIN_EMAIL}
+    password: ${ADMIN_PASSWORD}
+    name: ${ADMIN_NAME}
+  redis:
+    outbox:
+      maximum-retry-threshold: 5
+      retry-delay: 10m
+      clean-up: "0 0 3 * * *"
+  kafka:
+    consumer:
+      retry:
+        interval: 1s
+        max-retries: 3
+  storage:
+    type: local            # 사용할 스토리지 구현체: local | s3
+    local:
+      base-path: storage   # 파일이 저장되는 디스크상의 디렉터리 경로
+      base-url: /files     # 저장된 파일을 서빙하는 URL 경로 접두사
+      public-base-url: ""  # dev에서만 절대 URL로 오버라이드
+    s3:
+      bucket: ""           # S3 버킷 이름 (운영에서 오버라이드)
+      region: ""           # 버킷 리전
+      base-url: ""         # 공개 접근 URL 접두사 (CDN)
+    # 썸네일 미제공 시 내려줄 기본 URL. 앱 내장 정적 리소스(static/images/default-thumbnail.svg)를 서빙
+    # prod는 상대 경로(동일 origin), dev는 application-dev.yaml에서 절대 URL로 오버라이드
+    default-thumbnail-url: /images/default-thumbnail.svg
+  tmdb:
+    access-token: ${TMDB_ACCESS_TOKEN:}  # v4 Read Access Token
+    base-url: https://api.themoviedb.org/3
+    image-base-url: https://image.tmdb.org/t/p/w500
+    language: ko-KR
+    pages: 3  # popular 수집 페이지 수 (페이지당 20건)
+    backfill:
+      pages-per-run: 25       # 시간별 discover backfill 1회당 매체(movie/tv)별 페이지 수 (25p x 20 x 2 = 1000건/시간)
+      floor-date: 1950-01-01  # 개봉일이 여기까지 내려가면 backfill 완료(backfillComplete)
+    connect-timeout: 3s
+    read-timeout: 10s
+  sportsdb:
+    api-key: ${SPORTSDB_API_KEY:123}  # 무료 테스트 키 "123" (30 req/min)
+    base-url: https://www.thesportsdb.com/api/v1/json
+    connect-timeout: 3s
+    read-timeout: 10s
+    leagues: # 수집 대상 리그+시즌. 시즌 표기는 리그마다 다름
+      - id: "4328"
+        season: "2025-2026"  # English Premier League
+  ingestion:
+    run-on-startup: false  # true면 기동 시 1회 전체 소스 수집 실행 (검증/수동 실행용)
+    scheduler:
+      enabled: ${INGESTION_SCHEDULER_ENABLED:false}  # 기본 off. 테스트/로컬에서 실행 방지
+      cron: ${INGESTION_SCHEDULER_CRON:0 10 4 * * *}  # 일간 popular 수집 주기 (매시 정각 백필과 겹치지 않도록 04:10)
+      backfill-cron: ${INGESTION_SCHEDULER_BACKFILL_CRON:0 0 * * * *}  # 시간별 discover backfill 주기 (매시 정각)
+      lock-ttl: 30m  # 중복 실행 방지 락 TTL (최대 수집 소요보다 넉넉히)
+  jwt:
+    secret-key: ${JWT_SECRET_KEY}
+    access-token-expiration: 10m  # 10분
+    refresh-token-expiration: 7d  # 일주일
+    redis:
+      refresh-prefix: "jwt:refresh:"
+      used-refresh-prefix: "jwt:used-refresh:"
+      active-access-prefix: "jwt:active-access:userId:"
+      blacklist-prefix: "jwt:blacklist:"
+      user-lock-prefix: "jwt:userlock:"
+      temp-password-prefix: "temp:pw:"

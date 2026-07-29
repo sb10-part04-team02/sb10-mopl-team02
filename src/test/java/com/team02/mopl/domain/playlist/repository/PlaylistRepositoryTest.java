@@ -1,0 +1,641 @@
+package com.team02.mopl.domain.playlist.repository;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.team02.mopl.domain.content.entity.Content;
+import com.team02.mopl.domain.content.enums.ContentType;
+import com.team02.mopl.domain.playlist.entity.Playlist;
+import com.team02.mopl.domain.playlist.entity.PlaylistContent;
+import com.team02.mopl.domain.playlist.enums.PlaylistSortBy;
+import com.team02.mopl.global.enums.SortDirection;
+import com.team02.mopl.support.RepositoryTestSupport;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.hibernate.exception.ConstraintViolationException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.ReflectionTestUtils;
+
+class PlaylistRepositoryTest extends RepositoryTestSupport {
+
+  @Autowired private PlaylistRepository playlistRepository;
+  @Autowired private PlaylistContentRepository playlistContentRepository;
+
+  @PersistenceContext private EntityManager em;
+
+  private UUID ownerId;
+  private UUID contentId;
+
+  @BeforeEach
+  void setUp() {
+    ownerId = insertUser();
+    contentId = insertContent();
+  }
+
+  @Test
+  @DisplayName("플레이리스트를 저장하면 소유자 ID로 조회된다")
+  void findByOwnerId_whenPlaylistExists_returnsPlaylist() {
+    playlistRepository.save(new Playlist(ownerId, "내 플레이리스트", "설명"));
+    em.flush();
+
+    List<Playlist> result = playlistRepository.findByOwnerIdAndDeletedAtIsNull(ownerId);
+
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).getTitle()).isEqualTo("내 플레이리스트");
+    assertThat(result.get(0).getSubscriberCount()).isZero();
+  }
+
+  @Test
+  @DisplayName("소프트 삭제된 플레이리스트는 소유자 조회에서 제외된다")
+  void findByOwnerId_whenSoftDeleted_isExcluded() {
+    Playlist playlist = playlistRepository.save(new Playlist(ownerId, "삭제될 리스트", "설명"));
+    em.flush();
+
+    playlist.delete();
+    em.flush();
+
+    assertThat(playlistRepository.findByOwnerIdAndDeletedAtIsNull(ownerId)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("플레이리스트에 콘텐츠를 추가하면 플레이리스트 ID로 조회된다")
+  void addContent_whenSaved_isFoundByPlaylistId() {
+    Playlist playlist = playlistRepository.save(new Playlist(ownerId, "리스트", "설명"));
+    playlistContentRepository.save(new PlaylistContent(playlist, contentId));
+    em.flush();
+
+    List<PlaylistContent> result =
+        playlistContentRepository.findByPlaylistIdOrderByCreatedAtAscIdAsc(playlist.getId());
+
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).getContentId()).isEqualTo(contentId);
+  }
+
+  @Test
+  @DisplayName("같은 플레이리스트에 같은 콘텐츠를 두 번 추가하면 유니크 제약 위반 예외가 발생한다")
+  void addContent_whenDuplicate_violatesUniqueConstraint() {
+    Playlist playlist = playlistRepository.save(new Playlist(ownerId, "리스트", "설명"));
+    playlistContentRepository.save(new PlaylistContent(playlist, contentId));
+    em.flush();
+
+    playlistContentRepository.save(new PlaylistContent(playlist, contentId));
+
+    assertThatThrownBy(() -> em.flush()).isInstanceOf(ConstraintViolationException.class);
+  }
+
+  @Test
+  @DisplayName("deleteByPlaylistIdAndContentId로 특정 콘텐츠를 플레이리스트에서 제거할 수 있다")
+  void deleteByPlaylistIdAndContentId_removesContent() {
+    Playlist playlist = playlistRepository.save(new Playlist(ownerId, "리스트", "설명"));
+    playlistContentRepository.save(new PlaylistContent(playlist, contentId));
+    em.flush();
+
+    playlistContentRepository.deleteByPlaylistIdAndContentId(playlist.getId(), contentId);
+    em.flush();
+
+    assertThat(
+            playlistContentRepository.existsByPlaylistIdAndContentId(playlist.getId(), contentId))
+        .isFalse();
+  }
+
+  @Test
+  @DisplayName("커서 조회는 논리 삭제 플레이리스트를 제외하고 updatedAt 내림차순으로 반환한다")
+  void findPlaylistsByCursor_excludesSoftDeleted_andSortsByUpdatedAtDesc() {
+    Playlist first = playlistRepository.save(new Playlist(ownerId, "첫 번째", "설명"));
+    em.flush();
+    Playlist second = playlistRepository.save(new Playlist(ownerId, "두 번째", "설명"));
+    em.flush();
+    Playlist deleted = playlistRepository.save(new Playlist(ownerId, "삭제됨", "설명"));
+    deleted.delete();
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null, PlaylistSortBy.UPDATED_AT, SortDirection.DESCENDING, null, null, 10, null, null);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(second.getId(), first.getId());
+  }
+
+  @Test
+  @DisplayName("keyword가 있으면 제목·설명을 대소문자 구분 없이 부분일치로 필터링한다")
+  void findPlaylistsByCursor_filtersByKeyword() {
+    playlistRepository.save(new Playlist(ownerId, "액션 영화 모음", "설명"));
+    playlistRepository.save(new Playlist(ownerId, "다른 리스트", "액션 태그 포함"));
+    playlistRepository.save(new Playlist(ownerId, "코미디", "웃긴 것"));
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            "액션", PlaylistSortBy.UPDATED_AT, SortDirection.DESCENDING, null, null, 10, null, null);
+
+    assertThat(result).hasSize(2);
+    assertThat(countActiveWithKeyword("액션")).isEqualTo(2L);
+    assertThat(countActiveWithKeyword("코미디")).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("커서 이후 항목만 반환한다 (updatedAt DESC, 복합키 경계)")
+  void findPlaylistsByCursor_returnsItemsAfterCursor() {
+    Playlist first = playlistRepository.save(new Playlist(ownerId, "첫 번째", "설명"));
+    em.flush();
+    Playlist second = playlistRepository.save(new Playlist(ownerId, "두 번째", "설명"));
+    em.flush();
+
+    // second를 커서로 넘기면 그 이후(더 과거)인 first만 남는다
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.UPDATED_AT,
+            SortDirection.DESCENDING,
+            second.getUpdatedAt(),
+            second.getId(),
+            10,
+            null,
+            null);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(first.getId());
+  }
+
+  @Test
+  @DisplayName("subscriberCount 내림차순으로 정렬해 반환한다")
+  void findPlaylistsByCursor_sortsBySubscriberCountDesc() {
+    savePlaylistWithSubscriberCount("적음", 1L);
+    savePlaylistWithSubscriberCount("많음", 5L);
+    savePlaylistWithSubscriberCount("중간", 3L);
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.SUBSCRIBE_COUNT,
+            SortDirection.DESCENDING,
+            null,
+            null,
+            10,
+            null,
+            null);
+
+    assertThat(result).extracting(Playlist::getSubscriberCount).containsExactly(5L, 3L, 1L);
+  }
+
+  @Test
+  @DisplayName("subscriberCount 커서 이후 항목만 반환한다 (DESC, 복합키 경계)")
+  void findPlaylistsByCursor_bySubscriberCount_returnsItemsAfterCursor() {
+    Playlist high = savePlaylistWithSubscriberCount("높음", 5L);
+    Playlist mid = savePlaylistWithSubscriberCount("중간", 3L);
+    Playlist low = savePlaylistWithSubscriberCount("낮음", 1L);
+    em.flush();
+
+    // 중간(3)을 커서로 넘기면 그 이후(더 작은 subscriberCount)인 낮음(1)만 남는다
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.SUBSCRIBE_COUNT,
+            SortDirection.DESCENDING,
+            mid.getSubscriberCount(),
+            mid.getId(),
+            10,
+            null,
+            null);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(low.getId());
+    assertThat(result).doesNotContain(high);
+  }
+
+  @Test
+  @DisplayName("subscriberCount 동률이면 id 타이브레이커로 커서 이후 항목만 반환한다")
+  void findPlaylistsByCursor_bySubscriberCount_breaksTiesById() {
+    savePlaylistWithSubscriberCount("동률 A", 2L);
+    savePlaylistWithSubscriberCount("동률 B", 2L);
+    em.flush();
+
+    // DB 정렬 순서(UUID 비교는 Java와 다를 수 있으므로 실제 조회 결과로 확인)에서
+    // 첫 항목을 커서로 넘기면 그 이후인 두 번째 항목만 남는다
+    List<Playlist> all =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.SUBSCRIBE_COUNT,
+            SortDirection.DESCENDING,
+            null,
+            null,
+            10,
+            null,
+            null);
+    assertThat(all).hasSize(2);
+    Playlist cursor = all.get(0);
+    Playlist remaining = all.get(1);
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.SUBSCRIBE_COUNT,
+            SortDirection.DESCENDING,
+            cursor.getSubscriberCount(),
+            cursor.getId(),
+            10,
+            null,
+            null);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(remaining.getId());
+  }
+
+  @Test
+  @DisplayName("updatedAt 오름차순이면 오래된 플레이리스트부터 반환한다")
+  void findPlaylistsByCursor_sortsByUpdatedAtAsc() {
+    Playlist first = playlistRepository.save(new Playlist(ownerId, "첫 번째", "설명"));
+    em.flush();
+    Playlist second = playlistRepository.save(new Playlist(ownerId, "두 번째", "설명"));
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null, PlaylistSortBy.UPDATED_AT, SortDirection.ASCENDING, null, null, 10, null, null);
+
+    // ASC: 오래된 first가 먼저, 최신 second가 나중
+    assertThat(result).extracting(Playlist::getId).containsExactly(first.getId(), second.getId());
+  }
+
+  @Test
+  @DisplayName("커서 이후 항목만 반환한다 (updatedAt ASC, 복합키 경계)")
+  void findPlaylistsByCursor_byUpdatedAt_asc_returnsItemsAfterCursor() {
+    Playlist first = playlistRepository.save(new Playlist(ownerId, "첫 번째", "설명"));
+    em.flush();
+    Playlist second = playlistRepository.save(new Playlist(ownerId, "두 번째", "설명"));
+    em.flush();
+
+    // ASC에서 first(더 과거)를 커서로 넘기면 그 이후(더 미래)인 second만 남는다
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.UPDATED_AT,
+            SortDirection.ASCENDING,
+            first.getUpdatedAt(),
+            first.getId(),
+            10,
+            null,
+            null);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(second.getId());
+  }
+
+  @Test
+  @DisplayName("subscriberCount 오름차순으로 정렬해 반환한다")
+  void findPlaylistsByCursor_sortsBySubscriberCountAsc() {
+    savePlaylistWithSubscriberCount("적음", 1L);
+    savePlaylistWithSubscriberCount("많음", 5L);
+    savePlaylistWithSubscriberCount("중간", 3L);
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.SUBSCRIBE_COUNT,
+            SortDirection.ASCENDING,
+            null,
+            null,
+            10,
+            null,
+            null);
+
+    assertThat(result).extracting(Playlist::getSubscriberCount).containsExactly(1L, 3L, 5L);
+  }
+
+  @Test
+  @DisplayName("subscriberCount 커서 이후 항목만 반환한다 (ASC, 복합키 경계)")
+  void findPlaylistsByCursor_bySubscriberCount_asc_returnsItemsAfterCursor() {
+    Playlist low = savePlaylistWithSubscriberCount("낮음", 1L);
+    Playlist mid = savePlaylistWithSubscriberCount("중간", 3L);
+    Playlist high = savePlaylistWithSubscriberCount("높음", 5L);
+    em.flush();
+
+    // ASC에서 중간(3)을 커서로 넘기면 그 이후(더 큰 subscriberCount)인 높음(5)만 남는다
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.SUBSCRIBE_COUNT,
+            SortDirection.ASCENDING,
+            mid.getSubscriberCount(),
+            mid.getId(),
+            10,
+            null,
+            null);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(high.getId());
+    assertThat(result).doesNotContain(low);
+  }
+
+  @Test
+  @DisplayName("increaseSubscriberCount는 구독자 수만 1 증가시키고 updatedAt은 갱신하지 않는다")
+  void increaseSubscriberCount_incrementsCount_withoutTouchingUpdatedAt() {
+    Playlist playlist = playlistRepository.save(new Playlist(ownerId, "리스트", "설명"));
+    em.flush();
+    em.clear();
+    // DB에 저장된 값 기준으로 updatedAt을 확보 (인메모리 Instant와 DB 정밀도 차이 방지)
+    Instant updatedAtBefore =
+        playlistRepository.findById(playlist.getId()).orElseThrow().getUpdatedAt();
+
+    playlistRepository.increaseSubscriberCount(playlist.getId());
+    em.flush();
+    em.clear();
+
+    Playlist reloaded = playlistRepository.findById(playlist.getId()).orElseThrow();
+    assertThat(reloaded.getSubscriberCount()).isEqualTo(1L);
+    assertThat(reloaded.getUpdatedAt()).isEqualTo(updatedAtBefore);
+  }
+
+  @Test
+  @DisplayName("decreaseSubscriberCount는 구독자 수만 1 감소시키고 updatedAt은 갱신하지 않는다")
+  void decreaseSubscriberCount_decrementsCount_withoutTouchingUpdatedAt() {
+    Playlist playlist = savePlaylistWithSubscriberCount("리스트", 2L);
+    em.flush();
+    em.clear();
+    // DB에 저장된 값 기준으로 updatedAt을 확보 (인메모리 Instant와 DB 정밀도 차이 방지)
+    Instant updatedAtBefore =
+        playlistRepository.findById(playlist.getId()).orElseThrow().getUpdatedAt();
+
+    playlistRepository.decreaseSubscriberCount(playlist.getId());
+    em.flush();
+    em.clear();
+
+    Playlist reloaded = playlistRepository.findById(playlist.getId()).orElseThrow();
+    assertThat(reloaded.getSubscriberCount()).isEqualTo(1L);
+    assertThat(reloaded.getUpdatedAt()).isEqualTo(updatedAtBefore);
+  }
+
+  @Test
+  @DisplayName("decreaseSubscriberCount는 구독자 수가 0이면 음수로 내려가지 않는다")
+  void decreaseSubscriberCount_doesNotGoBelowZero() {
+    Playlist playlist = playlistRepository.save(new Playlist(ownerId, "리스트", "설명"));
+    em.flush();
+
+    playlistRepository.decreaseSubscriberCount(playlist.getId());
+    em.flush();
+    em.clear();
+
+    Playlist reloaded = playlistRepository.findById(playlist.getId()).orElseThrow();
+    assertThat(reloaded.getSubscriberCount()).isZero();
+  }
+
+  @Test
+  @DisplayName("ownerIdEqual로 지정한 소유자의 플레이리스트만 조회한다")
+  void findPlaylistsByCursor_filtersByOwnerId() {
+    UUID otherOwnerId = insertUser();
+    Playlist mine = playlistRepository.save(new Playlist(ownerId, "내 것", "설명"));
+    playlistRepository.save(new Playlist(otherOwnerId, "남의 것", "설명"));
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.UPDATED_AT,
+            SortDirection.DESCENDING,
+            null,
+            null,
+            10,
+            ownerId,
+            null);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(mine.getId());
+    assertThat(playlistRepository.countActive(null, ownerId, null)).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("subscriberIdEqual로 지정한 유저가 구독한 플레이리스트만 조회한다")
+  void findPlaylistsByCursor_filtersBySubscriberId() {
+    UUID subscriberId = insertUser();
+    Playlist p1 = playlistRepository.save(new Playlist(ownerId, "구독됨1", "설명"));
+    Playlist p2 = playlistRepository.save(new Playlist(ownerId, "구독안됨", "설명"));
+    Playlist p3 = playlistRepository.save(new Playlist(ownerId, "구독됨2", "설명"));
+    em.flush();
+    insertSubscription(subscriberId, p1.getId());
+    insertSubscription(subscriberId, p3.getId());
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.UPDATED_AT,
+            SortDirection.DESCENDING,
+            null,
+            null,
+            10,
+            null,
+            subscriberId);
+
+    assertThat(result)
+        .extracting(Playlist::getId)
+        .containsExactlyInAnyOrder(p1.getId(), p3.getId());
+    assertThat(result).extracting(Playlist::getId).doesNotContain(p2.getId());
+    assertThat(playlistRepository.countActive(null, null, subscriberId)).isEqualTo(2L);
+  }
+
+  @Test
+  @DisplayName("구독자 필터는 소프트 삭제된(취소한) 구독을 제외한다")
+  void findPlaylistsByCursor_subscriberFilter_excludesSoftDeletedSubscriptions() {
+    UUID subscriberId = insertUser();
+    Playlist active = playlistRepository.save(new Playlist(ownerId, "구독중", "설명"));
+    Playlist canceled = playlistRepository.save(new Playlist(ownerId, "구독취소", "설명"));
+    em.flush();
+    insertSubscription(subscriberId, active.getId());
+    insertSoftDeletedSubscription(subscriberId, canceled.getId());
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.UPDATED_AT,
+            SortDirection.DESCENDING,
+            null,
+            null,
+            10,
+            null,
+            subscriberId);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(active.getId());
+    assertThat(playlistRepository.countActive(null, null, subscriberId)).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("같은 유저가 구독 취소 후 재구독해 활성·취소 구독이 공존해도 플레이리스트를 중복 없이 한 번만 반환한다")
+  void findPlaylistsByCursor_subscriberFilter_activeAndCanceledCoexist_returnsPlaylistOnce() {
+    UUID subscriberId = insertUser();
+    Playlist playlist = playlistRepository.save(new Playlist(ownerId, "재구독", "설명"));
+    em.flush();
+    // 같은 (user, playlist)에 취소된 구독과 활성 구독이 공존 (취소 후 재구독)
+    insertSoftDeletedSubscription(subscriberId, playlist.getId());
+    insertSubscription(subscriberId, playlist.getId());
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.UPDATED_AT,
+            SortDirection.DESCENDING,
+            null,
+            null,
+            10,
+            null,
+            subscriberId);
+
+    // EXISTS 서브쿼리이므로 활성 구독 행이 여러 조건에 걸려도 플레이리스트는 한 번만 나온다
+    assertThat(result).extracting(Playlist::getId).containsExactly(playlist.getId());
+    assertThat(playlistRepository.countActive(null, null, subscriberId)).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("소유자·구독자 필터를 함께 주면 두 조건을 모두 만족하는 플레이리스트만 조회한다(AND)")
+  void findPlaylistsByCursor_ownerAndSubscriberFilter_together() {
+    UUID subscriberId = insertUser();
+    UUID otherOwnerId = insertUser();
+    // ownerId 소유 + subscriber 구독
+    Playlist match = playlistRepository.save(new Playlist(ownerId, "일치", "설명"));
+    // ownerId 소유지만 구독 안 함
+    Playlist ownerOnly = playlistRepository.save(new Playlist(ownerId, "소유만", "설명"));
+    // subscriber 구독하지만 소유자가 다름
+    Playlist subscriberOnly = playlistRepository.save(new Playlist(otherOwnerId, "구독만", "설명"));
+    em.flush();
+    insertSubscription(subscriberId, match.getId());
+    insertSubscription(subscriberId, subscriberOnly.getId());
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.UPDATED_AT,
+            SortDirection.DESCENDING,
+            null,
+            null,
+            10,
+            ownerId,
+            subscriberId);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(match.getId());
+    assertThat(result).extracting(Playlist::getId).doesNotContain(ownerOnly.getId());
+    assertThat(result).extracting(Playlist::getId).doesNotContain(subscriberOnly.getId());
+    assertThat(playlistRepository.countActive(null, ownerId, subscriberId)).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("소유자 필터와 keyword를 함께 주면 두 조건의 교집합을 조회한다")
+  void findPlaylistsByCursor_ownerFilterPlusKeyword() {
+    UUID otherOwnerId = insertUser();
+    Playlist match = playlistRepository.save(new Playlist(ownerId, "액션 모음", "설명"));
+    playlistRepository.save(new Playlist(ownerId, "코미디 모음", "설명"));
+    playlistRepository.save(new Playlist(otherOwnerId, "액션 영화", "설명"));
+    em.flush();
+
+    List<Playlist> result =
+        playlistRepository.findPlaylistsByCursor(
+            "액션",
+            PlaylistSortBy.UPDATED_AT,
+            SortDirection.DESCENDING,
+            null,
+            null,
+            10,
+            ownerId,
+            null);
+
+    assertThat(result).extracting(Playlist::getId).containsExactly(match.getId());
+    assertThat(playlistRepository.countActive("액션", ownerId, null)).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("구독자 필터에서도 커서 경계가 안정적으로 동작한다 (updatedAt DESC)")
+  void findPlaylistsByCursor_subscriberFilter_cursorPaginationStable() {
+    UUID subscriberId = insertUser();
+    Playlist first = playlistRepository.save(new Playlist(ownerId, "첫 번째", "설명"));
+    em.flush();
+    Playlist second = playlistRepository.save(new Playlist(ownerId, "두 번째", "설명"));
+    em.flush();
+    Playlist third = playlistRepository.save(new Playlist(ownerId, "세 번째", "설명"));
+    em.flush();
+    insertSubscription(subscriberId, first.getId());
+    insertSubscription(subscriberId, second.getId());
+    insertSubscription(subscriberId, third.getId());
+    em.flush();
+
+    // 첫 페이지: limit 2, DESC이므로 최신 third, second
+    List<Playlist> page1 =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.UPDATED_AT,
+            SortDirection.DESCENDING,
+            null,
+            null,
+            2,
+            null,
+            subscriberId);
+    assertThat(page1).extracting(Playlist::getId).containsExactly(third.getId(), second.getId());
+
+    // 두 번째 페이지: second를 커서로 넘기면 그 이후인 first만 남고 중복 없음
+    Playlist last = page1.get(page1.size() - 1);
+    List<Playlist> page2 =
+        playlistRepository.findPlaylistsByCursor(
+            null,
+            PlaylistSortBy.UPDATED_AT,
+            SortDirection.DESCENDING,
+            last.getUpdatedAt(),
+            last.getId(),
+            2,
+            null,
+            subscriberId);
+    assertThat(page2).extracting(Playlist::getId).containsExactly(first.getId());
+  }
+
+  private Playlist savePlaylistWithSubscriberCount(String title, long subscriberCount) {
+    Playlist playlist = new Playlist(ownerId, title, "설명");
+    ReflectionTestUtils.setField(playlist, "subscriberCount", subscriberCount);
+    return playlistRepository.save(playlist);
+  }
+
+  private long countActiveWithKeyword(String keyword) {
+    return playlistRepository.countActive(keyword, null, null);
+  }
+
+  // 지정 유저가 플레이리스트를 구독한 활성 구독 레코드를 삽입한다
+  private void insertSubscription(UUID userId, UUID playlistId) {
+    em.createNativeQuery(
+            "INSERT INTO playlist_subscriptions (id, user_id, playlist_id) "
+                + "VALUES (:id, :userId, :playlistId)")
+        .setParameter("id", UUID.randomUUID())
+        .setParameter("userId", userId)
+        .setParameter("playlistId", playlistId)
+        .executeUpdate();
+  }
+
+  // 지정 유저가 구독했다가 취소한(소프트 삭제된) 구독 레코드를 삽입한다
+  private void insertSoftDeletedSubscription(UUID userId, UUID playlistId) {
+    em.createNativeQuery(
+            "INSERT INTO playlist_subscriptions (id, deleted_at, user_id, playlist_id) "
+                + "VALUES (:id, now(), :userId, :playlistId)")
+        .setParameter("id", UUID.randomUUID())
+        .setParameter("userId", userId)
+        .setParameter("playlistId", playlistId)
+        .executeUpdate();
+  }
+
+  private UUID insertUser() {
+    UUID id = UUID.randomUUID();
+    em.createNativeQuery(
+            "INSERT INTO users (id, updated_at, name, email, role) "
+                + "VALUES (:id, now(), :name, :email, 'USER')")
+        .setParameter("id", id)
+        .setParameter("name", "소유자")
+        .setParameter("email", "owner-" + id + "@test.com")
+        .executeUpdate();
+    return id;
+  }
+
+  private UUID insertContent() {
+    Content content = new Content(ContentType.MOVIE, "테스트 영화", "설명", "http://img");
+    em.persist(content);
+    em.flush();
+    return content.getId();
+  }
+}

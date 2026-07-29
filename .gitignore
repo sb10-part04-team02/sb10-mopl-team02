@@ -43,6 +43,16 @@ out/
 *.pem
 !.env.example
 
+### ref ###
+/ref
+/.local
+
+### Logs ###
+logs/
+
+### Local Storage ###
+/storage/
+
 #===================================================================================================
 # Created by https://www.toptal.com/developers/gitignore/api/intellij,java,windows,macos,linux
 # Edit at https://www.toptal.com/developers/gitignore?templates=intellij,java,windows,macos,linux
@@ -181,6 +191,7 @@ fabric.properties
 *.zip
 *.tar.gz
 *.rar
+!gradle/wrapper/gradle-wrapper.jar
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
@@ -261,3 +272,5 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/intellij,java,windows,macos,linux
+# k6 부하테스트: 더미 계정 목록은 gen-dummy-users.mjs 로 생성하는 산출물(최대 10만 행)
+load-test/data/dummy-users.json

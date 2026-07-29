@@ -1,0 +1,88 @@
+# ============================================================
+# GitHub Actions Workflow: PR 머지 시 디스코드 알림 전송
+# 트리거: PR이 닫힐 때(closed) — 실제 머지된 경우에만 알림
+# ============================================================
+name: 🌿 PR 디스코드 알림
+
+on:
+  pull_request:
+    types: [ closed ]
+
+jobs:
+  # ──────────────────────────────────────────────
+  # 🎉 PR 머지됨 → 축하 알림
+  # ──────────────────────────────────────────────
+  notify-merged:
+    if: >-
+      github.event.action == 'closed'
+      && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🎲 축하 메시지 뽑기
+        id: message
+        run: |
+          MESSAGES=(
+            "머지 완료! 오늘의 영웅은 바로 당신! 🦸"
+          )
+          INDEX=$(( RANDOM % ${#MESSAGES[@]} ))
+          echo "cute_msg=${MESSAGES[$INDEX]}" >> "$GITHUB_OUTPUT"
+
+      - name: 🎊 디스코드로 머지 축하 보내기
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.BE_PR_WEBHOOK }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          MERGED_BY: ${{ github.event.pull_request.merged_by.login }}
+          CUTE_MSG: ${{ steps.message.outputs.cute_msg }}
+          CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
+          ADDITIONS: ${{ github.event.pull_request.additions }}
+          DELETIONS: ${{ github.event.pull_request.deletions }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d @- \
+            "$DISCORD_WEBHOOK_URL" <<CURL_EOF
+          {
+            "username": "PR봇 🤖",
+            "avatar_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+            "content": "🎊 **[BE] PR이 머지되었어요!** ${CUTE_MSG}",
+            "embeds": [
+              {
+                "title": "✅ ${PR_TITLE}",
+                "url": "${PR_URL}",
+                "color": 2067276,
+                "fields": [
+                  {
+                    "name": "👤 작성자",
+                    "value": "${PR_AUTHOR}",
+                    "inline": true
+                  },
+                  {
+                    "name": "🔀 머지한 사람",
+                    "value": "${MERGED_BY}",
+                    "inline": true
+                  },
+                  {
+                    "name": "🌿 브랜치",
+                    "value": "\`${HEAD_BRANCH}\` → \`${BASE_BRANCH}\`",
+                    "inline": true
+                  },
+                  {
+                    "name": "📊 최종 변경 사항",
+                    "value": "\`${CHANGED_FILES}\`개 파일  |  +${ADDITIONS}  -${DELETIONS}",
+                    "inline": false
+                  }
+                ],
+                "footer": {
+                  "text": "Backend 🌿 수고하셨습니다! 🍀"
+                },
+                "timestamp": "${{ github.event.pull_request.merged_at }}"
+              }
+            ]
+          }
+          CURL_EOF
+
+          echo "✅ 머지 축하 알림 전송 완료!"

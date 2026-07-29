@@ -1,13 +1,10 @@
 package com.team02.mopl;
 
+import com.team02.mopl.support.IntegrationTestSupport;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class MoplApplicationTests {
+class MoplApplicationTests extends IntegrationTestSupport {
 
   @Test
-  void contextLoads() {
-  }
-
+  void contextLoads() {}
 }

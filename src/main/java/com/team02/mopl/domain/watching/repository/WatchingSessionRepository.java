@@ -1,0 +1,39 @@
+package com.team02.mopl.domain.watching.repository;
+
+import com.team02.mopl.domain.watching.entity.WatchingSession;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface WatchingSessionRepository
+    extends JpaRepository<WatchingSession, UUID>, WatchingSessionRepositoryCustom {
+
+  // 유저·콘텐츠당 삭제되지 않은 세션은 부분 유니크 인덱스로 최대 1건이다.
+  Optional<WatchingSession> findByContent_IdAndUser_IdAndDeletedAtIsNull(
+      UUID contentId, UUID userId);
+
+  // 유저가 해당 콘텐츠의 활성 시청 세션에 참여 중인지 여부 (콘텐츠 채팅 발신 자격 검증용)
+  boolean existsByContent_IdAndUser_IdAndExitedAtIsNullAndDeletedAtIsNull(
+      UUID contentId, UUID userId);
+
+  // 단건 콘텐츠의 활성 시청자 수
+  @Query(
+      "select count(ws) from WatchingSession ws "
+          + "where ws.content.id = :contentId and ws.exitedAt is null and ws.deletedAt is null")
+  long countActiveByContentId(@Param("contentId") UUID contentId);
+
+  // 유저의 활성(미삭제) 시청 세션 중 가장 최근 1건.
+  // leave가 종료와 소프트 삭제를 함께 수행하므로 deletedAt IS NULL인 세션은 항상 활성 상태다.
+  Optional<WatchingSession> findFirstByUser_IdAndDeletedAtIsNullOrderByCreatedAtDesc(UUID userId);
+
+  // 여러 콘텐츠의 활성 시청자 수 일괄 집계 (목록 조회 N+1 방지)
+  @Query(
+      "select ws.content.id as contentId, count(ws) as count from WatchingSession ws "
+          + "where ws.content.id in :contentIds "
+          + "and ws.exitedAt is null and ws.deletedAt is null "
+          + "group by ws.content.id")
+  List<WatcherCountProjection> countActiveByContentIds(@Param("contentIds") List<UUID> contentIds);
+}

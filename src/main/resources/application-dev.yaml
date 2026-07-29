@@ -1,0 +1,42 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/mopl}
+    username: ${DB_USERNAME:mopl}
+    password: ${DB_PASSWORD:mopl}
+    driver-class-name: org.postgresql.Driver
+
+  sql:
+    init:
+      mode: never
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        highlight_sql: true
+    show-sql: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+app:
+  jwt:
+    secret-key: ${JWT_SECRET_KEY:"local-dev-insecure-jwt-secret-change-me-in-env"}
+  storage:
+    local:
+      public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080}
+    # dev는 절대 URL로 반환 (업로드 파일 URL이 절대 URL인 것과 일관)
+    default-thumbnail-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080}/images/default-thumbnail.svg
+  kafka:
+    smoke-test:
+      enabled: ${KAFKA_SMOKE_TEST_ENABLED:false}  # 스모크 테스트할 때만 true로 옵션 변경할 것
+
+logging:
+  level:
+    com.team02.mopl: DEBUG

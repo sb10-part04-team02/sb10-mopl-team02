@@ -1,5 +1,11 @@
+import com.github.spotbugs.snom.Confidence
+import com.github.spotbugs.snom.Effort
+
 plugins {
     id 'java'
+    id 'jacoco'
+    id 'com.diffplug.spotless' version '6.25.0'
+    id 'com.github.spotbugs' version '6.0.26'
     id 'org.springframework.boot' version '3.5.14'
     id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -19,22 +25,167 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-security'
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // === Spring Boot 핵심 스타터 ===
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    compileOnly 'org.projectlombok:lombok'
-    runtimeOnly 'com.h2database:h2'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'  // /actuator/prometheus 메트릭 노출
+    implementation 'org.springframework.kafka:spring-kafka'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework.boot:spring-boot-starter-batch'
+
+    // === 보안 / 인증 ===
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'com.nimbusds:nimbus-jose-jwt:10.9.1'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
+    // === 실시간 통신 ===
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    // === 재시도(Retry) ===
+    implementation 'org.springframework.retry:spring-retry'
+
+    // === 메일 ===
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    // === 데이터 저장소 ===
     runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // === DB 마이그레이션 (Flyway) ===
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+
+    // === AWS SDK v2 (S3) ===
+    implementation platform('software.amazon.awssdk:bom:2.34.0')
+    implementation 'software.amazon.awssdk:s3'
+
+    // === 로깅 ===
+    // 로컬 ELK 수집용 JSON 로그 인코더 (logback-spring.xml의 LOGSTASH appender에서 사용)
+    implementation 'net.logstash.logback:logstash-logback-encoder:8.1'
+
+    // === QueryDSL (Jakarta) === 버전은 Spring Boot BOM 이 관리
+    implementation 'com.querydsl:querydsl-jpa::jakarta'
+    annotationProcessor 'com.querydsl:querydsl-apt::jakarta'
+    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+
+    // === Lombok & MapStruct ===
+    compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'  // Lombok + MapStruct 연동
+    implementation 'org.mapstruct:mapstruct:1.5.5.Final'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
+
+    // === API 문서 (Swagger UI) ===
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17'
+
+    // === 정적 분석 ===
+    compileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.6'
+
+    // === 테스트 ===
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.testcontainers:localstack'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
+    testImplementation 'org.springframework.batch:spring-batch-test'
     testCompileOnly 'org.projectlombok:lombok'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+    finalizedBy jacocoTestReport
+    // 프로파일 미지정 테스트가 dev 프로파일로 뜨며 application-dev.yaml의 DEBUG 레벨을 물려받는 것을 차단
+    systemProperty 'logging.level.com.team02.mopl', 'INFO'
+}
+
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+// 커버리지 측정에서 제외할 자동 생성·측정 불가 코드
+def jacocoExcludes = [
+        '**/entity/Q*.class',       // QueryDSL 자동생성
+        '**/*MapperImpl.class',     // MapStruct 자동생성(@Generated가 SOURCE 유지라 자동제외 안 됨)
+        '**/MoplApplication.class'  // 부트스트랩(main 메서드만 존재)
+]
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    afterEvaluate {
+        classDirectories.setFrom(classDirectories.files.collect {
+            fileTree(dir: it, exclude: jacocoExcludes)
+        })
+    }
+}
+
+jacocoTestCoverageVerification {
+    dependsOn test
+    afterEvaluate {
+        classDirectories.setFrom(classDirectories.files.collect {
+            fileTree(dir: it, exclude: jacocoExcludes)
+        })
+    }
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.80
+            }
+        }
+    }
+}
+
+spotless {
+    java {
+        target 'src/**/*.java'
+        googleJavaFormat()
+        removeUnusedImports()
+    }
+}
+
+spotbugs {
+    effort.set(Effort.valueOf('DEFAULT'))          // 분석 강도 (MAX로 올리면 더 꼼꼼·느림)
+    reportLevel.set(Confidence.valueOf('DEFAULT'))  // 보고 민감도 (LOW로 올리면 더 많이 보고)
+    excludeFilter.set(file('config/spotbugs/exclude.xml'))
+    ignoreFailures = false                          // 위반 시 CI 실패(게이트)
+}
+
+tasks.spotbugsMain {
+    reports {
+        html.required = true
+        xml.required = true
+    }
+}
+
+// 실행 불가능한 plain jar 생성을 끈다. 배포 이미지는 bootJar만 복사하므로
+// build/libs 에 실행 가능한 jar 하나만 남겨 COPY 대상이 모호해지지 않게 한다.
+tasks.named('jar') {
+    enabled = false
+}
+
+// Git pre-commit 훅 자동 설치 — 커밋 시 spotlessApply 가 자동 실행되어 포맷 위반이 커밋되지 않게 한다.
+// 원본은 config/git-hooks/ 에 버전 관리되며, 빌드 시 .git/hooks/ 로 복사된다.
+tasks.register('installGitHooks', Copy) {
+    description = 'config/git-hooks 의 훅을 .git/hooks 로 설치한다'
+    group = 'build setup'
+    from "$rootDir/config/git-hooks"
+    into "$rootDir/.git/hooks"
+    fileMode = 0755
+    // .git 디렉터리가 없는 환경(예: CI 체크아웃 일부)에서는 조용히 건너뜀
+    onlyIf { file("$rootDir/.git").exists() }
+}
+
+// 빌드 라이프사이클에 묶어, 팀원이 한 번 빌드하면 훅이 설치되게 한다.
+tasks.named('build') {
+    dependsOn 'installGitHooks'
 }
